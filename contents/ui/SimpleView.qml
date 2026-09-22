@@ -4,16 +4,17 @@
  * area fill, a precipitation-chance band, per-point value labels, hour icons and
  * a time axis. A sliding window (`hourPos`) pans the icons/time/markers while the
  * curve RESHAPES in fixed columns; the timeline flows across midnight with
- * correctly-dated new-day markers. Detail level (`simpleHourly`) only sets the
- * timeline density (hourly / every-2h) and window width. Free drag/scroll slides;
+ * correctly-dated new-day markers. The zoom (`graphZoom`: 12 / 24 / 48 hours) only
+ * sets the window width and how sparsely it is labelled. Free drag/scroll slides;
  * tapping a day pill cross-fades the curve to that day (`dayMorphT`). Ported from
  * the MorphCurve design (quadratic ease-in-out tween).
- * Copyright 2026  bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2026  pku188, bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
  */
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import "wheel.js" as Wheel
 
 Item {
     id: simple
@@ -41,8 +42,23 @@ Item {
     property var morphToP: []
     property var morphToS: []
     property var morphToA: []
+    // 0/1 per column: does that column's hour carry a real chance of precipitation?
+    // Snapshotted with the rest so the % label's visibility can morph too.
+    property var morphFromC: []
+    property var morphToC: []
+    // global sample index of column 0 in the from / to snapshots (for the 48-hour
+    // readout plan, which is keyed on the hour)
+    property int morphFromBase: 0
+    property int morphToBase: 0
     property bool dragging: false
-    readonly property int selectedDay: {
+    // The highlighted day. Normally the day at the start of the window (leadDay), but
+    // a day picked from the pills wins (chosenDay): at 48 hours the window cannot pan
+    // far enough for the LAST day to start it, so tracking the window alone would keep
+    // the day before highlighted, with its totals and sun times in the header. Any
+    // scroll of the graph itself hands the selection back to the window.
+    property int chosenDay: -1
+    readonly property int selectedDay: (chosenDay >= 0 && chosenDay < dayCount) ? chosenDay : leadDay
+    readonly property int leadDay: {
         if (!weatherRoot || !weatherRoot.dailyData || !samples.length) return 0;
         // the day at the START of the window (where you actually are) — using the
         // window centre rounds onto tomorrow once the 13h window crosses midnight,
@@ -56,6 +72,23 @@ Item {
     // The focused hour's sample (the one at the START of the window — where you
     // actually are). Drives instantaneous header metrics (humidity) so they sync
     // to the scrolled hour, the way the daily-total metrics sync to selectedDay.
+    // Sample under the pointer while it is over the graph (the plot, the icon row
+    // and the time axis — not the header above them). The card layout's header
+    // metrics follow the hovered CARD; this gives the graph the same behaviour,
+    // scrubbing by pointer instead of by scroll position. null when not hovering,
+    // so the readouts fall back to focusedSample below.
+    // Resolution is per HOUR regardless of zoom: samples are hourly even in the
+    // day view where only every second hour carries a label, so the hours between
+    // labels scrub too.
+    property var hoveredSample: null
+    function sampleAtX(px) {
+        if (!samples.length || plotW <= 0) return null;
+        // inverse of hourX(): x = (g - hourPos + 0.5) * (plotW / pointsVisible)
+        var g = Math.round(px * pointsVisible / plotW - 0.5 + hourPos);
+        if (g < 0 || g >= samples.length) return null;
+        return samples[g];
+    }
+
     readonly property var focusedSample: {
         if (!samples.length) return null;
         var c = Math.max(0, Math.min(samples.length - 1, Math.round(hourPos)));
@@ -85,9 +118,17 @@ Item {
     readonly property real sunGlowCoreA:   0.62   // brightest (on the line) — softened from the design's .97
     readonly property real sunGlowFeather: 3.5    // radial falloff exponent: alpha = coreA·exp(−feather·r²). Higher = softer, more feathered rim; lower = a fuller, more defined glow
     readonly property real sunGlowStreakA: 0.45   // peak alpha of the line streak
-    readonly property real sunGlowHalfCols: 1.4   // horizontal radius of the radial bloom, in curve columns (feathering keeps a soft edge instead of wedging on a slope)
+    // Horizontal radius of the radial bloom, in curve columns (feathering keeps a
+    // soft edge instead of wedging on a slope). Tuned per zoom: the same width in
+    // columns reads as a far bigger smear once a screen holds 49 hours instead of
+    // 13, so the wider views take proportionally less.
+    readonly property real sunGlowHalfCols: (zoom === 0 ? 1.4 : zoom === 1 ? 1.0 : 0.7) * densityScale
     readonly property real sunGlowRiseIcons: 1.2  // vertical reach upward, in sun-glyph heights (≤1 keeps the glow no taller than the icon)
-    readonly property real sunStreakHalfCols: 2.2 // half-width of the warm streak ALONG the line, in columns — carries most of the bloom's width (always hugs the curve, never wedges)
+    // Half-width of the warm streak ALONG the line, in columns. 0 = off, and off is
+    // the default: the streak is a wide stroke CENTRED on the curve, so half of it
+    // always fell BELOW the line, which read as a smudge under the curve rather
+    // than a glow on it. Raise it (2.2 was the old width) to bring it back.
+    readonly property real sunStreakHalfCols: 0 * densityScale
 
     // ── Temperature → colour gradient: cold blue → cool teal → mild green →
     // warm amber → hot orange-red. The line and band are tinted per hour by how
@@ -105,14 +146,21 @@ Item {
     // 2 = precip only, 3 = none. When a series is "off" it falls back to a flat
     // neutral (theme-grey) instead of its colour.
     readonly property int  colorMode:   weatherRoot ? weatherRoot.graphColorMode : 0
-    readonly property bool colorTemp:   colorMode === 0 || colorMode === 1
-    readonly property bool colorPrecip: colorMode === 0 || colorMode === 2
+    // 4 colours the precipitation and the temperature LINE but leaves the
+    // temperature wash neutral, so the curve reads warm over a quiet background.
+    readonly property bool colorTempLine: colorMode === 0 || colorMode === 1 || colorMode === 4
+    readonly property bool colorTempBand: colorMode === 0 || colorMode === 1
+    readonly property bool colorPrecip:   colorMode === 0 || colorMode === 2 || colorMode === 4
+    // Which halves of a precipitation readout print (config precipLabelMode, a bit
+    // pair): 1 = the chance %, 2 = the snow / rain amount. Hiding one does not change
+    // which hours qualify or how the 48-hour spells are thinned; it can only let
+    // neighbours merge, where they now print the same thing (see readoutPlan).
+    readonly property bool showPrecipPct: !weatherRoot || (weatherRoot.precipLabelMode & 1) !== 0
+    readonly property bool showPrecipAmt: !weatherRoot || (weatherRoot.precipLabelMode & 2) !== 0
 
     // ── Graph data & geometry ─────────────────────────────────────────────
-    // "Graph detail" setting. Both modes use the per-day morph; the difference is
-    // curve density per day tile — every-2h thins to 12 points, hourly keeps all
-    // 24 (with the time axis / icons thinned to every 2nd point).
-    readonly property bool hourlyDetail: weatherRoot ? weatherRoot.simpleHourly : false
+    // Zoom (toolbar + / −): 0 = 12 hours, 1 = 24 hours, 2 = 48 hours.
+    readonly property int zoom: weatherRoot ? weatherRoot.graphZoom : 1
     // The graph is ONE continuous forward timeline (from now) for both detail
     // levels — so it flows across midnight: after tonight's 10 PM comes 12 AM with
     // a correctly-dated "new day" marker, no seam, no overlap, no missing hours.
@@ -122,49 +170,64 @@ Item {
     // Rough "how wet is this condition" rank for a WMO code, so a 2h cell can show
     // the wetter of its two hours' ICONS (rain often lands on the odd hour we skip,
     // which otherwise leaves a high chance next to a dry cloud icon).
-    function precipRank(c) {
-        if (c >= 95) return 5;                                        // thunderstorm
-        if ((c >= 71 && c <= 77) || c === 85 || c === 86) return 4;   // snow
-        if ((c >= 51 && c <= 67) || (c >= 80 && c <= 82)) return 3;   // rain/drizzle
-        if (c === 45 || c === 48) return 2;                           // fog
-        if (c === 2 || c === 3) return 1;                             // cloudy
-        return 0;                                                     // clear
-    }
-    readonly property var samples: {
-        if (!weatherRoot) return [];
-        var _a = weatherRoot.allHourly;
-        var _d = weatherRoot.dailyData;
-        var _n = weatherRoot.simpleDailyDays;
-        var src = weatherRoot.allSamples(1, weatherRoot.simpleDailyDays);
-        if (hourlyDetail) return src;
-        // Every-2h: step by 2 FROM NOW (src[0]) so the CURRENT hour is always the
-        // leading point — the old even-clock-hour filter dropped "now" whenever it fell
-        // on an odd hour (and lost that hour's precip spike, since folding only looked
-        // forward from even hours). Spacing stays a uniform 2 h — the sun-event x-mapping
-        // and the markers rely on uniform spacing; new-day markers key on a date change
-        // between samples (isDayStart), not an exact hour-0 sample. Fold the skipped
-        // in-between hour's MAX precip chance / amount / snow (and its wetter code) into
-        // the kept point so a spike between 2-hourly samples isn't lost.
-        var out = [];
-        for (var i = 0; i < src.length; i += 2) {
-            var s = Object.assign({}, src[i]);
-            var mid = (i + 1 < src.length) ? src[i + 1] : null;
-            if (mid) {
-                if (!isNaN(mid.precip)    && (isNaN(s.precip)    || mid.precip    > s.precip))    s.precip    = mid.precip;
-                if (!isNaN(mid.precipAmt) && (isNaN(s.precipAmt) || mid.precipAmt > s.precipAmt)) s.precipAmt = mid.precipAmt;
-                if (!isNaN(mid.snow)      && (isNaN(s.snow)      || mid.snow      > s.snow))      s.snow      = mid.snow;
-                if (precipRank(mid.code) > precipRank(s.code)) s.code = mid.code;
-            }
-            out.push(s);
-        }
-        return out;
-    }
-    readonly property int dayCount: weatherRoot ? weatherRoot.simpleDailyDays : 0
+    // The curve is ALWAYS hourly. It used to be decimated to every second hour in
+    // the default mode, which threw away half the data the provider had already
+    // sent — the axis showed a 2-hour scale, so the curve was drawn at a 2-hour
+    // scale too. Those are separate concerns: the axis is about how many labels
+    // fit, the curve about how much shape it can show. `hourlyGrid` also flattens
+    // met.no's 6-hour blocks onto the same 1-hour spacing, which the sun-marker
+    // x-mapping requires.
+    readonly property var samples: weatherRoot ? weatherRoot.hourlyGrid(simple.dayCount) : []
+    readonly property int dayCount: weatherRoot ? weatherRoot.graphDays : 0
 
-    // Sliding window width: hourly = 13 consecutive hours; every-2h = 12 even-hour
-    // points (≈ a day on screen).
-    readonly property int pointsVisible: hourlyDetail ? 13 : 12
+    // Sliding window width, in POINTS. Every zoom is inclusive at both ends, so a
+    // span of N hours needs N+1 points: 25 covers a full day (20:00 through 20:00
+    // the next day, the last label a whole 24 h after the first), 13 covers 12 h and
+    // 49 covers 48 h. A 24-point window ended one label short — 20:00 to 18:00 — which
+    // read as the day being clipped rather than framed. The data reaches one hour past
+    // the last day (see grid.js), so even the 48-hour window from the second day's
+    // midnight closes on a real point.
+    readonly property int pointsVisible: zoom === 0 ? 13 : zoom === 1 ? 25 : 49
+    // Draw a time label / icon every Nth sample: every hour at 12 hours, every second
+    // at 24 and every fourth at 48, so each zoom shows about the same number of labels.
+    // Keyed on the GLOBAL sample index, so a label belongs to a fixed hour and doesn't
+    // flip parity as the strip scrolls past.
+    readonly property int labelStride: zoom === 0 ? 1 : zoom === 1 ? 2 : 4
+    function isLabelled(g) { return g >= 0 && (g % labelStride) === 0; }
+    // Several constants below (scroll velocity, sun-bloom width) are expressed in
+    // CURVE COLUMNS, and were tuned when one screen was ~12 columns. Now that the
+    // curve is hourly a screen can be 24, which would silently halve a wheel notch
+    // and shrink the sun bloom to half its width — same numbers, twice the columns.
+    // Scaling by the density keeps them fixed in TIME and in screen fraction, which
+    // is what they were really describing.
+    readonly property real densityScale: pointsVisible / 12
+    // Hours moved per mouse-wheel notch, configurable per zoom level (Appearance →
+    // Graph). The defaults are a quarter of each zoom's visible window, which is
+    // what the previous fixed step worked out to.
+    readonly property int scrollHours: zoom === 0 ? (weatherRoot ? weatherRoot.graphScrollHoursDetail : 3)
+                                     : zoom === 1 ? (weatherRoot ? weatherRoot.graphScrollHoursDay    : 6)
+                                     :              (weatherRoot ? weatherRoot.graphScrollHoursWide   : 12)
+    // How long that notch takes to arrive, also per zoom (Appearance → Graph).
+    // It needs its own setting because the step alone doesn't decide how the scroll
+    // FEELS: one notch covers a quarter of the window at 12 hours and can cover half
+    // of it at 48, so a duration that reads as a gentle glide in the narrow view
+    // reads as a lurch in the wide one.
+    readonly property int slideMs: zoom === 0 ? (weatherRoot ? weatherRoot.graphSlideMsDetail : 350)
+                                 : zoom === 1 ? (weatherRoot ? weatherRoot.graphSlideMsDay    : 450)
+                                 :              (weatherRoot ? weatherRoot.graphSlideMsWide   : 800)
     readonly property int maxHourPos: Math.max(0, (samples ? samples.length : 0) - pointsVisible)
+    // A zoom change alters the window width, which can leave the window running past
+    // the end of the data. Keep its start, clamped to the new range — or, when a day
+    // was picked, re-open that day at the new width (so zooming in from 48 hours with
+    // the last day picked shows that day, not the one before it).
+    // (The limit is worked out here rather than read from maxHourPos: this handler can
+    // run before that binding has caught up with the new width.)
+    onPointsVisibleChanged: {
+        posAnim.stop(); cancelDayMorph();
+        var max = Math.max(0, (samples ? samples.length : 0) - pointsVisible);
+        var want = chosenDay >= 0 ? dayFirstSampleIndex(chosenDay) : Math.round(hourPos);
+        hourPos = Math.max(0, Math.min(max, want));
+    }
     function windowAt(w) {
         var o = [], n = samples.length;
         for (var i = 0; i < pointsVisible; ++i) {
@@ -189,15 +252,38 @@ Item {
     function isDayStart(g) {
         return g > 0 && g < samples.length && samples[g].date !== samples[g - 1].date;
     }
-    // is any new-day boundary in the visible window? — lets the marker canvas skip
-    // its per-frame repaint while no new-day line is on screen
-    readonly property bool windowHasMidnight: {
-        var base = windowBase;
-        for (var k = -1; k < poolSize; ++k)
-            if (isDayStart(base + k)) return true;
-        return false;
-    }
+    // Global sample indices of the midnights inside the window (plus a marker's
+    // width either side of the pool: a marker is ready before it slides in, and one
+    // its line is carrying off the plot is still partly on screen after the line
+    // itself has gone — see dayMarkerX). Three or four at 48 hours, one or two at
+    // 12 — which is why the new-day markers get their own small model instead of a
+    // slot per hour like the filmstrip pools: each marker carries a dash run, and
+    // holding 52 of those to draw 3 was the single most expensive thing in
+    // building the graph.
+    //
+    // The LENGTH only changes when a midnight enters or leaves (twice per day of
+    // scrolling), and a Repeater over a JS array recreates its delegates only when
+    // the length changes — so scrolling reuses the same few items.
+    // The filmstrip's icons and clock labels only appear on LABELLED hours — every
+    // hour at 12, every 2nd at 24, every 4th at 48 (see isLabelled) — so they get a
+    // pool of that many rather than one slot per hour. Before this, 48 hours built
+    // 52 icon slots to draw 13 of them.
+    //
+    // Indexing is stride-aligned (`filmBase` is a multiple of labelStride) so the
+    // COUNT never changes as the window slides, only each delegate's hour. An int
+    // model that holds its value keeps the same delegates alive across a scroll;
+    // a count that ticked up and down would rebuild them all every hour.
+    readonly property int filmBase:  Math.floor((windowBase - 1) / labelStride) * labelStride
+    readonly property int filmCount: Math.floor(poolSize / labelStride) + 3
+    function filmG(i) { return filmBase + i * labelStride; }
 
+    readonly property var dayStartsInWindow: {
+        var out = [];
+        var extra = Math.ceil(2 * dayMarkerHalfW / (plotW / pointsVisible));
+        for (var k = -1 - extra; k <= poolSize + extra; ++k)
+            if (isDayStart(windowBase + k)) out.push(windowBase + k);
+        return out;
+    }
     // the two window frames the position sits between + the blend. Keyed on the
     // INTEGER hour so they only re-allocate when the window actually shifts (once
     // per hour), not every drag frame — only the scalar curFrac changes per frame,
@@ -231,15 +317,32 @@ Item {
         }
         return out;
     }
+    // Rain WASH per column on the 0-100 chance scale — what the precip band is drawn
+    // from, and the silhouette the readouts and markers ride above. Where an hour has
+    // a real chance this IS that chance, unchanged; where it has none (met.no outside
+    // the Nordics) the amount stands in, so the band still shows the rain. The printed
+    // % must not come from here blindly — see curChanceOn.
     readonly property var curPrecip: {
         if (dayMorphT < 1) return lerpArr(morphFromP, morphToP, dayMorphT);
         var a = loSamples, b = hiSamples, f = curFrac, out = [];
         var n = Math.max(a.length, b.length);
         for (var i = 0; i < n; ++i) {
-            var av = i < a.length && !isNaN(a[i].precip) ? a[i].precip : 0;
-            var bv = i < b.length && !isNaN(b[i].precip) ? b[i].precip : 0;
+            var av = (i < a.length && weatherRoot) ? weatherRoot.precipWashPct(a[i]) : 0;
+            var bv = (i < b.length && weatherRoot) ? weatherRoot.precipWashPct(b[i]) : 0;
             out.push(av + (bv - av) * f);
         }
+        return out;
+    }
+    // 0/1 per column: whether the hour NEAREST the slot has a real chance. Gates the
+    // printed % — curPrecip alone can't, because for an hour without a chance it holds
+    // an amount-derived stand-in, and printing that would claim a probability the
+    // provider never gave (the old code printed it as a flat "0%"). Nearest-hour, the
+    // same rule the other readouts use to decide visibility.
+    readonly property var curChanceOn: {
+        if (dayMorphT < 1) return dayMorphT < 0.5 ? morphFromC : morphToC;
+        var arr = curFrac < 0.5 ? loSamples : hiSamples, out = [];
+        for (var i = 0; i < arr.length; ++i)
+            out.push(weatherRoot && weatherRoot.hasPrecipChance(arr[i]) ? 1 : 0);
         return out;
     }
     // Per-point "snowiness" 0..1 (blended through the morph) graded by the
@@ -295,6 +398,308 @@ Item {
         if (lblMorphActive) return lerpArr(morphFromT, morphToT, lblMorphT);
         return curTemps;
     }
+    // ── which hours get a temperature label ──────────────────────────────
+    // Fixed positions, never recomputed from the values. An earlier version
+    // collapsed runs of equal temperature into one centred label; the centre of a
+    // run depends on the values, so every scroll and day-morph re-derived it and
+    // the labels visibly drifted before settling. Position now depends only on the
+    // HOUR, so a label either is or isn't there — nothing to animate into place.
+    //
+    // Base rule: the same hours the time axis labels, so the two rows line up.
+    // isLabelled() is keyed on the GLOBAL sample index, exactly as the axis pool
+    // is, and curve column i holds global sample (windowBase + i) — so at rest the
+    // temperature sits directly above its own clock label.
+    //
+    // Plus the day's extremes: with a 2-hourly rule the actual high or low can fall
+    // on an unlabelled hour and never be shown. Each is added back at EVERY hour it
+    // occurs — but only if that value isn't already printed by a regular label
+    // somewhere in the day, since then it is on screen anyway and the extras would
+    // just be duplicates. High and low are judged independently.
+    //
+    // Both the extremes and their coverage are computed over the WHOLE series, per
+    // calendar day, so the answer doesn't change as you scroll.
+    readonly property var tempExtremes: {
+        var out = ({});
+        if (!samples || !samples.length) return out;
+        var i, s, v, e;
+        for (i = 0; i < samples.length; ++i) {
+            s = samples[i];
+            if (isNaN(s.temp)) continue;
+            v = Math.round(s.temp);
+            e = out[s.date];
+            if (!e) out[s.date] = { hi: v, lo: v, hiCovered: false, loCovered: false };
+            else { if (v > e.hi) e.hi = v; if (v < e.lo) e.lo = v; }
+        }
+        // second pass, once the extremes are known: is either already printed?
+        for (i = 0; i < samples.length; ++i) {
+            if (!isLabelled(i)) continue;
+            s = samples[i];
+            if (isNaN(s.temp)) continue;
+            e = out[s.date];
+            if (!e) continue;
+            v = Math.round(s.temp);
+            if (v === e.hi) e.hiCovered = true;
+            if (v === e.lo) e.loCovered = true;
+        }
+        return out;
+    }
+    // Which hour a column is treated as holding, FOR LABEL PLACEMENT ONLY.
+    //
+    // windowBase is floor(hourPos), so it steps through every intermediate hour of
+    // a pan. With the 2-hourly rule that flips which columns are labelled on each
+    // one, and the labels blinked on and off several times per notch. Detail zoom
+    // never showed it because stride 1 labels every column, so nothing can flip.
+    //
+    // Resolving against the pan's DESTINATION instead means the labelled columns are
+    // chosen once, when the scroll starts, and then hold still while their values
+    // morph — which is precisely what makes Detail zoom read as smooth. A drag holds
+    // the parity it began with, for the same reason.
+    property int dragLabelBase: 0
+    readonly property int labelBase: {
+        if (posAnim.running)   return Math.round(posAnim.to);
+        if (flickAnim.running) return Math.round(flickAnim.to);
+        if (dragging)          return dragLabelBase;
+        return windowBase;
+    }
+
+    // Whether each sample gets a temperature label: the axis hours plus the day's
+    // uncovered extremes (see tempExtremes). Worked out once per data/zoom change over
+    // the whole series, never per scroll, so a label's presence stays fixed to its hour.
+    //
+    // At 48 hours a column is only about as wide as a label, so two extra rules keep
+    // labels from printing over each other there (at 12 and 24 hours they have room,
+    // and nothing changes):
+    //  • a run of consecutive hours at the same extreme gets ONE label, in its middle,
+    //    instead of one per hour;
+    //  • an extreme outranks an axis-hour label in the column next to it — the high or
+    //    low is the reading worth keeping.
+    readonly property var tempLabelMap: {
+        var n = samples ? samples.length : 0, on = [], ext = [], i, j, k, s, e, v;
+        for (i = 0; i < n; ++i) {
+            s = samples[i];
+            on.push(isLabelled(i) && !isNaN(s.temp));
+            e = isNaN(s.temp) ? null : tempExtremes[s.date];
+            v = isNaN(s.temp) ? NaN : Math.round(s.temp);
+            ext.push(!!e && ((!e.hiCovered && v === e.hi) || (!e.loCovered && v === e.lo)));
+        }
+        if (labelStride >= 4) {
+            for (i = 0; i < n; i = j + 1) {
+                j = i;
+                if (!ext[i]) continue;
+                v = Math.round(samples[i].temp);
+                while (j + 1 < n && ext[j + 1] && samples[j + 1].date === samples[i].date
+                       && Math.round(samples[j + 1].temp) === v) ++j;
+                var mid = Math.floor((i + j) / 2);
+                for (k = i; k <= j; ++k) ext[k] = (k === mid);
+            }
+            for (i = 0; i < n; ++i) {
+                if (!ext[i]) continue;
+                if (i > 0 && !ext[i - 1]) on[i - 1] = false;
+                if (i + 1 < n && !ext[i + 1]) on[i + 1] = false;
+            }
+        }
+        for (i = 0; i < n; ++i) on[i] = on[i] || ext[i];
+        return on;
+    }
+    function showTempLabel(g) {
+        return g >= 0 && g < tempLabelMap.length && tempLabelMap[g];
+    }
+
+    // ── which hours get a precipitation readout ──────────────────────────
+    // An hour qualifies when it has snow, a measurable amount, or a published chance
+    // of at least pctLabelMin (_readoutWanted) — the same test at every zoom and for
+    // every provider. A SPELL is a run of consecutive qualifying hours, unbroken.
+    //
+    // At 12 and 24 hours every qualifying hour is labelled. At 48 hours the columns
+    // are too narrow for that, so each spell is thinned to:
+    //   • its first hour, and every second hour after that;
+    //   • plus its wettest hour, judged on the AMOUNT alone (and only when some hour
+    //     in the spell actually has one) — and the hours either side of that peak
+    //     give way to it.
+    //
+    // Then, at EVERY zoom: consecutive hours that would print the very same readout
+    // are one reading, not several, so a run of them keeps a single label at its
+    // middle. That is what a 6-hour block looks like once it is spread over the
+    // hourly grid — the same split amount on every hour — and what a flat stretch of
+    // one chance looks like. A run only keeps its label if the step above labelled
+    // some hour of it; for an even-length run the middle hour already labelled is
+    // preferred, so at 48 hours no two labels ever end up on neighbouring hours.
+    //
+    // Worked out once per forecast, zoom and readout setting — never per scroll — so
+    // a label belongs to its hour.
+    function _readoutWanted(s) {
+        if (!s || !weatherRoot) return false;
+        if (snowCm(s) >= 0.1) return true;
+        if (weatherRoot.hasPrecipAmt(precipMm(s))) return true;
+        return weatherRoot.hasPrecipChance(s) && s.precip >= pctLabelMin;
+    }
+    // What an hour's readout would print, as one string: two hours with the same key
+    // show the same label. Only the halves the readout setting lets through count,
+    // so hiding the chance lets hours that differ only in their chance merge.
+    function _readoutKey(s) {
+        var sn = snowCm(s), amt = precipMm(s);
+        var slot = !showPrecipAmt ? ""
+                 : sn >= 0.1 ? weatherRoot.snowfallStr(sn, true)
+                 : weatherRoot.precipAmtStr(amt);
+        // the chance prints at pctLabelMin and up, or alongside any rain amount
+        var pct = (showPrecipPct && weatherRoot.hasPrecipChance(s)
+                   && (s.precip >= pctLabelMin || (sn < 0.1 && weatherRoot.hasPrecipAmt(amt))))
+                  ? Math.round(s.precip) + "%" : "";
+        return slot + "|" + pct;
+    }
+    readonly property var readoutPlan: {
+        // _readoutKey consults these; reading them here too makes the plan rebuild
+        // when the readout setting or the units change, the same belt-and-braces
+        // readoutRowsByHour uses
+        if (!samples || !samples.length || !weatherRoot || !weatherRoot.units) return null;
+        if (showPrecipAmt === undefined || showPrecipPct === undefined) return null;
+        var n = samples.length, shown = [], i, j, k;
+        var thin = labelStride >= 4;   // 48 hours
+        for (i = 0; i < n; ++i) shown.push(false);
+        for (i = 0; i < n; i = j + 1) {
+            j = i;
+            if (!_readoutWanted(samples[i])) continue;
+            while (j + 1 < n && _readoutWanted(samples[j + 1])) ++j;
+            if (!thin) {
+                for (k = i; k <= j; ++k) shown[k] = true;
+            } else {
+                // the spell's first hour, then every second hour of it
+                for (k = i; k <= j; k += 2) shown[k] = true;
+                // and its wettest hour — `top` starts at 0, so a spell that is all
+                // chance and no measurable rain adds nothing here
+                var top = 0, pick = -1;
+                for (k = i; k <= j; ++k) {
+                    var amt = precipMm(samples[k]);
+                    if (amt > top) { top = amt; pick = k; }
+                }
+                if (pick >= 0) {
+                    shown[pick] = true;
+                    // The peak outranks the every-second-hour rule on either side of
+                    // it: whatever that rule picked immediately before or after gives
+                    // way, so the wettest hour is never crowded by a neighbour.
+                    if (pick - 1 >= i) shown[pick - 1] = false;
+                    if (pick + 1 <= j) shown[pick + 1] = false;
+                }
+            }
+            // runs of identical readouts inside the spell keep one label, mid-run
+            var keys = [];
+            for (k = i; k <= j; ++k) keys.push(_readoutKey(samples[k]));
+            for (var a = i, b; a <= j; a = b + 1) {
+                b = a;
+                while (b + 1 <= j && keys[b + 1 - i] === keys[a - i]) ++b;
+                if (b === a) continue;
+                var any = false;
+                for (k = a; k <= b; ++k) if (shown[k]) { any = true; break; }
+                if (!any) continue;
+                var lo = Math.floor((a + b) / 2), hi = Math.ceil((a + b) / 2);
+                var mid = (shown[hi] && !shown[lo]) ? hi : lo;
+                for (k = a; k <= b; ++k) shown[k] = false;
+                shown[mid] = true;
+            }
+        }
+        return shown;
+    }
+    function readoutShownAt(g) {
+        if (!readoutPlan) return true;
+        return g >= 0 && g < readoutPlan.length && readoutPlan[g];
+    }
+
+    // Which rows a precipitation readout prints, as a bit mask — roGroup decides
+    // the same way, so what the markers below dodge is exactly what is drawn:
+    //   1 = the snow / rain-amount slot row
+    //   2 = the chance %
+    //   4 = the chance row takes up height (the hour publishes a chance at all;
+    //       the row collapses to nothing when it doesn't)
+    // 0 = nothing is printed. Split from its callers because the two markers feed
+    // it from different places: the sun marker from the live morphing columns it
+    // floats over, the new-day marker from the hours it travels with (see below).
+    function readoutRows(pv, sv, av, cOn, shown) {
+        if (!shown) return 0;                                   // thinned out, or merged into a neighbour
+        var snowShown = sv >= 0.1;
+        var amtShown  = !snowShown && weatherRoot && weatherRoot.hasPrecipAmt(av);
+        // the chance also shows whenever an amount is present, even below pctLabelMin
+        var bits = (snowShown || amtShown ? 1 : 0)
+                 | (cOn && (pv >= pctLabelMin || amtShown) ? 2 : 0)
+                 | (cOn ? 4 : 0);
+        // a row the readout setting hides is not on screen to be dodged
+        return bits & ((showPrecipAmt ? 1 : 0) | (showPrecipPct ? 6 : 0));
+    }
+    // …from the live column values, for a marker that floats over the columns.
+    function readoutRowsAt(c, g) {
+        if (c < 0 || c >= nPts) return 0;
+        return readoutRows(c < curPrecip.length    ? curPrecip[c]    : 0,
+                           c < curSnow.length      ? curSnow[c]      : 0,
+                           c < curPrecipAmt.length ? curPrecipAmt[c] : 0,
+                           c < curChanceOn.length  ? curChanceOn[c]  : 0,
+                           readoutShownAt(g));
+    }
+    // …from each hour's own data, for a marker pinned to an hour. Worked out once
+    // per data load / zoom rather than per frame: markerLift asks about a dozen
+    // hours every time the graph repaints. Reading `units` here is deliberate —
+    // hasPrecipAmt answers by it, so the list has to be rebuilt when it changes.
+    readonly property var readoutRowsByHour: {
+        var out = [];
+        if (!weatherRoot || !weatherRoot.units || !samples) return out;
+        for (var h = 0; h < samples.length; ++h) {
+            var s = samples[h];
+            out.push(readoutRows(s.precip, snowCm(s), precipMm(s),
+                                 weatherRoot.hasPrecipChance(s), readoutShownAt(h)));
+        }
+        return out;
+    }
+    function readoutRowsForHour(h) {
+        return (h >= 0 && h < readoutRowsByHour.length) ? readoutRowsByHour[h] : 0;
+    }
+    // Air a readout keeps above the temperature curve before it gives up on riding
+    // the rain curve and goes over the temperature LABEL instead.
+    readonly property int readoutTempClear: Math.round(graphReadoutFontSize * 0.6)
+    // Screen y of a precipitation readout's TOP edge, for a column whose
+    // temperature curve is at tY and precipitation curve at pY, given the group's
+    // height h.
+    //
+    // It rides just above the RAIN curve wherever that runs — including well under
+    // the temperature curve, which is where rain usually sits and reads far more
+    // naturally than parking every readout along the top of the graph. Only when
+    // the two curves close up, and the group would no longer clear the temperature
+    // curve there, does it fall back to its old place above the temperature label.
+    function readoutTopFor(tY, pY, h) {
+        var onPrecip = pY - 14;
+        if (onPrecip - h >= tY + readoutTempClear) return onPrecip - h;
+        var tempLabelH = (weatherRoot ? weatherRoot.simpleGraphTempFontSize : 13) * 1.4;
+        return Math.min(tY - tempLabelH - Kirigami.Units.smallSpacing - 3, onPrecip) - h;
+    }
+    // How far a marker whose bottom edge sits at `bottom` must rise to keep
+    // markerClearGap above hour `h`'s readout; 0 when that hour prints nothing or
+    // already sits clear. It asks readoutTopFor where the group actually lands, so
+    // the marker clears the real text rather than a guessed line count.
+    //
+    // The curve is read from the HOUR's own temperature and rain, not from the
+    // morphing column the readout currently sits in. That keeps this steady while
+    // the window slides — the column's value sweeps between two hours and its
+    // assigned hour swaps at every half hour, and a marker chasing that would
+    // shiver. Steady here means steady on screen: the lift is subtracted from the
+    // marker's own curve-tracking y, so once a readout is being dodged the marker
+    // parks just above it instead of riding the curve.
+    function readoutNeed(h, bottom) {
+        var rows = readoutRowsForHour(h);
+        if (!rows) return 0;
+        var s = samples[h];
+        var slotH = showPrecipAmt ? readoutRowH : 0;
+        var hgt = slotH + 1 + ((rows & 4) ? readoutRowH : 0);
+        var top = Math.max(0, readoutTopFor(tempY(s.temp),
+                                            precipY(weatherRoot ? weatherRoot.precipWashPct(s) : 0),
+                                            hgt));
+        // an empty slot row is transparent space, so when only the chance prints,
+        // the highest thing actually drawn is the row below it
+        if (!(rows & 1)) top += slotH + 1;
+        // a readout riding the rain curve is below the marker, so this comes out 0
+        return Math.max(0, bottom - top + markerClearGap);
+    }
+
+    // How long a temperature label takes to dissolve in or out when the window
+    // moves off (or onto) its hour. Short enough to be over well before the slide
+    // lands, so the new set is settled by the time the curve arrives.
+    readonly property int lblFadeDur: 250
     readonly property int lblMorphDelay: 220   // numbers hold this long before ticking
     property int lblMorphDur: 600              // then morph over this (set per gesture)
     // The value labels get a SHORTER settle tail than the curve (morphSettleTail) so the
@@ -341,30 +746,30 @@ Item {
     // of columns, so a readout there would otherwise jumble with its time. Returns
     // the tallest readout (in lines) among the marker's neighbouring columns, ×0,
     // so dry columns keep the marker tight to the temp number.
-    function sunMarkerLift(px) {
-        // off-plot markers aren't drawn, so their lift is irrelevant — skip the work
-        // (the 3-column scan + per-column precipAmtStr) for markers outside the plot.
+    function sunMarkerLift(px, mh) {
+        // off-plot markers aren't drawn, so their lift is irrelevant — skip the
+        // 3-column scan entirely for markers outside the plot.
         if (nPts < 1 || isNaN(px) || px < 0 || px > plotW) return 0;
-        var col = Math.round(px / (plotW / nPts) - 0.5), maxLines = 0;
+        var tempLabelH = (weatherRoot ? weatherRoot.simpleGraphTempFontSize : 13) * 1.4;
+        // where the marker would sit with no lift at all — the box the readouts
+        // below are tested against. Working from the UNLIFTED position keeps this
+        // out of a circle with the delegate's own y.
+        var baseTop = curveYAtX(px) - tempLabelH - mh - sunMarkGap;
+        var col = Math.round(px / (plotW / nPts) - 0.5), lift = 0;
         for (var c = col - 1; c <= col + 1; ++c) {
-            if (c < 0 || c >= nPts) continue;
-            var pv = c < curPrecip.length    ? curPrecip[c]    : 0;
-            var sv = c < curSnow.length      ? curSnow[c]      : 0;
-            var av = c < curPrecipAmt.length ? curPrecipAmt[c] : 0;
-            // count lines EXACTLY as the readout (roGroup) shows them, or the lift
-            // mismatches: a slot line (snow OR amount) and a chance line that also
-            // shows whenever an amount is present, even below pctLabelMin.
-            var snowShown = sv >= 0.1;
-            var amtShown  = !snowShown && weatherRoot && av > 0 && weatherRoot.precipAmtStr(av) !== "";
-            var lines = 0;
-            if (snowShown || amtShown) lines++;             // slot line
-            if (pv >= pctLabelMin || amtShown) lines++;     // chance row
-            if (lines > maxLines) maxLines = lines;
+            var g = Math.round(hourPos) + c;
+            var rows = readoutRowsAt(c, g);
+            if (!rows) continue;
+            var gh = (showPrecipAmt ? readoutRowH : 0) + 1 + ((rows & 4) ? readoutRowH : 0);
+            var rTop = Math.max(0, readoutTopFor(curTempY(c), curPrecipY(c), gh));
+            // only a readout whose box actually meets the marker's is in the way —
+            // one riding the rain curve well below it is not, and neither is one
+            // stacked high above it
+            if (rTop + gh <= baseTop || rTop >= baseTop + mh) continue;
+            var need = baseTop + mh - rTop + markerClearGap;
+            if (need > lift) lift = need;
         }
-        // ×1.2 (not the readout's full 1.4 line height): the marker's own markGap
-        // already adds slack above the readout, so the full height over-clears and
-        // floats the glyph too high near a wet boundary.
-        return maxLines > 0 ? maxLines * Math.round(graphReadoutFontSize * 1.2) : 0;
+        return lift;
     }
     readonly property int nPts: curTemps.length
 
@@ -378,16 +783,82 @@ Item {
     readonly property real precipBandH: plotH * 0.13                   // bottom margin the temp curve keeps clear (smaller → taller, more dramatic temp curve)
     readonly property real precipMaxFrac: 0.70                         // precip fill rises to this fraction of plotH at 100% chance — high chances overlap the temp curve, low ones stay a sliver near the floor
     readonly property real markerGap:   Kirigami.Units.gridUnit * 1.9  // base gap between a new-day marker and the temp curve/label
-    // The precip readout's amount/snow slot is FIXED-height but invisible when
-    // dry, so a fixed markerGap either floats too high over dry boundaries or
-    // crowds wet ones. Lift the marker a touch extra ONLY when ITS column is
-    // actually wet (shows an amount or snow line). Keeps the dry case tight and
-    // the wet case clear; both the dashed line and the label share this lift.
-    function markerLift(g) {
-        var s = samples[g];
-        var wet = s && (snowCm(s) >= 0.1
-                  || (weatherRoot && weatherRoot.precipAmtStr(precipMm(s)) !== ""));
-        return markerGap + (wet ? Kirigami.Units.gridUnit * 0.7 : 0);
+    // The new-day line's dash pattern, and a run long enough to reach the floor
+    // from the highest a marker can sit. Fixed so the Repeater never rebuilds its
+    // delegates mid-scroll — the run is cut to length by the clip around it.
+    readonly property int dayLineDash: 3
+    readonly property int dayLineGap:  4
+    readonly property int dayLineDashes: Math.ceil(plotH / (dayLineDash + dayLineGap)) + 1
+    readonly property real markerClearGap: Kirigami.Units.smallSpacing   // air left between a marker and a readout it dodges
+    readonly property real sunMarkGap:     Kirigami.Units.smallSpacing * 3   // sun marker's own gap above the temp label
+    readonly property real markerRamp:     Kirigami.Units.gridUnit       // how far out a marker starts easing over a readout
+    // A new-day marker is icon + date WIDE — several columns at 48 hours — and it
+    // is centred on its midnight line, so it reaches well past its own column.
+    // Measured once from a representative date: every marker reads
+    // "<short weekday>, <date>" (or the weekday alone, per the option), and
+    // markerClearGap absorbs the few pixels one weekday name differs from another.
+    TextMetrics {
+        id: dayMarkerMetrics
+        font.bold: true
+        font.pixelSize: weatherRoot ? weatherRoot.simpleDayMarkerFontSize : 12
+        text: (weatherRoot && samples.length) ? weatherRoot.dayMarkerText(samples[0].date) : ""
+    }
+    readonly property real dayMarkerHalfW: {
+        var iconW = weatherRoot ? Math.round(weatherRoot.simpleDayMarkerFontSize * 2.25) : 27;
+        return (iconW + Kirigami.Units.smallSpacing + dayMarkerMetrics.width) / 2;
+    }
+    // Where a new-day marker `w` wide sits for a line at `lx`: centred on it, but
+    // held dayMarkerEdge inside the plot for as long as the line is, so the edge
+    // never cuts off its icon or date. Near an edge the marker stops and the line
+    // walks on across under it; when the line reaches the marker's outer side it
+    // takes the marker off the plot with it. Continuous at every hand-over, so a
+    // scroll never makes the marker jump.
+    readonly property real dayMarkerEdge: Kirigami.Units.smallSpacing
+    function dayMarkerX(lx, w) {
+        var e = dayMarkerEdge;
+        return Math.min(Math.max(lx - w / 2, Math.min(lx, e)),
+                        Math.max(lx - w, plotW - e - w));
+    }
+    // How far a new-day marker rises above the temp curve — the dashed line and
+    // the icon + date share this lift, so the line always meets the label.
+    // markerGap alone keeps it off the temperature label; on top of that it
+    // clears any precipitation readout standing where it wants to be, the way the
+    // sun markers do. It looks either side of its own midnight, not just at it:
+    // the marker is icon + date WIDE and centred on its line, so the "2.0 mm" it
+    // used to land on belongs to a neighbouring hour. `shift` is how far the
+    // marker's centre sits off its line — non-zero only while a plot edge holds
+    // it in (dayMarkerX) — and the hours it covers shift with it.
+    function markerLift(g, shift) {
+        var lift = markerGap;
+        if (nPts < 1) return lift;
+        var colW = plotW / nPts;
+        var tLabelH = (weatherRoot ? weatherRoot.simpleGraphTempFontSize : 13) * 1.4;
+        // where the marker's bottom edge would sit with no lift at all
+        var bottom = markerCurveY(g, hourX(g)) - tLabelH;
+        // half the width of the two boxes that must not meet: the marker, and a
+        // readout label (~3.4 character-widths, the same estimate readoutPlan
+        // stacks by). markerRamp softens the cutoff, so an hour just out of reach
+        // asks for part of the clearance rather than none.
+        var span = dayMarkerHalfW + graphReadoutFontSize * 1.7;
+        var off = shift || 0;
+        // Walk the HOURS either side of the marker. They travel with the marker, so
+        // both what they print and how far away they are stay put through a scroll
+        // and the lift never hops — only the curve underneath it moves, and that
+        // moves smoothly. The exception is a marker held in at an edge: the hours
+        // slide under it there, and the ramp below eases each one in and out.
+        var lo = Math.floor(g + (off - span - markerRamp) / colW);
+        var hi = Math.ceil(g + (off + span + markerRamp) / colW);
+        for (var h = lo; h <= hi; ++h) {
+            var sep = Math.abs((h - g) * colW - off) - span;   // ≤ 0 → the boxes overlap
+            if (sep >= markerRamp) continue;
+            var need = readoutNeed(h, bottom);
+            if (need <= lift) continue;
+            // ease only the part that goes BEYOND the base gap, so a marker with
+            // nothing to dodge keeps sitting exactly where it always did
+            var eased = markerGap + (need - markerGap) * (sep <= 0 ? 1 : 1 - sep / markerRamp);
+            if (eased > lift) lift = eased;
+        }
+        return lift;
     }
     readonly property real iconRowH: (weatherRoot ? weatherRoot.simpleHourlyIconSize : 24)
                                      + Kirigami.Units.smallSpacing * 2
@@ -468,6 +939,21 @@ Item {
         return yAt(n - 1);
     }
     function curveYAtX(px) { return colYAtX(px, 2); }
+    // The curve under new-day line `g` at x `lx`. Between the outer columns that
+    // is the drawn curve. Past them colYAtX pins to the edge column, and that
+    // column reshapes by a whole hour's change for every column of scroll — so a
+    // marker reading it would bob, and now that a marker stays partly on screen
+    // while its line carries it off the plot, the bob would show. Out there the
+    // line's own hour is used instead: it is exactly what the edge column holds
+    // at the moment the line crosses it, so the hand-over is seamless, and it
+    // holds still while the marker leaves.
+    function markerCurveY(g, lx) {
+        if (nPts < 1 || dayMorphT < 1 || (lx >= xAt(0) && lx <= xAt(nPts - 1))
+                || g < 0 || g >= samples.length)
+            return curveYAtX(lx);
+        var s = samples[g];
+        return Math.min(tempY(s.temp), precipY(weatherRoot ? weatherRoot.precipWashPct(s) : 0));
+    }
     // A precip-% readout shows on any column whose chance is at least this. It's a
     // STABLE threshold, not a moving-peak test: a column keeps its label while rain
     // is present there and the value just MORPHS as you scroll (like the temp
@@ -475,7 +961,7 @@ Item {
     // labels use a fixed cm floor (0.1) the same way. A column's % is shown when its
     // hour's chance is at/above this; the seam between a wet and dry hour is handled
     // by OR-ing both endpoint hours (see pctOn), not by a hysteresis release point.
-    readonly property int pctLabelMin:  25
+    readonly property int pctLabelMin:  20
 
     readonly property bool scrolling: posAnim.running || flickAnim.running || dragging
 
@@ -607,6 +1093,7 @@ Item {
         // that's transparent except a bump of `streak` colour around each peak,
         // stroked wide+faint then narrow+brighter to fake a blurred glow (Canvas
         // has no feGaussianBlur). Drawn unclipped — it rides the line, not above it.
+        if (sunStreakHalfCols <= 0) return;   // streak off — nothing left to draw
         var denom2 = nPts - 1, shw = sunStreakHalfCols / denom2;
         var sg = ctx.createLinearGradient(gx0, 0, gx1, 0);
         sg.addColorStop(0, rgbaArr(peaks[0].rise ? sunGlow.rise.streak : sunGlow.set.streak, 0));
@@ -650,7 +1137,9 @@ Item {
     // the only thing that shifts it: rain-blue → white in proportion to amount.
     readonly property var snowRGB:   [245, 250, 255]  // bright snow white
     readonly property var precipRGB: [66, 165, 245]   // rain blue (#42a5f5)
-    readonly property real precipBandA: 0.30          // consistent fill opacity
+    // Opacity of the band's TOP edge (config precipBandOpacity, a percentage); it
+    // still fades toward the floor from there. 0 leaves the curve as a bare line.
+    readonly property real precipBandA: (weatherRoot ? weatherRoot.precipBandOpacity : 30) / 100
     readonly property real precipLineA: 0.95          // consistent stroke opacity
     readonly property real precipFadeFloor: 0.18      // band alpha kept at the floor; the fill is dense at its top edge and fades down to this (vertical wash)
     readonly property real precipFadeExp:   1.4       // >1 = fade harder toward the floor while the top edge keeps full opacity
@@ -661,6 +1150,9 @@ Item {
         var g = Math.round(precipRGB[1] + (snowRGB[1] - precipRGB[1]) * s);
         var b = Math.round(precipRGB[2] + (snowRGB[2] - precipRGB[2]) * s);
         var a = (isLine ? precipLineA : precipBandA);
+        // a band turned all the way down means a bare line, snow included — without
+        // this the snow boost below would keep painting one
+        if (!isLine && a <= 0) return "rgba(" + r + "," + g + "," + b + ",0)";
         a = a + (1 - a) * s * 0.32;                   // snow reads a bit more opaque than rain
         return "rgba(" + r + "," + g + "," + b + "," + a.toFixed(3) + ")";
     }
@@ -670,6 +1162,44 @@ Item {
         return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255)
              + "," + Math.round(c.b * 255) + "," + a + ")";
     }
+    // Monotone cubic (Steffen, 1990) → bezier, for the PRECIPITATION curve.
+    //
+    // smooth() above is Catmull-Rom, which is right for temperature but wrong for rain:
+    // next to a flat run its control points pull the curve past the data, so a curve
+    // about to climb out of a dry spell first dips BELOW the axis — by about a sixth of
+    // the height it is climbing to, 10 px below the floor ahead of a 2 mm peak — and
+    // vanishes there. Rain has a hard floor at zero, so the curve must never cross it.
+    //
+    // Steffen limits each tangent to at most twice either neighbouring secant and to
+    // the average secant, and sets it level wherever the data turns or runs flat. That
+    // keeps every segment between its own two endpoints: flat stretches stay exactly
+    // flat, a rise leaves the floor with a level tangent, and a peak tops out at its
+    // real value instead of overshooting. The ends are level too, so the curve meets
+    // the flat extension drawn out to the plot edges without a corner.
+    function smoothMonotone(ctx, xs, ys) {
+        var n = xs.length;
+        if (n < 2) return;
+        var h = [], d = [], i;
+        for (i = 0; i < n - 1; ++i) {
+            h.push(xs[i + 1] - xs[i]);
+            d.push(h[i] !== 0 ? (ys[i + 1] - ys[i]) / h[i] : 0);
+        }
+        var m = [0];
+        for (i = 1; i < n - 1; ++i) {
+            if (d[i - 1] * d[i] <= 0) { m.push(0); continue; }   // turning point or flat
+            var p = (d[i - 1] * h[i] + d[i] * h[i - 1]) / (h[i - 1] + h[i]);
+            m.push((d[i] > 0 ? 1 : -1)
+                   * Math.min(2 * Math.abs(d[i - 1]), 2 * Math.abs(d[i]), Math.abs(p)));
+        }
+        m.push(0);
+        for (i = 0; i < n - 1; ++i) {
+            var t = h[i] / 3;
+            ctx.bezierCurveTo(xs[i] + t,     ys[i] + m[i] * t,
+                              xs[i + 1] - t, ys[i + 1] - m[i + 1] * t,
+                              xs[i + 1],     ys[i + 1]);
+        }
+    }
+
     function smooth(ctx, xs, ys) {   // Catmull-Rom → bezier
         for (var i = 0; i < xs.length - 1; ++i) {
             var x0 = i > 0 ? xs[i - 1] : xs[i], y0 = i > 0 ? ys[i - 1] : ys[i];
@@ -681,6 +1211,19 @@ Item {
     }
 
     function clampPos(p) { return Math.max(0, Math.min(dayCount - 1, p)); }
+
+    // Day stepping for the pill wheel. selectedDay only catches up once the pan
+    // animation has moved hourPos, so stepping straight off it would swallow the
+    // second and third notch of a fast scroll. pendingDay remembers where we are
+    // headed and chains from there instead; it clears when the pan settles.
+    property int pendingDay: -1
+    function stepDay(delta) {
+        var from = (pendingDay >= 0) ? pendingDay : selectedDay;
+        var to = clampPos(from + delta);
+        if (to === from) return;
+        pendingDay = to;
+        goToDay(to);
+    }
 
     // entrance animation: the curves rise from the baseline into shape (no
     // day-scrolling). Plays when the view is created (layout switch recreates
@@ -698,9 +1241,19 @@ Item {
     function entranceReveal() {
         posAnim.stop(); flickAnim.stop();
         hourPos = 0;   // always reopen on today
+        chosenDay = -1;
         revealAnim.restart();
     }
     Component.onCompleted: entranceReveal()
+
+    // Top of the header row, in view coordinates (the content's top margin). The header
+    // content is positioned from the shared geometry in WeatherToolbar, which is in view
+    // coordinates too; this converts between the two.
+    readonly property int headerY: Math.round(pad * 1.0)
+    // False while the popup is closed. Plasma keeps the view alive (and `visible`)
+    // behind a hidden popup, so an animated icon gated on `visible` alone keeps
+    // decoding frames for a window nobody can see.
+    readonly property bool onScreen: Window.visibility !== Window.Hidden
     // kept warm across layout switches now, so replay the curve reveal when the
     // view is shown again rather than relying on recreation
     onVisibleChanged: if (visible) entranceReveal()
@@ -722,6 +1275,7 @@ Item {
         property: "hourPos"
         duration: 600
         easing.type: Easing.InOutQuad
+        onFinished: simple.pendingDay = -1   // chain closed; resume from selectedDay
     }
     NumberAnimation {
         id: flickAnim
@@ -780,12 +1334,15 @@ Item {
     // fling) and its paired pan, returning the curve to following the window directly
     function cancelDayMorph() { morphAnim.stop(); flickMorphAnim.stop(); flickAnim.stop(); lblMorphAnim.stop(); simple.dayMorphT = 1; simple.lblMorphT = 1; }
     function flickTo(velocity) {                 // velocity in sample-index units/s
-        var maxVh = 42, decelh = 60;
+        // Sample-index units, so every one of these scales with the density — at the
+        // same finger speed an hourly curve produces twice the index velocity of a
+        // 2-hourly one. Scaled, a fling covers the same span of TIME either way.
+        var maxVh = 42 * densityScale, decelh = 60 * densityScale;
         var vh = Math.max(-maxVh, Math.min(maxVh, velocity));
-        if (Math.abs(vh) < 1.5) return;
+        if (Math.abs(vh) < 1.5 * densityScale) return;
         var dh = (vh < 0 ? -1 : 1) * (vh * vh) / (2 * decelh);
         var th = clampHour(simple.hourPos + dh);
-        if (Math.abs(th - simple.hourPos) < 0.5) return;
+        if (Math.abs(th - simple.hourPos) < 0.5 * densityScale) return;
         // land on a WHOLE hour so the fling morph hands off seamlessly to windowAt()
         var targetW = Math.round(th);
         if (targetW === Math.round(simple.hourPos)) return;
@@ -808,12 +1365,16 @@ Item {
     // the morph hands off cleanly to windowAt(targetW) when dayMorphT reaches 1.
     function _snapMorph(targetW) {
         var win = windowAt(targetW);
+        morphFromBase = Math.round(hourPos);
+        morphToBase = targetW;
         morphFromT = curTemps.slice();
         morphFromP = curPrecip.slice();
         morphFromS = curSnow.slice();
         morphFromA = curPrecipAmt.slice();
+        morphFromC = curChanceOn.slice();
         morphToT = win.map(function(s) { return s.temp; });
-        morphToP = win.map(function(s) { return isNaN(s.precip) ? 0 : s.precip; });
+        morphToP = win.map(function(s) { return weatherRoot ? weatherRoot.precipWashPct(s) : 0; });
+        morphToC = win.map(function(s) { return weatherRoot && weatherRoot.hasPrecipChance(s) ? 1 : 0; });
         morphToS = win.map(function(s) { return simple.snowCm(s); });
         morphToA = win.map(function(s) { return simple.precipMm(s); });
         simple.dayMorphT = 0;
@@ -822,8 +1383,14 @@ Item {
         // Cancel any in-flight pan/morph (a fling, a wheel notch, or a prior tap):
         // morphAnim and flickMorphAnim BOTH drive dayMorphT, so a leftover flick
         // morph would fight this one. (The old version only stopped posAnim.)
+        idx = clampPos(idx);
+        // Picked, so it stays highlighted even where the window cannot start on it
+        // (the last day at 48 hours): the window then goes as far as it can.
+        chosenDay = idx;
+        var targetW = Math.round(clampHour(dayFirstSampleIndex(idx)));
+        // Already there — nothing to pan or morph, only the highlight moves.
+        if (targetW === Math.round(hourPos) && !posAnim.running && !flickAnim.running) return;
         posAnim.stop(); flickAnim.stop(); morphAnim.stop(); flickMorphAnim.stop(); lblMorphAnim.stop();
-        var targetW = Math.round(clampHour(dayFirstSampleIndex(clampPos(idx))));
         _snapMorph(targetW);
         // Pan the strip to the target day...
         posAnim.from = simple.hourPos; posAnim.to = targetW; posAnim.start();
@@ -843,7 +1410,7 @@ Item {
     function notchMorph(targetW) {
         morphAnim.stop(); posAnim.stop();
         _snapMorph(targetW);
-        var dur = 350;
+        var dur = simple.slideMs;
         flickAnim.stop(); flickAnim.from = simple.hourPos; flickAnim.to = targetW;
         flickAnim.duration = dur; flickAnim.start();
         flickMorphAnim.stop(); flickMorphAnim.from = 0; flickMorphAnim.to = 1;
@@ -854,8 +1421,11 @@ Item {
 
     // toolbar buttons floated at the very top-right corner (mirrors FullView)
     WeatherToolbar {
+        id: toolbar
         pad: simple.pad
-        switchTooltip: i18n("Switch to detailed layout")
+        switchTooltip: i18n("Switch to card layout")
+        switchIcon: "view-cards"
+        showZoom: true
         root: weatherRoot
     }
 
@@ -865,162 +1435,63 @@ Item {
         anchors.leftMargin: simple.pad
         anchors.rightMargin: simple.pad
         anchors.bottomMargin: simple.pad
-        anchors.topMargin: Math.round(simple.pad * 1.0)
+        anchors.topMargin: simple.headerY
         spacing: Kirigami.Units.smallSpacing
 
         // ── Header ────────────────────────────────────────────────────────
+        // Placed from the shared header geometry in WeatherToolbar (view coordinates,
+        // converted here via headerY), so everything lands in the same spots as in the
+        // card layout.
         RowLayout {
+            id: headerRow
             Layout.fillWidth: true
-            // pull the header block left, past the content padding, to trim the
-            // extra space on the left of the icon
-            Layout.leftMargin: -Math.round(simple.pad * 0.9)
+            // Pinned to the top of its cell. A popup taller than the content gets the
+            // spare height spread between the rows (which gives the rows below their
+            // breathing room), and a centred header would drift down with it, away
+            // from where the other layout shows the same icon and location.
+            Layout.alignment: Qt.AlignTop
             spacing: Kirigami.Units.largeSpacing
 
-            // left block: icon + temperature, with "condition • location" below
-            ColumnLayout {
+            // Icon, temperature, condition and Weather Elements — the same block as the
+            // card layout's (see HeaderHero); only what differs is handed in here.
+            HeaderHero {
+                id: heroRow
                 Layout.alignment: Qt.AlignTop
-                // nudge the icon/temp/metrics block a touch right (the right-side
-                // filler absorbs it, so the day pills stay put)
-                Layout.leftMargin: Math.round(simple.pad * 0.4)
-                spacing: 0
-
-                RowLayout {
-                    spacing: Kirigami.Units.largeSpacing
-
-                    // current-condition icon to the left of the temperature
-                    Item {
-                        // hero size, shrunk for the visually-heavy clear-night moon
-                        readonly property int sz: Math.round((weatherRoot ? weatherRoot.simpleHeroIconSize : 68)
-                            * (weatherRoot ? weatherRoot.heroScale(weatherRoot.heroCode, weatherRoot.heroDay) : 1))
-                        Layout.preferredWidth: sz
-                        Layout.preferredHeight: sz
-                        Layout.alignment: Qt.AlignVCenter
-                        Layout.topMargin: -Math.round(Kirigami.Units.gridUnit * 1.1)
-
-                        Kirigami.Icon {
-                            anchors.centerIn: parent
-                            width: Math.round(parent.width * (weatherRoot ? weatherRoot.staticIconZoom(weatherRoot.heroCode, weatherRoot.heroDay) : 1))
-                            height: width
-                            roundToIconSize: false   // honor the exact zoom; don't snap to 32/48
-                            visible: simple.heroAnimSrc.length === 0
-                            source: weatherRoot ? weatherRoot.conditionIcon(weatherRoot.heroCode, weatherRoot.heroDay, weatherRoot.heroCloud)
-                                                : "weather-none-available"
-                        }
-                        AnimatedImage {
-                            anchors.fill: parent
-                            visible: simple.heroAnimSrc.length > 0
-                            source: simple.heroAnimSrc
-                            playing: visible
-                            cache: false
-                            smooth: true
-                            mipmap: true
-                            fillMode: Image.PreserveAspectFit
-                        }
-                    }
-
-                    Label {
-                        Layout.alignment: Qt.AlignTop
-                        // the big font has tall top leading — pull up so the
-                        // digits sit level with the icon
-                        Layout.topMargin: -Math.round((weatherRoot ? weatherRoot.simpleTempFontSize : 54) * 0.36)
-                        text: weatherRoot ? weatherRoot.temperatureText : "—"
-                        color: Kirigami.Theme.textColor
-                        font.pixelSize: weatherRoot ? weatherRoot.simpleTempFontSize : 54
-                        font.bold: true
-                    }
-
-                    // Metrics live INSIDE the icon+temp row so their x is governed
-                    // by that (stable) row, not by the variable-width condition/
-                    // location line below — otherwise a shorter location name
-                    // shrinks the left block and the metrics slide left into the
-                    // temperature (the post-location-change overlap bug).
-                    ColumnLayout {
-                        Layout.alignment: Qt.AlignTop
-                        Layout.topMargin: Math.round(Kirigami.Units.gridUnit * 0.05)
-                        Layout.leftMargin: -Math.round(Kirigami.Units.largeSpacing * 0.5)
-                        spacing: 0
-                        // user-selected header metrics (up to 4) — Simple layout's own
-                        // set; the "!" alert indicator sits next to the first line
-                        Repeater {
-                            model: weatherRoot ? weatherRoot.simpleHeaderMetrics : []
-                            delegate: RowLayout {
-                                id: simpMetricRow
-                                required property int index
-                                required property var modelData
-                                readonly property string metric: weatherRoot ? weatherRoot.metricText(modelData, simple.selectedDay, simple.focusedSample) : ""
-                                // keep the FIRST row visible for the alert "!" even when
-                                // its metric text is empty (e.g. metric "none", or a blank
-                                // precip metric) — an invisible parent would hide the
-                                // AlertIndicator child along with the row.
-                                visible: metric.length > 0
-                                         || (index === 0 && weatherRoot && weatherRoot.showAlerts
-                                             && weatherRoot.topAlert !== null)
-                                spacing: Kirigami.Units.smallSpacing
-                                Label {
-                                    textFormat: Text.StyledText
-                                    font.bold: true
-                                    font.pixelSize: weatherRoot ? weatherRoot.simpleHeaderInfoFontSize : 13
-                                    text: simpMetricRow.metric
-                                }
-                                AlertIndicator {
-                                    weatherRoot: simple.weatherRoot
-                                    visible: simpMetricRow.index === 0 && weatherRoot
-                                             && weatherRoot.showAlerts && weatherRoot.topAlert !== null
-                                    Layout.alignment: Qt.AlignVCenter
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Stale marker (see main.qml weatherStale). Simple layout has no
-                // location line to hang it on, so it sits under the icon/temp block.
-                Label {
-                    visible: weatherRoot && weatherRoot.weatherStale
-                    text: weatherRoot ? weatherRoot.staleAgeText() : ""
-                    opacity: 0.6
-                    font.italic: true
-                    font.pixelSize: weatherRoot ? weatherRoot.simpleHeaderInfoFontSize : 13
-                    Layout.topMargin: -Math.round(Kirigami.Units.gridUnit * 0.3)
-                }
+                Layout.leftMargin: toolbar.heroRowX - simple.pad
+                Layout.topMargin: toolbar.heroRowY - simple.headerY
+                weatherRoot: simple.weatherRoot
+                toolbar: toolbar
+                metrics: simple.weatherRoot ? simple.weatherRoot.simpleHeaderMetrics : []
+                selectedDay: simple.selectedDay
+                // the hour under the pointer, else the one the graph is focused on
+                sample: simple.hoveredSample || simple.focusedSample
+                // heroAnimSrc is already "" when the header animation is off
+                animSource: simple.heroAnimSrc
+                animPlaying: simple.onScreen
             }
 
             Item { Layout.fillWidth: true }
 
-            // Day pills — keep their own drop below the toolbar buttons (so the
-            // temperature header can sit up top), nudged a touch past the right
-            // edge so they tuck in under the buttons.
-            Row {
+            // Location, day pills and weather source — shared with the card layout, so
+            // they hold the same spots in both (see HeaderRightBlock).
+            HeaderRightBlock {
                 Layout.alignment: Qt.AlignTop
-                Layout.topMargin: -Math.round(Kirigami.Units.gridUnit * 0.15)
-                Layout.rightMargin: -Math.round(simple.pad * 0.9)
-                spacing: Kirigami.Units.smallSpacing
-                Repeater {
-                    model: weatherRoot ? weatherRoot.dailyData.slice(0, weatherRoot.simpleDailyDays) : []
-                    delegate: Rectangle {
-                        id: pill
-                        required property int index
-                        readonly property bool selected: index === simple.selectedDay
-                        width: pillLabel.implicitWidth + Math.round(Kirigami.Units.gridUnit * 1.1)
-                        height: Math.round(Kirigami.Units.gridUnit * 1.7)
-                        radius: height / 2
-                        color: selected
-                            ? Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g,
-                                      Kirigami.Theme.textColor.b, 0.16)
-                            : (pillHover.hovered ? Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g,
-                                      Kirigami.Theme.textColor.b, 0.08) : "transparent")
-                        Behavior on color { ColorAnimation { duration: 150 } }
-                        HoverHandler { id: pillHover }
-                        TapHandler { onTapped: simple.goToDay(pill.index) }
-                        Label {
-                            id: pillLabel
-                            anchors.centerIn: parent
-                            text: weatherRoot ? weatherRoot.dayName(pill.index, true) : ""
-                            font.bold: pill.selected
-                            font.pixelSize: Kirigami.Theme.defaultFont.pixelSize + 2
-                        }
-                    }
-                }
+                Layout.fillWidth: true
+                Layout.maximumWidth: implicitWidth
+                Layout.topMargin: toolbar.buttonCenterY - simple.headerY - capCenter
+                Layout.rightMargin: toolbar.rightInset - simple.pad
+                weatherRoot: simple.weatherRoot
+                toolbar: toolbar
+                originX: content.x + headerRow.x
+                // The location line is above the Weather Elements, so it may run over
+                // them; it only has to stay clear of the temperature.
+                leftBound: content.x + headerRow.x + heroRow.x + heroRow.heroTempWidth + Kirigami.Units.largeSpacing * 2
+                locationFontSize: weatherRoot ? weatherRoot.locationFontSize : 26
+                providerFontSize: weatherRoot ? weatherRoot.providerFontSize : 16
+                pillCount: weatherRoot ? weatherRoot.graphDays : 0
+                selectedDay: simple.selectedDay
+                onDayClicked: (index) => simple.goToDay(index)
+                onDayStepped: (delta) => simple.stepDay(delta)
             }
         }
 
@@ -1040,8 +1511,14 @@ Item {
 
             // wheel scroll: touchpad pixels = 1:1 slide; mouse notch = discrete jump that morphs
             WheelHandler {
+                id: graphWheel
                 acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                // leftover angle delta between notches — a touchpad sends many small
+                // ones, and they must add up to a notch rather than each firing a
+                // fractional step. Named `acc` because Wheel.step() writes it.
+                property real acc: 0
                 onWheel: (wheel) => {
+                    wheel.accepted = true;
                     var pd = wheel.pixelDelta.x !== 0 ? wheel.pixelDelta.x
                            : wheel.pixelDelta.y !== 0 ? wheel.pixelDelta.y : 0;
                     if (pd !== 0) {
@@ -1050,15 +1527,27 @@ Item {
                         simple.cancelDayMorph();
                         posAnim.stop();
                         var hourW = simple.plotW / simple.pointsVisible;
-                        simple.hourPos = simple.clampHour(simple.hourPos - pd / hourW);
+                        var slid = simple.clampHour(simple.hourPos - pd / hourW);
+                        if (slid !== simple.hourPos) simple.chosenDay = -1;
+                        simple.hourPos = slid;
                     } else {
                         // mouse notch: a discrete jump → MORPH the curve in place to the
-                        // target while the strip pans there (see notchMorph); chain from
-                        // the in-flight flickAnim target so fast scrolling accumulates
+                        // target while the strip pans there (see notchMorph).
                         var adh = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x;
-                        var baseh = flickAnim.running ? flickAnim.to : simple.hourPos;
-                        var targetW = Math.round(simple.clampHour(baseh - (adh / 120) * 3));
-                        if (targetW === Math.round(simple.hourPos) && !flickAnim.running) return;
+                        // One step per event, and step from a WHOLE hour. hourPos is a
+                        // real — a drag leaves it fractional, and a pan in flight is
+                        // fractional by definition — so rounding the RESULT made one
+                        // notch travel 2 hours one way and 1 the other. Rounding the
+                        // BASE first makes every notch exactly `notch` hours.
+                        var steps = Wheel.step(graphWheel, adh);
+                        if (steps === 0) return;
+                        // chain off whichever pan is in flight so rapid notches stack
+                        var baseh = flickAnim.running ? flickAnim.to
+                                  : posAnim.running   ? posAnim.to
+                                  : simple.hourPos;
+                        var targetW = simple.clampHour(Math.round(baseh) + steps * simple.scrollHours);
+                        if (targetW === Math.round(simple.hourPos) && !flickAnim.running && !posAnim.running) return;
+                        simple.chosenDay = -1;
                         simple.notchMorph(targetW);
                     }
                 }
@@ -1073,6 +1562,8 @@ Item {
                 property real lastT: 0
                 onPressed: (m) => {
                     posAnim.stop(); flickAnim.stop(); simple.cancelDayMorph();
+                    // freeze the labelled columns for the duration of the drag
+                    simple.dragLabelBase = Math.round(simple.hourPos);
                     startPos = simple.hourPos;
                     startX = m.x;
                     velocity = 0; lastT = Date.now();
@@ -1084,6 +1575,7 @@ Item {
                     var hourW = simple.plotW / simple.pointsVisible;
                     var newH = simple.clampHour(startPos - (m.x - startX) / hourW);
                     velocity = 0.6 * velocity + 0.4 * ((newH - simple.hourPos) / dt * 1000);
+                    if (newH !== simple.hourPos) simple.chosenDay = -1;   // a click alone keeps it
                     simple.hourPos = newH;
                     lastT = now;
                 }
@@ -1146,8 +1638,18 @@ Item {
                             // horizontal gradient span (shared by temp + precip)
                             var gx0 = xs[0], gx1 = xs[n - 1];
                             if (gx1 <= gx0) gx1 = gx0 + 1;   // guard single point
-                            var tBandStyle, tLineStyle;
-                            if (simple.colorTemp) {
+                            // Start from the flat neutral pair, then colour whichever
+                            // of the two the mode asks for — they are independent, so
+                            // "Temperature curve & precipitation" can warm the line
+                            // while the wash behind it stays grey.
+                            var gray = ctx.createLinearGradient(0, simple.topReserve, 0, height);
+                            gray.addColorStop(0, simple.rgba(tCol, 0.22));
+                            gray.addColorStop(1, simple.rgba(tCol, 0.02));
+                            var tBandStyle = gray;
+                            // flat neutral line — the sun warmth now comes from the
+                            // separate radial bloom pass (drawSunBloom), not a recolor.
+                            var tLineStyle = simple.rgba(tCol, 0.85);
+                            if (simple.colorTempLine || simple.colorTempBand) {
                                 var bandGrad = ctx.createLinearGradient(gx0, 0, gx1, 0);
                                 var lineGrad = ctx.createLinearGradient(gx0, 0, gx1, 0);
                                 // sample the colour ramp at a fixed few stops (not
@@ -1160,16 +1662,8 @@ Item {
                                     bandGrad.addColorStop(off, simple.rampColor(tn, simple.bandAlpha));
                                     lineGrad.addColorStop(off, simple.rampColor(tn, 1));
                                 }
-                                tBandStyle = bandGrad;
-                                tLineStyle = lineGrad;
-                            } else {
-                                var gray = ctx.createLinearGradient(0, simple.topReserve, 0, height);
-                                gray.addColorStop(0, simple.rgba(tCol, 0.22));
-                                gray.addColorStop(1, simple.rgba(tCol, 0.02));
-                                tBandStyle = gray;
-                                // flat neutral line — the sun warmth now comes from the
-                                // separate radial bloom pass (drawSunBloom), not a recolor.
-                                tLineStyle = simple.rgba(tCol, 0.85);
+                                if (simple.colorTempBand) tBandStyle = bandGrad;
+                                if (simple.colorTempLine) tLineStyle = lineGrad;
                             }
 
                             // Draw order matters here. The precip/snow band is
@@ -1205,11 +1699,13 @@ Item {
                                 pLineStyle = simple.rgba(tCol, 0.5);
                             }
 
-                            // precipitation area (flat-extended to both edges)
+                            // precipitation area (flat-extended to both edges) — the
+                            // shaded band beneath the rain curve, as dense as
+                            // precipBandA asks for (0 = nothing but the line).
                             ctx.beginPath();
                             ctx.moveTo(0, py[0]);
                             ctx.lineTo(xs[0], py[0]);
-                            simple.smooth(ctx, xs, py);
+                            simple.smoothMonotone(ctx, xs, py);
                             ctx.lineTo(width, py[n - 1]);
                             ctx.lineTo(width, height);
                             ctx.lineTo(0, height);
@@ -1262,7 +1758,7 @@ Item {
                             ctx.beginPath();
                             ctx.moveTo(0, py[0]);
                             ctx.lineTo(xs[0], py[0]);
-                            simple.smooth(ctx, xs, py);
+                            simple.smoothMonotone(ctx, xs, py);
                             ctx.lineTo(width, py[n - 1]);
                             ctx.lineWidth = 2;
                             ctx.strokeStyle = pLineStyle;
@@ -1279,21 +1775,40 @@ Item {
                             ctx.lineTo(xs[0], ty[0]);
                             simple.smooth(ctx, xs, ty);
                             ctx.lineTo(width, ty[n - 1]);
-                            ctx.lineWidth = simple.colorTemp ? 2.2 : 2;
+                            ctx.lineWidth = simple.colorTempLine ? 2.2 : 2;
                             ctx.strokeStyle = tLineStyle;
                             ctx.stroke();
                         }
                     }
 
-                    // temperature value labels — ride the morphing curve. In hourly
-                    // mode the curve has 24 points, so label every 2nd to avoid crowding.
+                    // temperature value labels — one per curve column, shown on the
+                    // hours showTempLabel() picks (axis hours + the day's extremes).
+                    // The x of each is fixed by its column, so a label never slides.
+                    //
+                    // Which columns are labelled changes when the window moves, and it
+                    // changes by a lot in the 48-hour view: a notch there replaces up to
+                    // half the window, so around eight of the ~14 labels on screen belong
+                    // to hours that have just arrived or just left. Flipping `visible`
+                    // made those eight blink in and out at the moment the slide started;
+                    // fading them dissolves one set into the other while the curve
+                    // travels. The 12- and 24-hour views flip nothing at their default
+                    // steps, so this costs them nothing.
                     Repeater {
                         model: simple.nPts
                         delegate: Label {
                             required property int index
+                            readonly property bool labelled: simple.showTempLabel(simple.labelBase + index)
+                            // tempStr prints a whole degree, so bind the text to the
+                            // rounded value: it is recomputed every frame either way,
+                            // but only signals a change when the digit actually turns —
+                            // which is when the text needs building again.
+                            readonly property real degree: Math.round(simple.lblTemps[index])
+                            opacity: labelled ? 1 : 0
+                            visible: opacity > 0
+                            Behavior on opacity { NumberAnimation { duration: simple.lblFadeDur; easing.type: Easing.InOutQuad } }
                             x: simple.xAt(index) - width / 2
                             y: simple.curTempY(index) - height - Kirigami.Units.smallSpacing
-                            text: weatherRoot ? weatherRoot.tempStr(simple.lblTemps[index]) : ""
+                            text: weatherRoot ? weatherRoot.tempStr(degree) : ""
                             font.bold: true
                             font.pixelSize: weatherRoot ? weatherRoot.simpleGraphTempFontSize : 13
                             color: Kirigami.Theme.textColor
@@ -1314,7 +1829,17 @@ Item {
                             id: roGroup
                             required property int  index
                             readonly property real pVal: index < simple.curPrecip.length ? simple.curPrecip[index] : 0
+                            // printed rounded, so bind the label to the rounded value
+                            readonly property int  pInt: Math.round(pVal)
+                            readonly property bool chanceOn: index < simple.curChanceOn.length && simple.curChanceOn[index] === 1
                             readonly property real sVal: index < simple.curSnow.length   ? simple.curSnow[index]   : 0
+                            // The hour this column shows (the nearest one mid-scroll, the
+                            // nearer snapshot mid-morph), and whether the 48-hour readout
+                            // plan labels it. Always true at 12 and 24 hours.
+                            readonly property int nearG: simple.dayMorphT < 1
+                                ? (simple.dayMorphT < 0.5 ? simple.morphFromBase : simple.morphToBase) + index
+                                : (simple.curFrac < 0.5 ? simple.hourFloor : simple.hourCeil) + index
+                            readonly property bool planned: simple.readoutShownAt(nearG)
                             // Precip % shows on EVERY hour above the threshold, including
                             // repeated flat runs (a steady 90% stretch is labelled every
                             // hour, not just at its start). It ALSO shows whenever this
@@ -1335,8 +1860,11 @@ Item {
                             function _onAt(arr, i) {
                                 var s = i < arr.length ? arr[i] : null;
                                 if (!s) return false;
-                                if (!isNaN(s.precip) && s.precip >= simple.pctLabelMin) return true;
-                                return weatherRoot && weatherRoot.precipAmtStr(simple.precipMm(s)) !== "";
+                                // no chance published for this hour → nothing to print, even
+                                // with an amount (that used to come out as "0%")
+                                if (!weatherRoot || !weatherRoot.hasPrecipChance(s)) return false;
+                                if (s.precip >= simple.pctLabelMin) return true;
+                                return weatherRoot && weatherRoot.hasPrecipAmt(simple.precipMm(s));
                             }
                             readonly property bool pctOn: {
                                 // Visibility tracks the NEAREST real hour to this slot, not an OR
@@ -1345,18 +1873,20 @@ Item {
                                 // then cleared on settle. Nearest flips once at the midpoint: the
                                 // label travels with a wet hour and clears as a dry one becomes
                                 // nearest. Settled (curFrac 0) it's the slot's own real hour.
+                                if (!planned) return false;
                                 if (simple.dayMorphT < 1)   // day-pill / fling: nearest morph snapshot
-                                    return (simple.dayMorphT < 0.5 ? _pctOnAt(simple.morphFromP, simple.morphFromA, index)
-                                                                   : _pctOnAt(simple.morphToP,   simple.morphToA,   index)) === 1;
+                                    return (simple.dayMorphT < 0.5 ? _pctOnAt(simple.morphFromP, simple.morphFromA, simple.morphFromC, index)
+                                                                   : _pctOnAt(simple.morphToP,   simple.morphToA,   simple.morphToC,   index)) === 1;
                                 return _onAt(simple.curFrac < 0.5 ? simple.loSamples : simple.hiSamples, index);
                             }
                             // Is the % label on for snapshot column i? — same rule as the
                             // settled state: chance over threshold, OR a real amount this hour.
-                            function _pctOnAt(pArr, aArr, i) {
+                            function _pctOnAt(pArr, aArr, cArr, i) {
+                                if (!(i < cArr.length && cArr[i])) return 0;   // no chance → no %
                                 var p = i < pArr.length ? pArr[i] : 0;
                                 if (p >= simple.pctLabelMin) return 1;
                                 var a = i < aArr.length ? aArr[i] : 0;
-                                return (weatherRoot && weatherRoot.precipAmtStr(a) !== "") ? 1 : 0;
+                                return (weatherRoot && weatherRoot.hasPrecipAmt(a)) ? 1 : 0;
                             }
                             // Morph-tracked fade ONLY for a day-pill cross-fade (morphAnim): the
                             // % fades across the whole morph from its source-day to target-day
@@ -1365,9 +1895,12 @@ Item {
                             // unrelated hours start vs end — there (and on scroll/settle) the
                             // plain on-flag + Behavior fade is correct.
                             readonly property real pctOpacity: {
+                                if (!simple.showPrecipPct) return 0;   // hidden by the readout setting
                                 if (morphAnim.running) {
-                                    var fromOn = _pctOnAt(simple.morphFromP, simple.morphFromA, index);
-                                    var toOn   = _pctOnAt(simple.morphToP,   simple.morphToA,   index);
+                                    var fromOn = _pctOnAt(simple.morphFromP, simple.morphFromA, simple.morphFromC, index)
+                                                 * (simple.readoutShownAt(simple.morphFromBase + index) ? 1 : 0);
+                                    var toOn   = _pctOnAt(simple.morphToP,   simple.morphToA,   simple.morphToC,   index)
+                                                 * (simple.readoutShownAt(simple.morphToBase + index) ? 1 : 0);
                                     return fromOn + (toOn - fromOn) * simple.dayMorphT;
                                 }
                                 return pctOn ? 1 : 0;
@@ -1393,14 +1926,17 @@ Item {
                                 var arr = simple.curFrac < 0.5 ? simple.loSamples : simple.hiSamples;
                                 return index < arr.length ? simple.precipMm(arr[index]) : 0;
                             }
-                            readonly property bool   snowOn: _nearSnow() >= 0.1
+                            readonly property bool   snowOn: planned && _nearSnow() >= 0.1
                             // Snow fades ACROSS a day-pill cross-fade (morphAnim) like the %,
                             // rather than popping at its 0.1in threshold partway through the
                             // morph. Scroll/settle keep the on-flag + Behavior fade.
                             readonly property real snowOpacity: {
+                                if (!simple.showPrecipAmt) return 0;   // hidden by the readout setting
                                 if (morphAnim.running) {
-                                    var f = (index < simple.morphFromS.length ? simple.morphFromS[index] : 0) >= 0.1 ? 1 : 0;
-                                    var t = (index < simple.morphToS.length   ? simple.morphToS[index]   : 0) >= 0.1 ? 1 : 0;
+                                    var f = (index < simple.morphFromS.length ? simple.morphFromS[index] : 0) >= 0.1
+                                            && simple.readoutShownAt(simple.morphFromBase + index) ? 1 : 0;
+                                    var t = (index < simple.morphToS.length   ? simple.morphToS[index]   : 0) >= 0.1
+                                            && simple.readoutShownAt(simple.morphToBase + index) ? 1 : 0;
                                     return f + (t - f) * simple.dayMorphT;
                                 }
                                 return snowOn ? 1 : 0;
@@ -1411,20 +1947,30 @@ Item {
                             // hidden, and suppressed while it's snowing — the snow row
                             // above already carries that hour's accumulation.
                             readonly property real   aVal:   index < simple.curPrecipAmt.length ? simple.curPrecipAmt[index] : 0
-                            readonly property string aText:  weatherRoot ? weatherRoot.precipAmtStr(aVal) : ""
-                            readonly property bool   amtOn:  !snowOn && weatherRoot && weatherRoot.precipAmtStr(_nearAmt()) !== ""
+                            // aVal morphs every frame of a scroll; aQ is the same number
+                            // rounded to what actually gets printed, so the formatting
+                            // below runs when the text changes rather than every frame.
+                            readonly property real   aQ:     weatherRoot ? weatherRoot.precipAmtQ(aVal) : 0
+                            readonly property string aText:  weatherRoot ? weatherRoot.precipAmtStr(aQ) : ""
+                            // (the snow check reads the amount itself, not snowOn, which the
+                            // readout plan can switch off for an hour it doesn't label)
+                            readonly property bool   amtOn:  planned && _nearSnow() < 0.1 && weatherRoot
+                                                             && weatherRoot.hasPrecipAmt(_nearAmt())
                             // Amount fades across a day-pill morph like the % and snow. On at a
                             // snapshot column = a real amount AND not snowing there (snow's label
                             // carries that hour instead). Scroll/settle keep the Behavior fade.
                             function _amtOnAt(sArr, aArr, i) {
                                 if ((i < sArr.length ? sArr[i] : 0) >= 0.1) return 0;   // snowing → snow owns the slot
                                 var a = i < aArr.length ? aArr[i] : 0;
-                                return (weatherRoot && weatherRoot.precipAmtStr(a) !== "") ? 1 : 0;
+                                return (weatherRoot && weatherRoot.hasPrecipAmt(a)) ? 1 : 0;
                             }
                             readonly property real amtOpacity: {
+                                if (!simple.showPrecipAmt) return 0;   // hidden by the readout setting
                                 if (morphAnim.running) {
-                                    var f = _amtOnAt(simple.morphFromS, simple.morphFromA, index);
-                                    var t = _amtOnAt(simple.morphToS,   simple.morphToA,   index);
+                                    var f = _amtOnAt(simple.morphFromS, simple.morphFromA, index)
+                                            * (simple.readoutShownAt(simple.morphFromBase + index) ? 1 : 0);
+                                    var t = _amtOnAt(simple.morphToS,   simple.morphToA,   index)
+                                            * (simple.readoutShownAt(simple.morphToBase + index) ? 1 : 0);
                                     return (f + (t - f) * simple.dayMorphT) * 0.9;
                                 }
                                 return amtOn ? 0.9 : 0;
@@ -1443,17 +1989,8 @@ Item {
                             onATextChanged: if (aText.length > 0) aShown = aText
                             spacing: 1
                             x: Math.max(0, simple.xAt(index) - width / 2)
-                            y: {
-                                var pTop = simple.curPrecipY(index);
-                                var tTop = simple.curTempY(index);
-                                var tempLabelH = (weatherRoot ? weatherRoot.simpleGraphTempFontSize : 13) * 1.4;
-                                var tempLabelTop = tTop - tempLabelH - Kirigami.Units.smallSpacing;
-                                var gap = 3;
-                                // group bottom must clear the temp label AND sit a
-                                // comfortable distance above the precip curve.
-                                var bottom = Math.min(tempLabelTop - gap, pTop - 14);
-                                return Math.max(0, bottom - height);
-                            }
+                            y: Math.max(0, simple.readoutTopFor(simple.curTempY(index),
+                                                               simple.curPrecipY(index), height))
                             // Snow + rain-amount share ONE fixed-height slot above the
                             // chance. They're mutually exclusive, so one cross-fades into
                             // the other IN PLACE; and because the slot's height is FIXED
@@ -1464,7 +2001,7 @@ Item {
                             Item {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 width: Math.max(snowLbl.implicitWidth, amtLbl.implicitWidth)
-                                height: simple.readoutRowH
+                                height: simple.showPrecipAmt ? simple.readoutRowH : 0
                                 Label {
                                     id: snowLbl
                                     anchors.centerIn: parent
@@ -1488,11 +2025,15 @@ Item {
                                     font.pixelSize: Math.round(simple.graphReadoutFontSize * 0.85)
                                 }
                             }
-                            // chance % — the bottom readout row
+                            // chance % — the bottom readout row. Collapses to nothing for an
+                            // hour with no published chance, so the amount above sits where
+                            // the % would have been rather than over an empty row. Chance
+                            // availability doesn't change while scrolling a single provider's
+                            // data, so this never reflows mid-gesture.
                             Item {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 width: pctLbl.implicitWidth
-                                height: simple.readoutRowH
+                                height: (roGroup.chanceOn && simple.showPrecipPct) ? simple.readoutRowH : 0
                                 Label {
                                     id: pctLbl
                                     anchors.centerIn: parent
@@ -1502,7 +2043,7 @@ Item {
                                     // pctOpacity frame-by-frame, so the Behavior would fight it.
                                     // Enabled for flick/scroll/settle so those still fade normally.
                                     Behavior on opacity { enabled: !morphAnim.running; NumberAnimation { duration: roGroup.pctOn ? simple.readoutFadeDur : simple.readoutFadeOutDur; easing.type: Easing.InOutQuad } }
-                                    text: Math.round(roGroup.pVal) + "%"
+                                    text: roGroup.pInt + "%"
                                     color: simple.colorPrecip ? simple.precipColor : Kirigami.Theme.textColor
                                     font.bold: true
                                     font.pixelSize: simple.graphReadoutFontSize
@@ -1510,75 +2051,86 @@ Item {
                             }
                         }
                     }
-                    // New-day markers: a dashed line + moon + date at any fixed
-                    // column whose hour is 00:00 (it snaps column to column as you
-                    // scroll, in keeping with the reshape-in-place columns).
-                    Canvas {
-                        id: hrMarkerCanvas
-                        anchors.fill: parent
-                        Connections {
-                            target: simple
-                            // only track the curve per-frame while a midnight line is
-                            // actually on screen; repaint once on enter/leave to clear
-                            function onCurTempsChanged() { if (simple.windowHasMidnight) hrMarkerCanvas.requestPaint(); }
-                            function onCurPrecipChanged() { if (simple.windowHasMidnight) hrMarkerCanvas.requestPaint(); }
-                            function onWindowHasMidnightChanged() { hrMarkerCanvas.requestPaint(); }
-                            function onRevealChanged() { hrMarkerCanvas.requestPaint(); }
-                        }
-                        onPaint: {
-                            var ctx = getContext("2d"); ctx.reset();
-                            ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
-                            ctx.strokeStyle = simple.rgba(Kirigami.Theme.textColor, 0.45);
-                            var tLabelH = (weatherRoot ? weatherRoot.simpleGraphTempFontSize : 13) * 1.4;
-                            var rowH = weatherRoot ? Math.round(weatherRoot.hourlyInfoFontSize * 1.7) : 18;
-                            var s = simple.samples, base = simple.windowBase;
-                            for (var k = -1; k < simple.poolSize; ++k) {
-                                var g = base + k;
-                                if (g < 0 || g >= s.length) continue;
-                                if (!simple.isDayStart(g)) continue;
-                                var mx = simple.hourX(g);
-                                if (mx < -10 || mx > width + 10) continue;
-                                var top = Math.max(rowH, simple.curveYAtX(mx) - tLabelH - simple.markerLift(g));
-                                ctx.beginPath(); ctx.moveTo(mx, top); ctx.lineTo(mx, height); ctx.stroke();
-                            }
-                        }
-                    }
+                    // New-day markers: moon + date over a dashed line down to the
+                    // floor, at any fixed column whose hour is 00:00 (it snaps column
+                    // to column as you scroll, in keeping with the reshape-in-place
+                    // columns).
                     Repeater {
-                        model: simple.poolSize
-                        delegate: Row {
-                            required property int index
-                            readonly property int g: simple.windowBase + index - 1
-                            readonly property var modelData: (g >= 0 && g < simple.samples.length) ? simple.samples[g] : null
+                        model: simple.dayStartsInWindow
+                        delegate: Item {
+                            id: dayMarker
+                            required property var modelData        // the midnight's global sample index
+                            readonly property int g: modelData
+                            readonly property var sample: (g >= 0 && g < simple.samples.length) ? simple.samples[g] : null
                             readonly property real lineX: simple.hourX(g)
                             // day-representative forecast entry (matches the Card day
                             // tab), keyed by the marker's date rather than the 00:00 code
-                            readonly property var dayEntry: (weatherRoot && modelData)
-                                ? weatherRoot.dailyData[weatherRoot.dayIndexForDate(modelData.date)] : null
-                            visible: modelData !== null && simple.isDayStart(g)
+                            readonly property var dayEntry: (weatherRoot && sample)
+                                ? weatherRoot.dailyData[weatherRoot.dayIndexForDate(sample.date)] : null
+                            visible: sample !== null
                                      && lineX > -width && lineX < plot.width + width
-                            spacing: Kirigami.Units.smallSpacing
-                            x: lineX - width / 2
+                            width: markerRow.width
+                            height: markerRow.height
+                            // centred on the line, but never cut off by a plot edge
+                            // while the line is on screen (see dayMarkerX)
+                            x: simple.dayMarkerX(lineX, width)
                             y: {
-                                var cy = simple.curveYAtX(lineX);
+                                var cy = simple.markerCurveY(g, lineX);
                                 var tLabelH = (weatherRoot ? weatherRoot.simpleGraphTempFontSize : 13) * 1.4;
-                                return Math.max(0, cy - tLabelH - height - simple.markerLift(g));
+                                return Math.max(0, cy - tLabelH - height
+                                                   - simple.markerLift(g, x + width / 2 - lineX));
                             }
-                            Kirigami.Icon {
-                                // new-day marker icon — a touch larger than the row text
-                                width: weatherRoot ? Math.round(weatherRoot.hourlyInfoFontSize * 2.45) : 27
-                                height: width
-                                roundToIconSize: false   // render at the exact size; don't snap to 22/32
-                                anchors.verticalCenter: parent.verticalCenter
-                                source: (weatherRoot && parent.dayEntry)
-                                        ? weatherRoot.conditionIcon(parent.dayEntry.code, 1)
-                                        : "weather-clear-night"
+                            Row {
+                                id: markerRow
+                                spacing: Kirigami.Units.smallSpacing
+                                Kirigami.Icon {
+                                    // new-day marker icon — a touch larger than the row text, and
+                                    // scaled with the day label's font so the two stay in proportion
+                                    width: weatherRoot ? Math.round(weatherRoot.simpleDayMarkerFontSize * 2.25) : 27
+                                    height: width
+                                    roundToIconSize: false   // render at the exact size; don't snap to 22/32
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    source: (weatherRoot && dayMarker.dayEntry)
+                                            ? weatherRoot.conditionIcon(dayMarker.dayEntry.code, 1)
+                                            : "weather-clear-night"
+                                }
+                                Label {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    // weekday + day and month in the system's date format,
+                                    // or the weekday alone
+                                    text: (weatherRoot && dayMarker.sample) ? weatherRoot.dayMarkerText(dayMarker.sample.date) : ""
+                                    font.bold: true
+                                    opacity: 0.8
+                                    font.pixelSize: weatherRoot ? weatherRoot.simpleDayMarkerFontSize : 12
+                                }
                             }
-                            Label {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: parent.modelData ? new Date(parent.modelData.time).toLocaleDateString(Qt.locale(), "ddd, MMM d") : ""
-                                font.bold: true
-                                opacity: 0.8
-                                font.pixelSize: weatherRoot ? weatherRoot.hourlyInfoFontSize + 1 : 12
+                            // The dashed line, from the marker's own bottom edge down to
+                            // the floor of the graph. Plain rectangles, not a Canvas: a
+                            // Canvas spanning the plot has to re-rasterise on the CPU
+                            // every frame the curve moves under it, while these are
+                            // scene-graph nodes the renderer only translates. Being part
+                            // of the marker also means the line cannot drift from it —
+                            // they share one y instead of recomputing the same lift twice.
+                            // It stays on the midnight itself when an edge holds the
+                            // marker off-centre, so it can hang from anywhere under it.
+                            Item {
+                                x: Math.round(dayMarker.lineX - dayMarker.x)
+                                y: dayMarker.height
+                                width: 1
+                                height: Math.max(0, plot.height - dayMarker.y - dayMarker.height)
+                                clip: true   // the dash run is cut to length here
+                                Column {
+                                    spacing: simple.dayLineGap
+                                    Repeater {
+                                        model: simple.dayLineDashes
+                                        delegate: Rectangle {
+                                            width: 1
+                                            height: simple.dayLineDash
+                                            color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g,
+                                                           Kirigami.Theme.textColor.b, 0.45)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1604,11 +2156,11 @@ Item {
                             // and y lerps between the above/below anchors. Both anchors
                             // track the live curve, so only the FLIP animates — continuous
                             // curve-tracking stays lag-free (belowF holds at 0 or 1).
-                            readonly property real markGap: Kirigami.Units.smallSpacing * 3
+                            readonly property real markGap: simple.sunMarkGap
                             readonly property real cyV: simple.curveYAtX(mx)
                             readonly property real aboveY: cyV
                                 - ((weatherRoot ? weatherRoot.simpleGraphTempFontSize : 13) * 1.4)
-                                - height - markGap - simple.sunMarkerLift(mx)
+                                - height - markGap - simple.sunMarkerLift(mx, height)
                             readonly property real belowY: cyV + markGap
                             readonly property bool wantBelow: aboveY < 2
                             property real belowF: wantBelow ? 1 : 0
@@ -1651,14 +2203,16 @@ Item {
                     // A sliding pool of icons — stable delegates that pan via
                     // hourX and recycle their hour once per window shift.
                     Repeater {
-                        model: simple.poolSize
+                        model: simple.filmCount
                         delegate: Item {
                             id: hrIconC
                             required property int index
-                            readonly property int g: simple.windowBase + index - 1
+                            readonly property int g: simple.filmG(index)
                             readonly property var modelData: (g >= 0 && g < simple.samples.length) ? simple.samples[g] : null
                             readonly property real cx: simple.hourX(g)
-                            visible: modelData !== null && cx > -width && cx < gcol.width + width
+                            // Only labelled hours get an icon — at day width the curve
+                            // has 24 points and 24 icons would overlap into a smear.
+                            visible: shown && cx > -width && cx < gcol.width + width
                             width: weatherRoot ? weatherRoot.simpleHourlyIconSize : 24
                             height: width
                             x: cx - width / 2
@@ -1670,7 +2224,10 @@ Item {
                             // the SAME artwork as the animated card icon — just frozen (playing
                             // gated below on simpleAnimatedIcons). Falls back to the static SVG only
                             // for conditions heroAnim has no WebP for (returns ""), matching the card.
-                            readonly property string animSrc: (weatherRoot && modelData)
+                            // the pool only holds labelled hours now (see filmBase), so this
+                            // is just "is there a sample here"
+                            readonly property bool shown: modelData !== null
+                            readonly property string animSrc: (weatherRoot && modelData && shown)
                                 ? weatherRoot.heroAnim(hrIconC.iconCode, modelData.day, modelData.cloud) : ""
                             // per-condition fine-tune (sunny trimmed); guard null model
                             readonly property real iScale: (weatherRoot && hrIconC.modelData)
@@ -1681,9 +2238,9 @@ Item {
                                 height: width
                                 roundToIconSize: false   // honor the exact zoom; don't snap to 32/48
                                 visible: hrIconC.animSrc.length === 0
-                                source: (weatherRoot && hrIconC.modelData)
+                                source: (weatherRoot && hrIconC.modelData && hrIconC.shown)
                                         ? weatherRoot.conditionIcon(hrIconC.iconCode, hrIconC.modelData.day, hrIconC.modelData.cloud)
-                                        : "weather-none-available"
+                                        : ""
                             }
                             AnimatedImage {
                                 anchors.centerIn: parent
@@ -1693,7 +2250,7 @@ Item {
                                 source: hrIconC.animSrc
                                 // animate only when the graph's hourly-anim option is on; otherwise
                                 // hold frame 0 (a static poster that matches the card's animated art)
-                                playing: weatherRoot && weatherRoot.simpleAnimatedIcons && visible && !simple.scrolling
+                                playing: weatherRoot && weatherRoot.simpleAnimatedIcons && visible && simple.onScreen && !simple.scrolling
                                 cache: false
                                 smooth: true
                                 mipmap: true
@@ -1710,13 +2267,14 @@ Item {
                     clip: true
                     // A sliding pool of hour labels that pan with the scroll
                     Repeater {
-                        model: simple.poolSize
+                        model: simple.filmCount
                         delegate: Label {
                             required property int index
-                            readonly property int g: simple.windowBase + index - 1
+                            readonly property int g: simple.filmG(index)
                             readonly property var modelData: (g >= 0 && g < simple.samples.length) ? simple.samples[g] : null
                             readonly property real cx: simple.hourX(g)
-                            visible: modelData !== null && cx > -width && cx < gcol.width + width
+                            visible: modelData !== null
+                                     && cx > -width && cx < gcol.width + width
                             x: cx - width / 2
                             anchors.verticalCenter: parent.verticalCenter
                             text: modelData ? new Date(modelData.time).toLocaleTimeString(Qt.locale(), weatherRoot && weatherRoot.use24Hour ? "H:mm" : "h AP") : ""
@@ -1724,6 +2282,26 @@ Item {
                         }
                     }
                 }
+            }
+
+            // ── hover scrubbing ──
+            // Topmost on purpose, ABOVE the labels. The drag MouseArea underneath
+            // used to do this, but hover events go to the frontmost item that wants
+            // them and do not fall through — so the moment the pointer crossed an
+            // hour, temperature or day label the drag area stopped seeing it, the
+            // hovered hour cleared, and the readouts snapped back to the current
+            // hour. Sitting on top means nothing in the graph can shadow it.
+            //
+            // acceptedButtons: NoButton keeps it hover-only: presses, drags and
+            // flicks pass straight through to the MouseArea below, so scrolling is
+            // untouched.
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.NoButton
+                hoverEnabled: true
+                onPositionChanged: (m) => { simple.hoveredSample = simple.sampleAtX(m.x); }
+                onExited: simple.hoveredSample = null
+                onContainsMouseChanged: if (!containsMouse) simple.hoveredSample = null
             }
         }
     }

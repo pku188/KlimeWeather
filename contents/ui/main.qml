@@ -1,18 +1,22 @@
 /*
  * Weather — a simple weather widget for KDE Plasma 6
- * Copyright 2026  bvlthvzvr
+ * Copyright 2026  pku188, bvlthvzvr
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Original work. Weather data from Open-Meteo (https://open-meteo.com),
- * a free, no-key public API.
+ * Original work. Weather data comes from a pluggable provider — see
+ * providers/ for the adapters and the model contract they implement.
  */
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Window
 import QtQuick.Effects
+import QtQuick.LocalStorage
 import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
+import org.kde.plasma.plasma5support as P5Support
 import org.kde.kirigami as Kirigami
+import "providers"
+import "providers/grid.js" as Grid
 
 PlasmoidItem {
     id: root
@@ -20,7 +24,19 @@ PlasmoidItem {
     readonly property bool keepOpen: Plasmoid.configuration.keepOpen || false
     function setKeepOpen(v) { Plasmoid.configuration.keepOpen = v; }
     function toggleLayout() { Plasmoid.configuration.simpleLayout = !simpleLayout; }
+    // Graph zoom: a whole day on screen (2-hour labels) or half a day (hourly
+    // labels). Both draw the same hourly curve — see SimpleView's pointsVisible.
+    // Also reachable from Appearance → Graph; this is the in-place shortcut.
+    // Graph zoom, one step at a time: 0 = 12 hours, 1 = 24 hours, 2 = 48 hours.
+    function zoomGraphIn()  { if (graphZoom > 0) Plasmoid.configuration.graphZoom = graphZoom - 1; }
+    function zoomGraphOut() { if (graphZoom < 2) Plasmoid.configuration.graphZoom = graphZoom + 1; }
     hideOnWindowDeactivate: !keepOpen
+    // Build the popup's content in the background when the widget loads, instead of
+    // on the first click. Without it the first open had to construct the whole view
+    // (and every hourly card) while you waited; Plasma already knows how to do this
+    // lazily and off the interaction path. Costs nothing extra over a session: once
+    // opened, the popup content is kept anyway.
+    preloadFullRepresentation: true
 
     // Transparent on the desktop by default — the widget paints its own content
     // and looks better floating frameless over the wallpaper. ConfigurableBackground
@@ -36,7 +52,11 @@ PlasmoidItem {
     property real temperature: NaN
     property int  weatherCode: -1
     property real cloudCover: NaN     // %, drives the overcast-snow icon
+    property real pressure:   NaN     // hPa at sea level (both providers report it there)
     property bool loading: false
+    // The most recent weather request failed (network down, HTTP error, unreadable
+    // body). Cleared by the next success. With no data at all, the popup says so.
+    property bool fetchFailing: false
 
     readonly property string locationName: Plasmoid.configuration.locationName || "—"
     // just the city/region for the header — drop the ", Region, Country" that
@@ -50,12 +70,24 @@ PlasmoidItem {
     readonly property bool   hasLocation:  Plasmoid.configuration.locationConfigured
     readonly property string units: Plasmoid.configuration.temperatureUnit || "celsius"
     readonly property int    dailyDays:      Plasmoid.configuration.dailyDays      || 5
-    readonly property int    simpleDailyDays: Plasmoid.configuration.simpleDailyDays || 5
-    readonly property bool   simpleHourly:    Plasmoid.configuration.simpleHourly    || false
+    // Days the graph spans, today included: 3 by default, up to 5 (Appearance →
+    // Graph). Three is what BOTH providers can draw at hourly resolution — met.no's
+    // hourly data runs out around hour 54 and only 6-hour blocks follow, so its later
+    // days are stretched blocks (which read acceptably once identical readouts merge,
+    // see SimpleView's readoutPlan). Open-Meteo stays hourly the whole way. The CARD
+    // layout keeps its own day count (dailyDays); it renders blocks as blocks.
+    readonly property int    graphDays: Math.max(3, Math.min(5, Plasmoid.configuration.simpleDailyDays || 3))
+    readonly property int    graphZoom:       Math.max(0, Math.min(2, Plasmoid.configuration.graphZoom ?? 1))
     readonly property int    refreshMinutes: Plasmoid.configuration.refreshInterval || 15
     readonly property int    heroIconSize:   Plasmoid.configuration.heroIconSize   || 88
     readonly property int    tempFontSize:   Plasmoid.configuration.tempFontSize   || 88
     readonly property int    dailyIconSize:  Plasmoid.configuration.dailyIconSize  || 36
+    readonly property int    dailyTempFontSize: Plasmoid.configuration.dailyTempFontSize || 15
+    // Pixel size of the wind-direction arrow, wherever it is drawn (hourly cards and
+    // both headers' Wind element). Its own setting because the glyph reads much smaller
+    // than text at the same size — the arrow sits inside a circle that eats most of it.
+    readonly property int    windArrowSize:     Plasmoid.configuration.windArrowSize || 21
+    readonly property bool   showDayDate:       Plasmoid.configuration.showDayDate ?? true
     readonly property int    hourlyIconSize:     Plasmoid.configuration.hourlyIconSize     || 38
     readonly property int    hourlyInfoFontSize: Plasmoid.configuration.hourlyInfoFontSize || 11
     // Detailed hourly-card element font (time + per-hour readouts/glyphs); SimpleView
@@ -65,9 +97,20 @@ PlasmoidItem {
     // hour a non-today day opens at in the Detailed timeline (6 = 6 AM, 0 = midnight).
     // Read directly — NOT `|| 6` — since 0 (midnight) is a valid value `||` would clobber.
     readonly property int    detailDayStartHour:  Plasmoid.configuration.detailDayStartHour
+    readonly property int    cardDealDurationPercent: Plasmoid.configuration.cardDealDurationPercent ?? 60
+    readonly property int    cardsPerScroll:      Math.max(1, Plasmoid.configuration.cardsPerScroll || 1)
+    readonly property int    graphScrollHoursDay:    Math.max(1, Plasmoid.configuration.graphScrollHoursDay    || 6)
+    readonly property int    graphScrollHoursDetail: Math.max(1, Plasmoid.configuration.graphScrollHoursDetail || 3)
+    readonly property int    graphScrollHoursWide:   Math.max(1, Plasmoid.configuration.graphScrollHoursWide   || 12)
+    // How long that notch takes to slide, per zoom. `??` rather than `||`: 0 is a
+    // valid setting here, meaning jump with no slide at all.
+    readonly property int    graphSlideMsDetail:    Math.max(0, Plasmoid.configuration.graphSlideMsDetail ?? 350)
+    readonly property int    graphSlideMsDay:       Math.max(0, Plasmoid.configuration.graphSlideMsDay    ?? 450)
+    readonly property int    graphSlideMsWide:      Math.max(0, Plasmoid.configuration.graphSlideMsWide   ?? 800)
     readonly property int    conditionFontSize:   Plasmoid.configuration.conditionFontSize   || 28
+    readonly property int    locationFontSize:    Plasmoid.configuration.locationFontSize    || 28
+    readonly property int    providerFontSize:    Plasmoid.configuration.providerFontSize    || 16
     readonly property bool   animatedDailyIcons:  Plasmoid.configuration.animatedDailyIcons  ?? true
-    readonly property bool   showDayDate:         Plasmoid.configuration.showDayDate         ?? true
     readonly property bool   animatedHourlyIcons: Plasmoid.configuration.animatedHourlyIcons ?? true
     readonly property bool   simpleLayout:         Plasmoid.configuration.simpleLayout         || false
     readonly property int    simpleHourlyIconSize: Plasmoid.configuration.simpleHourlyIconSize || 34
@@ -75,9 +118,10 @@ PlasmoidItem {
     readonly property bool   simpleHeaderAnim:     Plasmoid.configuration.simpleHeaderAnim     ?? true
     // regular-layout header (hero) icon animates unless forecast animation is None
     readonly property bool   fullHeaderAnim:       animatedDailyIcons || animatedHourlyIcons
-    readonly property int    simpleHeroIconSize:   Plasmoid.configuration.simpleHeroIconSize   || 86
-    readonly property int    simpleTempFontSize:   Plasmoid.configuration.simpleTempFontSize   || 86
     readonly property int    graphColorMode:       Plasmoid.configuration.graphColorMode       ?? 2
+    readonly property int    precipBandOpacity:    Math.max(0, Math.min(90, Plasmoid.configuration.precipBandOpacity ?? 30))
+    readonly property int    precipLabelMode:      Math.max(0, Math.min(3, Plasmoid.configuration.precipLabelMode ?? 3))
+    readonly property bool   showDayMarkerDate:    Plasmoid.configuration.showDayMarkerDate    ?? true
     readonly property int    panelIconPercent:   Plasmoid.configuration.panelIconPercent   || 130
     readonly property int    panelFontPercent:   Plasmoid.configuration.panelFontPercent   || 48
     readonly property bool   panelColorIcon:     Plasmoid.configuration.panelColorIcon === true
@@ -90,13 +134,18 @@ PlasmoidItem {
 
     // Wind speed unit. "auto" follows the temperature unit (mph with °F, kmh
     // with °C) — what the widget always did; "kmh"/"mph"/"ms" pin it instead.
-    // windUnitApi goes straight into the Open-Meteo query, windUnitLabel is
-    // what the UI prints.
+    // windUnitApi is the unit wind speeds are converted to (convertUnits);
+    // windUnitLabel is what the UI prints.
     readonly property string windUnit:    Plasmoid.configuration.windUnit || "auto"
     readonly property string windUnitApi: (windUnit !== "auto") ? windUnit
                                         : (units === "fahrenheit" ? "mph" : "kmh")
     readonly property string windUnitLabel: (windUnitApi === "mph") ? "mph"
                                           : (windUnitApi === "ms")  ? "m/s" : "kmh"
+    // Air pressure unit, the same shape as the wind one: "auto" follows the temperature
+    // unit (inHg is the customary unit wherever °F is), hPa or inHg pin it.
+    readonly property string pressureUnit:    Plasmoid.configuration.pressureUnit || "auto"
+    readonly property string pressureUnitApi: (pressureUnit !== "auto") ? pressureUnit
+                                            : (units === "fahrenheit" ? "inHg" : "hPa")
 
     property real apparentTemp: NaN
     property real humidity:     NaN
@@ -214,17 +263,25 @@ PlasmoidItem {
         return s;
     }
 
-    // header info lines: up to 4 user-selected metrics shown next to the temp.
-    // Each layout has its own list + font — `headerMetrics`/`headerInfoFontSize`
-    // for Detailed (FullView), the `simple*` pair for Simple (SimpleView).
-    readonly property int headerInfoFontSize:       Plasmoid.configuration.headerInfoFontSize       || 12
-    readonly property int simpleHeaderInfoFontSize: Plasmoid.configuration.simpleHeaderInfoFontSize || 12
+    // Weather Elements: up to 4 user-selected metric lines beside the temperature.
+    // Each layout picks its own list (`headerMetrics` for the cards, the `simple*` one
+    // for the graph); the font size and weight are shared (Appearance → Common).
+    readonly property int headerInfoFontSize: Plasmoid.configuration.headerInfoFontSize || 14
+    // Weight of the Weather Elements text: 400 Regular, 600 SemiBold (the default)
+    // or 700 Bold. No fallback of our own: font matching settles on the NEAREST face
+    // the family has, so a font without a SemiBold draws its Bold instead — which is
+    // the order we want (SemiBold, else Bold).
+    readonly property int headerInfoFontWeight: {
+        var w = Plasmoid.configuration.headerInfoFontWeight;
+        return (w === 400 || w === 600 || w === 700) ? w : 600;
+    }
     // Simple-layout graph hour-axis label font (the "6 PM 7 PM …" row)
     readonly property int simpleHourFontSize: Plasmoid.configuration.simpleHourFontSize || 13
     readonly property bool use24Hour: Plasmoid.configuration.use24Hour
     // Simple-layout graph per-point temperature label font (the "41° 40° …");
     // decoupled from the Detailed cards' hourlyTempFontSize.
     readonly property int simpleGraphTempFontSize: Plasmoid.configuration.simpleGraphTempFontSize || 16
+    readonly property int simpleDayMarkerFontSize: Plasmoid.configuration.simpleDayMarkerFontSize || 12
     readonly property var headerMetrics: [
         Plasmoid.configuration.headerMetric1 || "feelsLike",
         Plasmoid.configuration.headerMetric2 || "humidity",
@@ -304,6 +361,7 @@ PlasmoidItem {
         case "uv":        return isNaN(m.uv) ? "" : ("UV " + Math.round(m.uv));
         case "feelsLike": return isNaN(m.feels) ? "" : tempStr(m.feels);
         case "cloud":     return (isNaN(m.cloud) || m.cloud < 10) ? "" : (Math.round(m.cloud) + "%");
+        case "pressure":  return isNaN(m.pressure) ? "" : pressureStr(m.pressure);
         }
         return "";   // "none" / unknown
     }
@@ -316,6 +374,7 @@ PlasmoidItem {
     function hourlyMetricGlyph(id) {
         switch (id) {
         case "cloud":     return "\uf041";   // wi-cloud (U+F041) — escape form, not the literal PUA char the others use
+        case "pressure":  return "\uf079";   // wi-barometer (U+F079)
         case "precip":    return "";   // wi-umbrella (U+F084) — precip *chance* (vs wi-raindrop below = precip amount)
         case "precipAmt": return "";   // wi-raindrop
         case "snow":      return "";   // wi-snowflake-cold
@@ -335,8 +394,20 @@ PlasmoidItem {
         case "humidity":
         case "feelsLike":
         case "precip":    return 1.25;   // wi-umbrella reads a touch large at base — nudge down to match sun/humidity
+        case "pressure":  return 1.25;   // the barometer dial reads large at base, like those
         }
         return 1.5;
+    }
+    // Air pressure → "1013 hPa" / "29.92 inHg". Both providers publish it at sea level
+    // in hPa (the contract's unit), converted here like precipitation and snowfall are —
+    // nothing plots pressure, so the model keeps the contract's unit throughout.
+    // hPa is rounded whole: a tenth is below what a forecast can mean, and the extra
+    // digit only makes the readout harder to scan. inHg keeps the two decimals it is
+    // always quoted with (a whole inHg would be a 34 hPa step).
+    function pressureStr(hPa) {
+        if (isNaN(hPa)) return "";
+        if (pressureUnitApi === "inHg") return i18n("%1 inHg", (hPa * 0.02952998).toFixed(2));
+        return i18n("%1 hPa", Math.round(hPa));
     }
     // per-hour precipitation amount → "1.2 mm" / "0.05 in" (imperial follows °F).
     // A real-but-sub-display amount (would round to "0.00 in" / "0.0 mm" at the normal
@@ -344,17 +415,48 @@ PlasmoidItem {
     // number (e.g. "0.004 in") rather than a meaningless zero. Only a TRUE zero
     // (mm <= 0) — or a value that rounds away even at the extra precision — blanks.
     // Every non-empty return is a positive number, so callers gate visibility on `!== ""`.
+    // Formats the value precipAmtQ rounds to, rather than rounding again in toFixed:
+    // one rounding rule for every precipitation amount the widget prints. toFixed
+    // on its own rounds the BINARY value, so an hour of a 0.9 mm six-hour block —
+    // 0.15, stored as 0.1499… — printed "0.1 mm" while anything using precipAmtQ
+    // printed "0.2 mm", and the graph could label two different readings alike.
+    // Now both halves round the decimal value half-up, and agree by construction.
     function precipAmtStr(mm) {
-        if (isNaN(mm) || mm <= 0) return "";
+        var q = precipAmtQ(mm);
+        if (q <= 0) return "";                                   // rounds away → blank
+        if (units === "fahrenheit") {
+            var inch = q / 25.4;
+            return (inch >= 0.005 ? inch.toFixed(2)              // normal: 2 dp
+                                  : inch.toFixed(3)) + " in";    // trace: 3 dp so it isn't "0.00 in"
+        }
+        return (q >= 0.05 ? q.toFixed(1)                         // normal: 1 dp
+                          : q.toFixed(2)) + " mm";               // trace: 2 dp
+    }
+    // Is there an amount for precipAmtStr to print? The same answer, without building
+    // the string to compare it against "". The graph asks this per column per frame
+    // while it scrolls, so the string was pure waste there. Thresholds mirror the
+    // blanking rules above: metric rounds away below 0.005 mm, imperial below
+    // 0.0005 in.
+    function hasPrecipAmt(mm) {
+        if (isNaN(mm) || mm <= 0) return false;
+        return (units === "fahrenheit") ? (mm / 25.4 >= 0.0005) : (mm >= 0.005);
+    }
+    // The amount precipAmtStr will actually PRINT, rounded half-up to the step it
+    // prints at — and clamped inside its own branch, so rounding can never promote a
+    // trace reading into a normal one. precipAmtStr formats exactly this value, and
+    // it is idempotent, so binding a label to precipAmtStr(precipAmtQ(v)) prints the
+    // same string as precipAmtStr(v) while only CHANGING when that string would —
+    // the formatting stops running on every frame of a value morphing between two
+    // hours.
+    function precipAmtQ(mm) {
+        if (isNaN(mm) || mm <= 0) return 0;
         if (units === "fahrenheit") {
             var inch = mm / 25.4;
-            if (inch >= 0.005) return inch.toFixed(2) + " in";   // normal: 2 dp
-            var i3 = inch.toFixed(3);                            // trace: 3 dp so it isn't "0.00 in"
-            return i3 === "0.000" ? "" : i3 + " in";             // rounds away even at 3 dp → blank
+            return 25.4 * (inch >= 0.005 ? Math.round(inch * 100) / 100
+                                         : Math.min(0.00499, Math.round(inch * 1000) / 1000));
         }
-        if (mm >= 0.05) return mm.toFixed(1) + " mm";            // normal: 1 dp
-        var m2 = mm.toFixed(2);                                  // trace: 2 dp
-        return m2 === "0.00" ? "" : m2 + " mm";                  // rounds away even at 2 dp → blank
+        return mm >= 0.05 ? Math.round(mm * 10) / 10
+                          : Math.min(0.0499, Math.round(mm * 100) / 100);
     }
     // header precipitation amount (mm) → display string in the active unit; imperial
     // (°F) → inches (2 dp), else mm (1 dp). `perHour` adds "/h" for a rate. Unlike
@@ -434,22 +536,31 @@ PlasmoidItem {
             // rule as the hourly cards, so header and cards never disagree (no "5G10" on a
             // card while the header hides it). Skips a redundant "5 G5" on calm hours.
             var gs = (hourSample && !isNaN(hourSample.gust)) ? hourSample.gust : windGust;
+            // Sustained wind with its unit, then the gust in brackets: "11.2 kmh (G24)".
+            // The gust is a peak, so it is rounded; keeping it outside the unit also
+            // stops it reading as a second measurement of the same thing. Whether to
+            // show it is still decided on rounded values, so a steady hour doesn't
+            // get a redundant "(G11)" after "11.2 kmh".
             var windBody = (!isNaN(gs) && Math.round(gs) > Math.round(ws))
-                ? (Math.round(ws) + " G" + Math.round(gs) + " " + windUnitLabel)
+                ? (windLabel(ws) + " (G" + Math.round(gs) + ")")
                 : windLabel(ws);
-            return i18n("Wind: %1", "<b>" + windBody + "</b>");
+            return i18n("Wind: %1", windBody);
         }
         if (id === "cloud") {
             var cc = (hourSample && !isNaN(hourSample.cloud)) ? hourSample.cloud : cloudCover;
-            return isNaN(cc) ? "" : i18n("Cloud cover: %1", "<b>" + Math.round(cc) + "%</b>");
+            return isNaN(cc) ? "" : i18n("Cloud cover: %1", Math.round(cc) + "%");
+        }
+        if (id === "pressure") {
+            var pr = (hourSample && !isNaN(hourSample.pressure)) ? hourSample.pressure : pressure;
+            return isNaN(pr) ? "" : i18n("Pressure: %1", pressureStr(pr));
         }
         if (id === "snowSum") {
             var ss = day ? day.snowSum : snowSumToday;
             return isNaN(ss) ? "" : i18n("Snowfall %1: %2", whenWord,
                 "<font color=\"" + precipColor + "\">" + snowfallStr(ss) + "</font>");
         }
-        // Combined sunrise/sunset — Detailed-layout header only (not offered in
-        // Simple). One compact line "↑ 5:23a  ↓ 8:23p"; falls back to today
+        // Combined sunrise/sunset, offered in both layouts' Weather Elements.
+        // One compact line "↑ 5:23a  ↓ 8:23p"; falls back to today
         // (dailyData[0]) when no day is focused. The old "sunrise"/"sunset" ids are
         // kept as aliases so a previously-saved value still renders.
         if (id === "sun" || id === "sunrise" || id === "sunset") {
@@ -475,6 +586,22 @@ PlasmoidItem {
 
     // ISO local time string → "9PM" (12h) or "19:00" (24h)
     function formatHour(iso) { return new Date(iso).toLocaleTimeString(Qt.locale(), use24Hour ? "H:mm" : "hAP"); }
+    // Card heading for one hourly sample. Past roughly hour 54 met.no stops
+    // publishing hourly data and only 6-hour blocks remain, so a card there covers
+    // a RANGE — label it as one ("20–02") instead of a single hour, which would
+    // claim a precision the forecast no longer has. Hourly samples are unchanged.
+    function formatSlot(sample) {
+        if (!sample) return "";
+        var span = sample.spanHours > 0 ? sample.spanHours : 1;
+        if (span <= 1) return formatHour(sample.time);
+        var end = new Date(new Date(sample.time).getTime() + span * 3600000);
+        // 24h: bare hours read cleanly as a range ("20–02"). 12h: keep the AM/PM
+        // marker on each end, since "8–2" would be ambiguous.
+        if (use24Hour)
+            return new Date(sample.time).toLocaleTimeString(Qt.locale(), "HH")
+                 + "\u2013" + end.toLocaleTimeString(Qt.locale(), "HH");
+        return formatHour(sample.time) + "\u2013" + end.toLocaleTimeString(Qt.locale(), "hAP");
+    }
     // compact clock for the combined sun line: "5:23a" / "8:23p" (12h) or "5:23" / "20:23" (24h)
     function _sunClock(iso) {
         var d = new Date(iso);
@@ -484,18 +611,36 @@ PlasmoidItem {
     }
 
     // Wind speed → "6.0 mph" / "12.3 kmh" / "3.4 m/s" (see windUnit).
+    // One decimal, everywhere a wind speed is spelled out. Shared so the sustained
+    // value can't change precision depending on whether a gust is shown next to it —
+    // the header used to print "11.2 kmh" on its own but "11 G20 kmh" the moment a
+    // gust appeared, which reads as the number losing accuracy for no reason.
+    // (The hourly CARDS keep their own whole-number "5G10" form on purpose: no room.)
+    function windNum(v) { return Math.round(v * 10) / 10; }
     function windLabel(speed) {
         if (isNaN(speed)) return "";
-        return (Math.round(speed * 10) / 10) + " " + windUnitLabel;
+        return windNum(speed) + " " + windUnitLabel;
     }
 
     // Wind-direction arrow as a Weather Icons font glyph (the glyph already
     // points the right way for each of the 16 compass sectors — no rotation).
-    function windDirectionGlyph(deg) {
-        if (isNaN(deg)) return "";   // wi-wind fallback
-        var glyphs = ["", "", "", "", "", "", "", "",
-                      "", "", "", "", "", "", "", ""];
-        return glyphs[Math.floor(((deg + 11.25) % 360) / 22.5) % 16];
+    // The bundled Weather Icons font, loaded once for every view that draws a glyph
+    // from it (the wind-direction arrows) — a named theme icon would render differently
+    // per user, or not at all.
+    FontLoader {
+        id: wiFontLoader
+        source: Qt.resolvedUrl("../fonts/weathericons-regular-webfont.ttf")
+    }
+    readonly property string wiFontFamily: wiFontLoader.status === FontLoader.Ready
+                                           ? wiFontLoader.font.family : ""
+
+    // How far to turn contents/icons/wind-direction.svg (which points UP) for a wind
+    // direction. Providers report where the wind comes FROM, and the arrow shows where it
+    // BLOWS, so it is turned the other way round: a northerly (0°) points south, down the
+    // screen. The angle is used as it comes, rather than snapped to the 16 compass points
+    // the old font glyphs offered.
+    function windArrowRotation(deg) {
+        return isNaN(deg) ? 0 : (deg + 180) % 360;
     }
 
     // Day label for a daily index: index 0 is "Today" — Open-Meteo returns
@@ -509,16 +654,74 @@ PlasmoidItem {
         if (idx === 0 && !absolute) return i18n("Today");
         return new Date(dailyData[idx].date + "T12:00").toLocaleDateString(Qt.locale(), "ddd");
     }
-    // Calendar date for a daily index, in the viewer's locale order but without the
-    // year — en_US gives "9/10", fr_FR "10/09", de_DE "10.09.". Derived from the
-    // locale's short date format with the year token (and its separators) stripped,
-    // so the day/month order follows the locale instead of being hardcoded.
+    // Calendar date for a daily index — day and month only, in the order and style of
+    // the system's date format: en_US "9/17", en_GB "17/09", Polish "17.09", Swedish
+    // "09-17", Hungarian "09. 17.". The format follows the system's DATE locale, which
+    // can differ from the language (Qt.locale() already reports LC_TIME's formats).
     function dailyDate(idx) {
         if (idx < 0 || idx >= dailyData.length) return "";
-        var fmt = Qt.locale().dateFormat(Locale.ShortFormat)
-                    .replace(/^[^a-zA-Z]*y+[^a-zA-Z]*/, "")
-                    .replace(/[^a-zA-Z]*y+[^a-zA-Z]*$/, "");
-        return new Date(dailyData[idx].date + "T12:00").toLocaleDateString(Qt.locale(), fmt);
+        return monthDayText(dailyData[idx].date);
+    }
+    // Day and month of a "YYYY-MM-DD" date in that format, and the same with the short
+    // weekday in front ("Fri, 18/09") for the graph's new-day marker — or the weekday
+    // alone when the marker is set not to show the date.
+    function monthDayText(date) {
+        return new Date(date + "T12:00").toLocaleDateString(Qt.locale(), monthDayFormat);
+    }
+    function weekdayText(date) {
+        return new Date(date + "T12:00").toLocaleDateString(Qt.locale(), "ddd");
+    }
+    function weekdayDateText(date) {
+        return weekdayText(date) + ", " + monthDayText(date);
+    }
+    function dayMarkerText(date) {
+        return showDayMarkerDate ? weekdayDateText(date) : weekdayText(date);
+    }
+    readonly property string monthDayFormat: withoutYear(Qt.locale().dateFormat(Locale.ShortFormat))
+    // Qt has no "day and month" format of its own, so the year is taken out of the
+    // locale's short date format. The format is read as fields (a run of one pattern
+    // letter: d, M, y…) and literals (separators, and quoted text such as the
+    // Bulgarian "'г'." year suffix), and the year leaves together with what ties it to
+    // the rest: at the end (dd/MM/yyyy, d.MM.yy 'г'.) the separator before it; at the
+    // start (yyyy-MM-dd, yy. M. d.) the separator after it.
+    function withoutYear(fmt) {
+        var parts = [];
+        function addLiteral(t) {
+            var last = parts[parts.length - 1];
+            if (last && !last.field) last.text += t;
+            else parts.push({ field: "", text: t });
+        }
+        for (var i = 0; i < fmt.length; ) {
+            var c = fmt[i];
+            if (c === "'") {
+                var close = fmt.indexOf("'", i + 1);
+                if (close < 0) close = fmt.length - 1;
+                addLiteral(fmt.substring(i, close + 1));
+                i = close + 1;
+            } else if (/[A-Za-z]/.test(c)) {
+                var k = i;
+                while (k < fmt.length && fmt[k] === c) ++k;
+                parts.push({ field: c, text: fmt.substring(i, k) });
+                i = k;
+            } else {
+                addLiteral(c);
+                ++i;
+            }
+        }
+        var y = -1;
+        for (var p = 0; p < parts.length; ++p) if (parts[p].field === "y") { y = p; break; }
+        if (y < 0) return fmt;
+        var fieldAfter = false;
+        for (var q = y + 1; q < parts.length; ++q) if (parts[q].field) fieldAfter = true;
+        if (!fieldAfter) {
+            // Punctuation after a final year stays (Croatian "dd. MM. yyyy." → "dd. MM."),
+            // a word does not (Bulgarian "'г'.", "year").
+            var tail = parts.slice(y + 1).map(function (x) { return x.text; }).join("");
+            parts.splice(y > 0 && !parts[y - 1].field ? y - 1 : y);
+            if (tail && !/['A-Za-z\u00C0-\uFFFF]/.test(tail)) addLiteral(tail);
+        } else
+            parts.splice(y, y + 1 < parts.length && !parts[y + 1].field ? 2 : 1);
+        return parts.map(function (x) { return x.text; }).join("");
     }
     function dayIndexForDate(date) {
         for (var i = 0; i < dailyData.length; ++i)
@@ -551,7 +754,10 @@ PlasmoidItem {
         for (var i = 0; i < allHourly.length; ++i) {
             var h = allHourly[i];
             if (cutoff !== "" && h.date > cutoff) break;    // dates sort lexically
-            if (new Date(h.time).getTime() + 3600000 < now.getTime()) continue;
+            // a sample is current until its whole span has elapsed — 1 h for an
+            // hourly forecast, 6 for one of met.no's blocks
+            var span = h.spanHours > 0 ? h.spanHours : 1;
+            if (new Date(h.time).getTime() + span * 3600000 < now.getTime()) continue;
             if (lastDate !== "" && h.date !== lastDate)
                 out.push({ dayBreak: true, date: h.date,
                            label: new Date(h.date + "T12:00").toLocaleDateString(Qt.locale(), "ddd") });
@@ -587,33 +793,13 @@ PlasmoidItem {
     readonly property int  heroDay:   currentHourSample ? currentHourSample.day   : isDay
     readonly property real heroCloud: currentHourSample ? currentHourSample.cloud : cloudCover
 
-    // All hourly entries across the configured days, sampled every `step` hours
-    // (00:00, 02:00, …) — the continuous data for the simple-layout graph.
-    // `days` overrides the day span (defaults to dailyDays).
-    function allSamples(step, days) {
-        var out = [];
-        var now = locNow();
-        var span = (days !== undefined && days > 0) ? days : dailyDays;
-        var n = Math.min(span, dailyData.length);
-        var cutoff = n > 0 ? dailyData[n - 1].date : "";   // last day to include
-        for (var i = 0; i < allHourly.length; ++i) {
-            var h = allHourly[i];
-            if (cutoff !== "" && h.date > cutoff) break;    // dates sort lexically
-            // drop hours already past, so the Today graph begins near the
-            // current time instead of midnight (future days stay full)
-            if (new Date(h.time).getTime() + 3600000 < now.getTime()) continue;
-            if (new Date(h.time).getHours() % step !== 0) continue;
-            // a precip spike in a skipped hour would vanish between samples
-            // (e.g. 21% at 5 PM with step 2) — carry the max of the hours
-            // this sample covers instead of the point value
-            var s = Object.assign({}, h);
-            for (var j = i + 1; j < Math.min(i + step, allHourly.length); ++j) {
-                var p = allHourly[j].precip;
-                if (!isNaN(p) && (isNaN(s.precip) || p > s.precip)) s.precip = p;
-            }
-            out.push(s);
-        }
-        return out;
+    // ── Uniform hourly grid (the graph's source) ──────────────────────────
+    // Expands met.no's 6-hour blocks onto a 1-hour grid so the graph has the even
+    // spacing its curve and sun-marker mapping need. The whole rule set lives in
+    // providers/grid.js as a pure function — see its header for why temperature
+    // interpolates while everything categorical is held.
+    function hourlyGrid(days) {
+        return Grid.build(allHourly, dailyData, days, locNow().getTime());
     }
 
     // Privacy: weather/alerts are computed on multi-km grids, so we only ever
@@ -625,24 +811,181 @@ PlasmoidItem {
         return Math.round(v * p) / p;
     }
 
-    // ── Data fetch (Open-Meteo current weather) ───────────────────────────
-    function fetchWeather() {
-        if (!root.hasLocation) { root.loading = false; return; }
+    // ── Weather providers ─────────────────────────────────────────────────
+    // Each provider is an adapter that turns one HTTP GET into the normalized
+    // model below — see providers/OpenMeteo.qml for the full contract. Adding a
+    // provider = one file there plus one line in the registry; no view file, and
+    // none of the icon/condition machinery, knows a provider exists.
+    OpenMeteo { id: openMeteoProvider }
+    MetNo     { id: metNoProvider }
+
+    readonly property var providers: ({ "openmeteo": openMeteoProvider, "metno": metNoProvider })
+    readonly property string providerId: providers[Plasmoid.configuration.weatherProvider]
+                                         ? Plasmoid.configuration.weatherProvider : "openmeteo"
+    readonly property var provider: providers[providerId]
+    // Toggle order for the header button — the switch walks this list, so a third
+    // provider joins the rotation by being added here and to the registry above.
+    readonly property var providerOrder: ["openmeteo", "metno"]
+    // The header's location button. Location is the first settings page, which is
+    // where the dialog opens.
+    function openLocationSettings() { Plasmoid.internalAction("configure").trigger(); }
+    function toggleProvider() {
+        var i = providerOrder.indexOf(providerId);
+        Plasmoid.configuration.weatherProvider = providerOrder[(i + 1) % providerOrder.length];
+    }
+    // Name of the provider the button would switch TO — for its tooltip.
+    readonly property string nextProviderName: {
+        var i = providerOrder.indexOf(providerId);
+        var next = providers[providerOrder[(i + 1) % providerOrder.length]];
+        return next ? next.displayName : "";
+    }
+
+    // ── The location's UTC offset ─────────────────────────────────────────
+    // Open-Meteo reports it in every response; met.no has no notion of timezone
+    // at all. Rather than ship a timezone database (or spend a request on a
+    // lookup), resolve the IANA zone the geocoder already gave us through
+    // Plasma's time dataengine — DST-correct, offline, and no new dependency
+    // beyond a module that ships with the workspace.
+    // Falls back to the VIEWER's own offset, which is right for the overwhelmingly
+    // common case (your own city) and the best guess for a location saved before
+    // the zone was recorded.
+    readonly property string locationTimezone: Plasmoid.configuration.locationTimezone || ""
+    P5Support.DataSource {
+        id: tzSource
+        engine: "time"
+        connectedSources: root.locationTimezone ? [root.locationTimezone] : []
+        interval: 60000   // only needs to be fresh enough to catch a DST change
+    }
+    readonly property real resolvedOffsetSeconds: {
+        var tz = locationTimezone;
+        if (tz && tzSource.data[tz] && tzSource.data[tz]["Offset"] !== undefined)
+            return tzSource.data[tz]["Offset"];
+        return -(new Date().getTimezoneOffset()) * 60;
+    }
+
+    // ── Units ─────────────────────────────────────────────────────────────
+    // Every provider delivers the SAME units — °C, km/h, mm, cm (see the contract in
+    // providers/OpenMeteo.qml) — and they are converted to the user's choice here,
+    // once, for all of them. Each provider used to convert on its own (met.no in
+    // code, Open-Meteo by asking its API for the user's units): two paths to keep in
+    // step, and a network fetch just to switch °C/°F. The unconverted model is kept,
+    // so a unit change now re-applies it on the spot.
+    // Wind is based on km/h rather than m/s because that is Open-Meteo's native
+    // precision (0.1 km/h): the default unit shows exactly what the API sent.
+    // Precipitation (mm) and snowfall (cm) are left alone — their display functions
+    // already convert for imperial users.
+    property var _rawWeather: null
+    function _userTemp(c) { return units === "fahrenheit" ? c * 9 / 5 + 32 : c; }   // NaN stays NaN
+    function _userWind(kmh) {
+        if (windUnitApi === "mph") return kmh / 1.609344;
+        if (windUnitApi === "ms")  return kmh / 3.6;
+        return kmh;
+    }
+    // Returns a converted COPY: the raw model must stay in °C / km/h to be converted
+    // again later, never converted twice.
+    function convertUnits(raw) {
+        var out = { utcOffsetSeconds: raw.utcOffsetSeconds, current: null, daily: [], hourly: [] };
+        var i, x;
+        if (raw.current) {
+            x = Object.assign({}, raw.current);
+            x.temperature  = _userTemp(x.temperature);
+            x.apparentTemp = _userTemp(x.apparentTemp);
+            x.windSpeed    = _userWind(x.windSpeed);
+            x.windGust     = _userWind(x.windGust);
+            out.current = x;
+        }
+        for (i = 0; i < (raw.daily || []).length; ++i) {
+            x = Object.assign({}, raw.daily[i]);
+            x.hi = _userTemp(x.hi);
+            x.lo = _userTemp(x.lo);
+            out.daily.push(x);
+        }
+        for (i = 0; i < (raw.hourly || []).length; ++i) {
+            x = Object.assign({}, raw.hourly[i]);
+            x.temp  = _userTemp(x.temp);
+            x.feels = _userTemp(x.feels);
+            x.wind  = _userWind(x.wind);
+            x.gust  = _userWind(x.gust);
+            out.hourly.push(x);
+        }
+        return out;
+    }
+    // A unit setting changed: re-apply what we already have. Only fetch when there
+    // is nothing yet (e.g. the setting changed before the first load finished).
+    function reapplyUnits() {
+        if (_rawWeather) applyWeather(convertUnits(_rawWeather));
+        else fetchWeather();
+    }
+
+    // Apply a provider's normalized model to the live state the views bind to.
+    // Every field the widget shows is set HERE, from that one shape — so two
+    // providers can never leave the widget in half-updated states, and a field a
+    // provider can't supply just stays NaN and reads as "—" everywhere.
+    function applyWeather(res) {
+        root.utcOffsetSeconds = res.utcOffsetSeconds;
+        var c = res.current;
+        if (c) {
+            root.temperature  = c.temperature;
+            root.weatherCode  = c.weatherCode;
+            root.apparentTemp = c.apparentTemp;
+            root.humidity     = c.humidity;
+            root.isDay        = c.isDay;
+            root.uvIndex      = c.uvIndex;
+            root.precipRate   = c.precipRate;
+            root.windSpeed    = c.windSpeed;
+            root.windGust     = c.windGust;
+            root.cloudCover   = c.cloudCover;
+            root.pressure     = c.pressure;
+        }
+        if (res.daily && res.daily.length) {
+            root.dailyData = res.daily;
+            var d0 = res.daily[0];
+            root.highTemp          = d0.hi;
+            root.lowTemp           = d0.lo;
+            root.precipSumToday    = d0.precipSum;
+            root.precipChanceToday = d0.precipChanceMax;
+            root.snowSumToday      = d0.snowSum;
+        }
+        if (res.hourly && res.hourly.length)
+            root.allHourly = res.hourly;
+    }
+
+    // ── Data fetch ────────────────────────────────────────────────────────
+    // The request LIFECYCLE lives here, not in the provider: abort-in-flight,
+    // fast-fail, watchdog and the boot probe below are hard-won boot-resilience
+    // behaviour, and every provider gets it identically by construction.
+    // What a request for the current provider and location looks like: the provider,
+    // the ctx it parses with, its URL, and the key that names its data. Shared by the
+    // fetch and the offline cache, so a cached copy is only ever used for the exact
+    // request it answered. null when there is no usable location.
+    function _requestPlan() {
+        if (!root.hasLocation) return null;
         var lat = Plasmoid.configuration.latitude;
         var lon = Plasmoid.configuration.longitude;
         if (lat === undefined || lon === undefined || isNaN(lat) || isNaN(lon))
-            return;
+            return null;
+        var p = root.provider;
+        // Privacy: the provider only ever sees the COARSENED coordinate (see
+        // coarseCoord) — it builds the URL, so this is the one place that choice
+        // can be enforced for all of them.
+        var ctx = {
+            lat: coarseCoord(lat),
+            lon: coarseCoord(lon),
+            forecastDays: 7,
+            // Providers that report their own offset ignore this; the ones that
+            // can't (met.no) render everything in the location's clock with it.
+            utcOffsetSeconds: resolvedOffsetSeconds
+        };
+        var url = p.buildUrl(ctx);
+        return { provider: p, ctx: ctx, url: url, cacheKey: p.providerId + "|" + url };
+    }
+
+    function fetchWeather() {
+        if (!root.hasLocation) { root.loading = false; return; }
+        var plan = _requestPlan();
+        if (!plan) return;
         loading = true;
-        var url = "https://api.open-meteo.com/v1/forecast"
-                + "?latitude=" + coarseCoord(lat)
-                + "&longitude=" + coarseCoord(lon)
-                + "&current=temperature_2m,weather_code,apparent_temperature,relative_humidity_2m,is_day,uv_index,precipitation,wind_speed_10m,wind_gusts_10m,cloud_cover"
-                + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,snowfall_sum,sunrise,sunset"
-                + "&hourly=temperature_2m,apparent_temperature,weather_code,is_day,relative_humidity_2m,uv_index,precipitation_probability,precipitation,snowfall,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover"
-                + "&forecast_days=7"
-                + "&timezone=auto"
-                + "&wind_speed_unit=" + windUnitApi
-                + "&temperature_unit=" + (units === "fahrenheit" ? "fahrenheit" : "celsius");
+        var p = plan.provider, ctx = plan.ctx, url = plan.url;
         // Abandon any still-in-flight request first. At boot the free-running
         // boot probe (below) re-fires on its OWN schedule whether or not the
         // previous attempt's callbacks ever returned, so without this an attempt
@@ -661,13 +1004,27 @@ PlasmoidItem {
             if (done) return;
             done = true;
             root.loading = false;
+            root.fetchFailing = true;
             loadingWatchdog.stop();
             console.log("Weather:", why);   // probe re-fires on its own timer
         }
         xhr.timeout = 8000;
         xhr.ontimeout = function () { failWeather("timeout"); };
+        var cacheKey = plan.cacheKey;
         xhr.onreadystatechange = function () {
             if (xhr.readyState !== XMLHttpRequest.DONE || done) return;
+            // 304: our copy is still the current forecast. Nothing to parse — just
+            // stamp the success so the staleness marker clears, exactly as a 200 would.
+            if (xhr.status === 304) {
+                done = true;
+                root.loading = false;
+                root.fetchFailing = false;
+                loadingWatchdog.stop();
+                root._probeUntilOk = false;
+                root.lastGoodFetch = Date.now();
+                root._touchCache(cacheKey, root.lastGoodFetch);
+                return;
+            }
             if (xhr.status !== 200) {
                 failWeather("HTTP " + xhr.status);   // network likely not up yet (boot)
                 return;
@@ -677,76 +1034,141 @@ PlasmoidItem {
             loadingWatchdog.stop();
             root._probeUntilOk = false;   // a resume-armed retry has landed
             try {
-                var data = JSON.parse(xhr.responseText);
-                root.utcOffsetSeconds = (data.utc_offset_seconds !== undefined) ? data.utc_offset_seconds : NaN;
-                var c = data.current;
-                root.temperature  = c.temperature_2m;
-                root.weatherCode  = c.weather_code;
-                root.apparentTemp = c.apparent_temperature;
-                root.humidity     = c.relative_humidity_2m;
-                root.isDay        = c.is_day;
-                root.uvIndex      = c.uv_index;
-                root.precipRate   = (c.precipitation !== undefined) ? c.precipitation : NaN;
-                root.windSpeed    = (c.wind_speed_10m !== undefined) ? c.wind_speed_10m : NaN;
-                root.windGust     = (c.wind_gusts_10m !== undefined) ? c.wind_gusts_10m : NaN;
-                root.cloudCover   = (c.cloud_cover !== undefined) ? c.cloud_cover : NaN;
-                if (data.daily && data.daily.time) {
-                    var dd = data.daily;
-                    var darr = [];
-                    for (var di = 0; di < dd.time.length; ++di)
-                        darr.push({
-                            date: dd.time[di],
-                            code: dd.weather_code[di],
-                            hi:   dd.temperature_2m_max[di],
-                            lo:   dd.temperature_2m_min[di],
-                            snowSum:   (dd.snowfall_sum && di < dd.snowfall_sum.length) ? dd.snowfall_sum[di] : NaN,
-                            precipSum: (dd.precipitation_sum && di < dd.precipitation_sum.length) ? dd.precipitation_sum[di] : NaN,
-                            // local-time ISO strings ("2026-06-16T06:18") — timezone=auto
-                            sunrise:   (dd.sunrise && di < dd.sunrise.length) ? dd.sunrise[di] : "",
-                            sunset:    (dd.sunset  && di < dd.sunset.length)  ? dd.sunset[di]  : ""
-                        });
-                    root.dailyData = darr;
-                    root.highTemp = dd.temperature_2m_max[0];
-                    root.lowTemp  = dd.temperature_2m_min[0];
-                    root.precipSumToday = (dd.precipitation_sum && dd.precipitation_sum.length)
-                                          ? dd.precipitation_sum[0] : NaN;
-                    root.precipChanceToday = (dd.precipitation_probability_max && dd.precipitation_probability_max.length)
-                                          ? dd.precipitation_probability_max[0] : NaN;
-                    root.snowSumToday = (dd.snowfall_sum && dd.snowfall_sum.length)
-                                        ? dd.snowfall_sum[0] : NaN;
-                }
-                if (data.hourly && data.hourly.time) {
-                    var hh = data.hourly;
-                    var harr = [];
-                    for (var hi = 0; hi < hh.time.length; ++hi)
-                        harr.push({
-                            time:    hh.time[hi],
-                            date:    hh.time[hi].substring(0, 10),
-                            temp:    hh.temperature_2m[hi],
-                            feels:   hh.apparent_temperature ? hh.apparent_temperature[hi] : NaN,
-                            code:    hh.weather_code[hi],
-                            day:     hh.is_day[hi],
-                            humidity: hh.relative_humidity_2m ? hh.relative_humidity_2m[hi] : NaN,
-                            uv:       hh.uv_index ? hh.uv_index[hi] : NaN,
-                            precip:  hh.precipitation_probability ? hh.precipitation_probability[hi] : NaN,
-                            precipAmt: hh.precipitation ? hh.precipitation[hi] : NaN,   // mm this hour
-                            snow:    hh.snowfall ? hh.snowfall[hi] : NaN,   // cm in that hour
-                            cloud:   hh.cloud_cover ? hh.cloud_cover[hi] : NaN,   // % cover, for overcast-snow icon
-                            wind:    hh.wind_speed_10m ? hh.wind_speed_10m[hi] : NaN,
-                            gust:    hh.wind_gusts_10m ? hh.wind_gusts_10m[hi] : NaN,
-                            windDir: hh.wind_direction_10m ? hh.wind_direction_10m[hi] : 0
-                        });
-                    root.allHourly = harr;
-                }
+                root._rawWeather = p.parse(xhr.responseText, ctx);
+                root.applyWeather(root.convertUnits(root._rawWeather));
                 root.lastGoodFetch = Date.now();   // stamp success → clears the stale marker
+                root.fetchFailing = false;
+                root._loadedKey = cacheKey;        // the model now holds THIS source's data
+                var lm = "";
+                if (p.conditional) {
+                    lm = xhr.getResponseHeader("Last-Modified") || "";
+                    // Only remember it once the body PARSED — caching a validator for
+                    // data we failed to read would lock us into 304s forever.
+                    if (lm) root._lastModified[cacheKey] = lm;
+                }
+                root._saveCache(cacheKey, xhr.responseText, root.lastGoodFetch, lm);
                 // good data — weatherCode is now ≥ 0, so the boot probe stops
             } catch (e) {
+                root.fetchFailing = true;
                 console.log("Weather: parse error", e);   // probe keeps retrying while weatherCode < 0
             }
         };
         xhr.open("GET", url);
+        // Provider-required headers (met.no's terms demand an identifying
+        // User-Agent; Qt 6's XHR does allow overriding it). Must come AFTER
+        // open() — setRequestHeader on an unopened request is a no-op.
+        var hdrs = p.requestHeaders || [];
+        for (var i = 0; i < hdrs.length; ++i) {
+            try { xhr.setRequestHeader(hdrs[i][0], hdrs[i][1]); } catch (e) {}
+        }
+        // Only revalidate when the model still holds THIS source's data — see _loadedKey.
+        if (p.conditional && root._lastModified[cacheKey] && root._loadedKey === cacheKey) {
+            try { xhr.setRequestHeader("If-Modified-Since", root._lastModified[cacheKey]); } catch (e) {}
+        }
         xhr.send();
         loadingWatchdog.restart();   // see the watchdog — this request may never call back
+    }
+
+    // ── Offline cache ─────────────────────────────────────────────────────
+    // The last good response is kept per widget in QML's LocalStorage (an SQLite file
+    // under ~/.local/share/plasmashell/QML/OfflineStorage). Right after a reboot the
+    // network is often not up for a minute or two; instead of an empty panel and
+    // popup, the widget starts from that copy — marked "Updated … ago" once it is old
+    // enough to count as stale — and the boot probe keeps retrying until a live fetch
+    // replaces it. The raw response is stored and parsed again on restore, so the
+    // cache needs nothing from the model's format (whose NaNs JSON would not keep).
+    // A copy older than cacheMaxAgeMs is ignored: by then it misleads more than helps.
+    readonly property double cacheMaxAgeMs: 48 * 3600 * 1000
+    function _cacheDb() {
+        try {
+            var db = LocalStorage.openDatabaseSync("KlimeWeather", "", "KlimeWeather forecast cache", 4000000);
+            db.transaction(function (tx) {
+                tx.executeSql("CREATE TABLE IF NOT EXISTS forecast(applet TEXT PRIMARY KEY, request TEXT, "
+                              + "fetched REAL, lastModified TEXT, body TEXT)");
+            });
+            return db;
+        } catch (e) {
+            console.log("Weather: cache unavailable", e);
+            return null;
+        }
+    }
+    function _saveCache(key, body, fetchedMs, lastModified) {
+        var db = _cacheDb();
+        if (!db) return;
+        try {
+            db.transaction(function (tx) {
+                tx.executeSql("INSERT OR REPLACE INTO forecast VALUES (?, ?, ?, ?, ?)",
+                              [String(Plasmoid.id), key, fetchedMs, lastModified || "", body]);
+            });
+        } catch (e) { console.log("Weather: cache write failed", e); }
+    }
+    // A 304 confirmed the cached copy is still current: move its timestamp only.
+    function _touchCache(key, fetchedMs) {
+        var db = _cacheDb();
+        if (!db) return;
+        try {
+            db.transaction(function (tx) {
+                tx.executeSql("UPDATE forecast SET fetched = ? WHERE applet = ? AND request = ?",
+                              [fetchedMs, String(Plasmoid.id), key]);
+            });
+        } catch (e) { console.log("Weather: cache write failed", e); }
+    }
+    // The cached copy's "current" block is a reading from when it was fetched, which
+    // may be hours ago. Replace it with the forecast for the hour we are in now.
+    // Returns false when the forecast no longer covers now (nothing sensible to show).
+    function _currentFromForecast(raw) {
+        var off = raw.utcOffsetSeconds;
+        var now = isNaN(off) ? Date.now()
+                             : Date.now() + off * 1000 + new Date().getTimezoneOffset() * 60000;
+        var hs = raw.hourly || [];
+        for (var i = 0; i < hs.length; ++i) {
+            var s = hs[i];
+            var span = Math.max(1, s.spanHours || 1);
+            var start = new Date(s.time).getTime();
+            if (now >= start && now < start + span * 3600000) {
+                raw.current = {
+                    temperature: s.temp, weatherCode: s.code, apparentTemp: s.feels,
+                    humidity: s.humidity, isDay: s.day, uvIndex: s.uv,
+                    precipRate: isNaN(s.precipAmt) ? NaN : s.precipAmt / span,
+                    windSpeed: s.wind, windGust: s.gust, cloudCover: s.cloud,
+                    pressure: s.pressure
+                };
+                return true;
+            }
+        }
+        return false;
+    }
+    function restoreCache() {
+        var plan = _requestPlan();
+        if (!plan || root.weatherCode >= 0) return;   // never over live data
+        var db = _cacheDb();
+        if (!db) return;
+        var row = null;
+        try {
+            db.readTransaction(function (tx) {
+                var rs = tx.executeSql("SELECT request, fetched, lastModified, body FROM forecast WHERE applet = ?",
+                                       [String(Plasmoid.id)]);
+                if (rs.rows.length) row = rs.rows.item(0);
+            });
+        } catch (e) { return; }
+        // only the exact request it answered: same provider, same place
+        if (!row || row.request !== plan.cacheKey || Date.now() - row.fetched > cacheMaxAgeMs) return;
+        try {
+            var raw = plan.provider.parse(row.body, plan.ctx);
+            if (!_currentFromForecast(raw)) return;
+            root._rawWeather = raw;
+            root.applyWeather(root.convertUnits(raw));
+            root.lastGoodFetch = row.fetched;
+            // A conditional request can now confirm this copy with a 304 instead of
+            // downloading it again (see _loadedKey).
+            root._loadedKey = plan.cacheKey;
+            if (row.lastModified) root._lastModified[plan.cacheKey] = row.lastModified;
+            // Restored data has weatherCode >= 0, which would stop the boot probe; keep
+            // it retrying until a live fetch lands, as after a resume.
+            root._probeUntilOk = true;
+        } catch (e) {
+            console.log("Weather: cached forecast unreadable", e);
+        }
     }
 
     // ── Severe-weather alerts (KDE FOSS Public Alert Server) ──────────────
@@ -927,6 +1349,40 @@ PlasmoidItem {
     // 20 = NWS "Slight Chance" line (its first firm precip wording); pairs with
     // rainIconThreshold's 60 = NWS "Likely". See DEVELOPMENT for the PoP table.
     readonly property real precipDisplayFloor: 20
+
+    // ── Precipitation chance vs. amount ──────────────────────────────────
+    // Not every provider publishes a CHANCE of precipitation. met.no only does for
+    // the Nordic region — anywhere else every sample carries an amount but no
+    // probability at all. Both helpers below decide from the SAMPLE, never from the
+    // provider's name, so any provider (or any individual hour) that lacks a chance
+    // gets the same treatment automatically.
+    //
+    // Does this sample carry a real chance of precipitation? Where it doesn't, a
+    // missing value must not be read as 0% and printed.
+    function hasPrecipChance(s) { return !!s && !isNaN(s.precip); }
+    // Amount (mm) that paints the rain wash as heavily as a 100% chance would.
+    readonly property real precipWashFullMm: 2.5
+    // The rain WASH intensity for a sample, on the same 0-100 scale as a chance, so
+    // the graph band and the card background keep one pipeline for both kinds of
+    // provider. A real chance is used exactly as before. Without one, the amount
+    // stands in, linearly: 2.5 mm or more is full intensity, 1.25 mm is half.
+    // Amount and chance are different quantities — this is purely so a location
+    // without a chance still shows its rain, not a claim that one implies the other.
+    function precipWashPct(s) {
+        if (!s) return 0;
+        if (!isNaN(s.precip)) return s.precip;
+        if (!isNaN(s.precipAmt))
+            return Math.min(100, Math.max(0, s.precipAmt) / precipWashFullMm * 100);
+        return 0;
+    }
+    // Real precipitation — at least rainAmountThreshold (0.1 mm), the same line the
+    // icons use for "it rains" — on a sample with no chance to show for it. Such an
+    // hour is raining and says so in its amount, but its amount-derived wash can still
+    // fall under a view's display floor (up to 0.5 mm maps to 20% or less). Views use
+    // this to give it at least their faintest rain treatment rather than none.
+    function precipWithoutChance(s) {
+        return !!s && isNaN(s.precip) && !isNaN(s.precipAmt) && s.precipAmt >= rainAmountThreshold;
+    }
     readonly property real snowIconThreshold: 0.1    // cm/hr — at/above this it's snowing; show snow even over a RAIN code (marginal-temp mismatch)
     // cloud% at/above which DAYTIME snow drops the sun-and-cloud glyph for the
     // sun-free "overcast snow" icon — 85 = the METAR/WMO "overcast" (8/8) cutoff.
@@ -1174,6 +1630,21 @@ PlasmoidItem {
     // button (Mullvad, no-logging). No startup detection: boot uses the stored
     // coordinates, so the widget never pings a geolocation service unprompted.
     Component.onCompleted: {
+        // One-time carry-over: the condition font setting used to size the location
+        // too, so start each layout's new location font at its condition font. Only a
+        // location font still at its default is taken over; one already set is kept.
+        if (!Plasmoid.configuration.locationFontsSplit) {
+            if (Plasmoid.configuration.locationFontSize === 28)
+                Plasmoid.configuration.locationFontSize = conditionFontSize;
+            Plasmoid.configuration.locationFontsSplit = true;
+        }
+        // The graph zoom used to be a two-way switch; carry a 12-hour choice over to
+        // the three-level setting, and clear the old key so this happens only once.
+        if (Plasmoid.configuration.simpleHourly) {
+            Plasmoid.configuration.graphZoom = 0;
+            Plasmoid.configuration.simpleHourly = false;
+        }
+        restoreCache();
         fetchWeather();
         fetchAlerts();
     }
@@ -1251,6 +1722,17 @@ PlasmoidItem {
     // so we load within one interval of the route coming up. It stops the instant
     // we have data (weatherCode ≥ 0) and after ~3 min hands off to periodic refresh.
     property var _wxhr: null         // current in-flight weather request (abortable)
+    // Last-Modified per provider+url, for conditional re-fetches. met.no's terms
+    // ask us not to re-request unchanged data; If-Modified-Since is the sanctioned
+    // way to keep refreshing on schedule without pulling the payload every time.
+    property var _lastModified: ({})
+    // Which provider+url the data CURRENTLY on screen was parsed from. A 304 means
+    // "unchanged since you last asked ME" — it says nothing about whether the model
+    // still holds that provider's data. After switching away and back, the validator
+    // is still cached but the model belongs to the other provider, so revalidating
+    // would answer 304 and leave the widget showing the wrong source's forecast
+    // under the new name. Only send If-Modified-Since when this matches.
+    property string _loadedKey: ""
     property int _bootProbes: 0
     // Armed by the resume-from-suspend detector. Waking up is the boot case all over
     // again — the wifi is still reassociating, so the refetch hits the same half-up
@@ -1281,20 +1763,17 @@ PlasmoidItem {
         target: Plasmoid.configuration
         function onLatitudeChanged()        { root.fetchWeather(); root.weatherAlerts = []; alertsDebounce.restart(); }
         function onLongitudeChanged()       { root.fetchWeather(); root.weatherAlerts = []; alertsDebounce.restart(); }
-        function onTemperatureUnitChanged() { root.fetchWeather(); }
-        function onWindUnitChanged()        { root.fetchWeather(); }
+        function onWeatherProviderChanged() { root.fetchWeather(); }
+        // the offset feeds straight into a met.no request — a new zone means the
+        // forecast has to be rebuilt on the new clock
+        function onLocationTimezoneChanged() { root.fetchWeather(); }
+        function onTemperatureUnitChanged() { Qt.callLater(root.reapplyUnits); }
+        function onWindUnitChanged()        { Qt.callLater(root.reapplyUnits); }
         function onShowAlertsChanged()      { root.fetchAlerts(); }
         // On first-time setup, lat/lon and locationConfigured commit together on
         // Apply in an unspecified order — fetch on the flag too so weather always
         // loads even if the coordinates happened to write first (while gated off).
         function onLocationConfiguredChanged() { root.fetchWeather(); root.fetchAlerts(); }
-        // Auto-fit the Simple popup to the day tabs when the count changes. A new
-        // day count is an explicit re-fit gesture, so it clears any manual-resize
-        // latch (re-enabling auto-fit). A closed popup re-fits on its next open.
-        function onSimpleDailyDaysChanged() {
-            Plasmoid.configuration.simplePopupManual = false;
-            if (root.expanded) fullRep.armFit();
-        }
     }
     // A location switch updates latitude AND longitude as two separate writes;
     // debounce so alerts are fetched once with the FINAL point, not on the first
@@ -1393,9 +1872,20 @@ PlasmoidItem {
             Qt.callLater(function () { fullRep._applying = false; });
         }
 
+        // Only a user can resize the popup, and only while it is open. Size changes
+        // while it is hidden, or in the moment after it opens, come from Plasma itself:
+        // it restores ONE shared popup size — whichever layout was last closed — onto
+        // the preloaded popup at login. Taking that for a drag stored the graph
+        // layout's size as the card layout's, which then opened too short, cards cut off.
+        property double _openedMs: 0
+        function _userCanResize() {
+            return root.expanded && Date.now() - _openedMs > 600;
+        }
+
         function captureSize() {
             if (_applying || fullRep.width <= 0 || fullRep.height <= 0) return;
             if (root.planar) return;   // desktop auto-fits to content; nothing to capture
+            if (!_userCanResize()) return;
             if (root.simpleLayout) {
                 Plasmoid.configuration.simplePopupWidth  = Math.round(fullRep.width);
                 Plasmoid.configuration.simplePopupHeight = Math.round(fullRep.height);
@@ -1414,13 +1904,13 @@ PlasmoidItem {
         // stops overriding their chosen width (Simple layout only; cleared on a day-
         // count change). Height drags don't disable width auto-fit.
         onWidthChanged:  {
-            if (!_applying) {
+            if (!_applying && _userCanResize()) {
                 _lastDragMs = Date.now();
                 if (root.simpleLayout) Plasmoid.configuration.simplePopupManual = true;
             }
             captureTimer.restart();
         }
-        onHeightChanged: { if (!_applying) _lastDragMs = Date.now(); captureTimer.restart(); }
+        onHeightChanged: { if (!_applying && _userCanResize()) _lastDragMs = Date.now(); captureTimer.restart(); }
         Timer { id: captureTimer; interval: 250; onTriggered: fullRep.captureSize() }
 
         // A font/metric change alters the view's implicit (and minimum) size, so
@@ -1469,7 +1959,7 @@ PlasmoidItem {
         // shrinking to an exact fit (the pills live in the header row, so the count
         // drives the view's implicit width; SimpleView floors it at gridUnit*34 so
         // few days don't shrink it absurdly). Runs only on the discrete count-change
-        // events (popup open + a simpleDailyDays change) — never on scroll, where the
+        // event (popup open) — never on scroll, where the
         // live metric readouts also nudge the implicit width. A manual width resize
         // latches simplePopupManual, which suppresses this so the user's size sticks.
         // The timer lets the new pills lay out before we measure.
@@ -1502,28 +1992,58 @@ PlasmoidItem {
 
         Connections {
             target: root
-            function onExpandedChanged()    { if (root.expanded) { Qt.callLater(fullRep.applySize); fullRep.armFit(); } }
+            function onExpandedChanged()    {
+                if (root.expanded) {
+                    fullRep._openedMs = Date.now();
+                    Qt.callLater(fullRep.applySize);
+                    fullRep.armFit();
+                }
+            }
             // Both views stay warm (loaders below), so a switch just flips which is
             // visible — no rebuild, no blank frame. Resize after the shown view paints.
             function onSimpleLayoutChanged() { resizeAfterPaint.restart(); fullRep.armFit(); }
         }
 
-        // Keep BOTH layouts instantiated once a location is set, toggling visibility
-        // instead of swapping a single Loader's sourceComponent. Destroying + recreating
-        // the view on every switch left an empty frame (the "flash"); a warm view paints
+        // Both layouts stay instantiated once built, toggling visibility instead of
+        // swapping a single Loader's sourceComponent: destroying and recreating the view
+        // on every switch left an empty frame (the "flash"), while a warm view paints
         // the instant it's shown. active:false until hasLocation keeps the lazy-until-
         // located behaviour and lets the empty-state notice below stand in.
+        //
+        // But only the layout on SCREEN is built up front, synchronously, so the popup
+        // opens with content. Building both at once made every first open pay for the
+        // layout you weren't looking at too — the card layout alone is most of the cost.
+        // The hidden one is built shortly after the visible one is ready, asynchronously
+        // (in small slices, so it never stalls a frame). `asynchronous` is bound to
+        // "hidden": switch to it before it has finished, and Qt completes it on the spot.
+        //
+        // The *Built latches keep a view alive once it exists. Without them, switching
+        // before the warm-up began would drop the layout you just left (its `active`
+        // would fall back to false) and build it again later.
+        property bool warmHidden: false
+        property bool detailBuilt: false
+        property bool simpleBuilt: false
+        Timer {
+            interval: 400
+            running: root.hasLocation && !fullRep.warmHidden
+                     && (root.simpleLayout ? simpleLoader.status : detailLoader.status) === Loader.Ready
+            onTriggered: fullRep.warmHidden = true
+        }
         Loader {
             id: detailLoader
             anchors.fill: parent
-            active: root.hasLocation
+            active: root.hasLocation && (!root.simpleLayout || fullRep.warmHidden || fullRep.detailBuilt)
+            asynchronous: root.simpleLayout
+            onLoaded: fullRep.detailBuilt = true
             visible: !root.simpleLayout
             sourceComponent: detailComp
         }
         Loader {
             id: simpleLoader
             anchors.fill: parent
-            active: root.hasLocation
+            active: root.hasLocation && (root.simpleLayout || fullRep.warmHidden || fullRep.simpleBuilt)
+            asynchronous: !root.simpleLayout
+            onLoaded: fullRep.simpleBuilt = true
             visible: root.simpleLayout
             sourceComponent: simpleComp
         }
@@ -1548,6 +2068,28 @@ PlasmoidItem {
                     text: i18n("Open settings")
                     icon.name: "configure"
                     onTriggered: Plasmoid.internalAction("configure").trigger()
+                }
+            ]
+        }
+
+        // No forecast at all (nothing cached either) and the requests are failing —
+        // typically the network is not up yet after login. Say so instead of leaving
+        // an empty popup; the boot probe keeps retrying on its own.
+        Kirigami.InlineMessage {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.margins: Kirigami.Units.largeSpacing
+            z: 100
+            visible: root.hasLocation && root.weatherCode < 0 && root.fetchFailing
+            type: Kirigami.MessageType.Warning
+            text: i18n("Can't reach %1 yet. Retrying automatically.", root.provider ? root.provider.displayName : "")
+            actions: [
+                Kirigami.Action {
+                    text: i18n("Retry now")
+                    icon.name: "view-refresh"
+                    enabled: !root.loading
+                    onTriggered: root.fetchWeather()
                 }
             ]
         }

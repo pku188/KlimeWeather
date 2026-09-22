@@ -1,4 +1,4 @@
-# Bare Weather — KDE Plasma weather widget.
+# KlimeWeather — KDE Plasma weather widget.
 # Translation template, under the same GPL-2.0-or-later license as the widget.
 #
 # ==========================================================================
@@ -18,12 +18,15 @@
 # Strings added after that contribution were filled in from KDE's own Ukrainian
 # catalogs (kunitconversion6, digitalclock) and from the wording already used in
 # this file. Corrections welcome.
+# Strings added by the multi-provider rework (weather source, air pressure, graph
+# zoom, Common settings tab, …) were translated with AI assistance and have not
+# been reviewed by a native speaker yet — corrections especially welcome there.
 msgid ""
 msgstr ""
-"Project-Id-Version: org.bvlthvzvr.weather\n"
-"Report-Msgid-Bugs-To: https://github.com/bvlthvzvr/BareWeather/issues\n"
-"POT-Creation-Date: 2026-09-10 03:31-0400\n"
-"PO-Revision-Date: 2026-08-18 03:51-0400\n"
+"Project-Id-Version: io.github.pku188.klimeweather\n"
+"Report-Msgid-Bugs-To: https://github.com/pku188/KlimeWeather/issues\n"
+"POT-Creation-Date: 2026-09-22 18:51+0200\n"
+"PO-Revision-Date: 2026-09-18 18:40+0200\n"
 "Last-Translator: yigorsm <https://github.com/yigorsm>\n"
 "Language-Team: Ukrainian\n"
 "Language: uk\n"
@@ -32,673 +35,6 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
-
-#: contents/ui/WeatherToolbar.qml:35
-msgid "Unpin window"
-msgstr "Відкріпити вікно"
-
-#: contents/ui/WeatherToolbar.qml:35
-msgid "Keep window open"
-msgstr "Тримати вікно відкритим"
-
-#: contents/ui/WeatherToolbar.qml:41
-msgid "Refresh"
-msgstr "Оновити"
-
-#: contents/ui/configGeneral.qml:29
-msgid "Refresh interval (minutes):"
-msgstr "Інтервал оновлення (у хвилинах)"
-
-#: contents/ui/configGeneral.qml:35
-msgid "Weather alerts:"
-msgstr "Погодні попередження"
-
-#: contents/ui/configGeneral.qml:38
-msgid "Show weather alerts"
-msgstr "Показувати погодні попередження"
-
-#: contents/ui/configGeneral.qml:47
-msgid ""
-"Weather alerts come from KDE Public Alert Server. It collects official "
-"weather warnings from agencies around the world so you get worldwide alerts "
-"without contacting, or exposing yourself to each individual agency."
-msgstr ""
-"Погодні попередження надходять із сервера KDE Public Alert Server. Він "
-"збирає офіційні попередження про погоду від служб з усього світу, тож ви "
-"отримуєте сповіщення глобального масштабу, не звертаючись до кожної окремої "
-"служби й не передаючи їй свої дані."
-
-#: contents/ui/configGeneral.qml:52
-msgid "Show alerts at or above:"
-msgstr "Показувати сповіщення при рівні або вище"
-
-#: contents/ui/configGeneral.qml:57
-msgid "Minor"
-msgstr "Незначні"
-
-#: contents/ui/configGeneral.qml:58 contents/ui/main.qml:1138
-msgid "Moderate"
-msgstr "Помірні"
-
-#: contents/ui/configGeneral.qml:59
-msgid "Severe"
-msgstr "Суттєві"
-
-#: contents/ui/configGeneral.qml:60 contents/ui/main.qml:1141
-msgid "Extreme"
-msgstr "Екстремальні"
-
-#: contents/ui/configGeneral.qml:70
-msgid "Temperature unit:"
-msgstr "Одиниця вимірювання температури"
-
-#: contents/ui/configGeneral.qml:73
-msgid "Celsius (°C)"
-msgstr "Градуси Цельсія (°C)"
-
-#: contents/ui/configGeneral.qml:74
-msgid "Fahrenheit (°F)"
-msgstr "Градуси Фаренгейта (°F)"
-
-#: contents/ui/configGeneral.qml:84
-msgid "Wind speed unit:"
-msgstr "Одиниці вимірювання швидкості вітру:"
-
-#: contents/ui/configGeneral.qml:87
-msgid "Follow temperature unit"
-msgstr "Використовувати одиницю вимірювання температури"
-
-#: contents/ui/configGeneral.qml:88
-msgid "Kilometers per hour (kmh)"
-msgstr "Кілометри за годину (км/год)"
-
-#: contents/ui/configGeneral.qml:89
-msgid "Miles per hour (mph)"
-msgstr "Милі за годину (mph)"
-
-#: contents/ui/configGeneral.qml:90
-msgid "Meters per second (m/s)"
-msgstr "Метри за секунду (м/с)"
-
-#: contents/ui/configGeneral.qml:100
-msgid "Clock format:"
-msgstr "Формат часу:"
-
-#: contents/ui/configGeneral.qml:101
-msgid "Use 24-hour time"
-msgstr "Використовувати 24-годинний формат"
-
-#: contents/ui/configLocation.qml:122
-msgid "Searching…"
-msgstr "Триває пошук..."
-
-#: contents/ui/configLocation.qml:137
-msgid "No match for “%1”. Try just the place name."
-msgstr "Не знайдено відповідностей для «%1». Спробуйте ввести лише назву"
-
-#: contents/ui/configLocation.qml:177
-msgid "%1 matches — pick one:"
-msgstr "%1 відповідностей — виберіть одне:"
-
-#: contents/ui/configLocation.qml:190
-msgid "Set to: %1"
-msgstr "Встановити: %1"
-
-#: contents/ui/configLocation.qml:252
-msgid "Detecting location…"
-msgstr "Визначаємо місцезнаходження..."
-
-#: contents/ui/configLocation.qml:271
-msgid "Could not detect location. Enter it manually below."
-msgstr "Не вдалося визначити місцезнаходження. Введіть його вручну нижче."
-
-#: contents/ui/configLocation.qml:302
-msgid "This location is already saved."
-msgstr "Місцезнаходження збережено."
-
-#: contents/ui/configLocation.qml:333
-msgid "You can have up to %1 favorites."
-msgstr "Ви можете додати до %1 у список обраних."
-
-#: contents/ui/configLocation.qml:361
-msgid "Edit location"
-msgstr "Редагувати місцезнаходження"
-
-#: contents/ui/configLocation.qml:373
-msgid "Name:"
-msgstr "Назва:"
-
-#: contents/ui/configLocation.qml:377 contents/ui/configLocation.qml:514
-msgid "Latitude:"
-msgstr "Широта:"
-
-#: contents/ui/configLocation.qml:383 contents/ui/configLocation.qml:532
-msgid "Longitude:"
-msgstr "Довгота:"
-
-#: contents/ui/configLocation.qml:408
-msgid "Automatic"
-msgstr "Автоматично"
-
-#: contents/ui/configLocation.qml:412
-msgid "Auto-detect:"
-msgstr "Автоматичне визначення:"
-
-#: contents/ui/configLocation.qml:414
-msgid "Detect now"
-msgstr "Визначити зараз"
-
-#: contents/ui/configLocation.qml:428
-msgid ""
-"Auto-detect estimates your location from your public IP address via Mullvad, "
-"a privacy focused, no logging service. Your IP is not stored or profiled."
-msgstr ""
-"Функція автоматичного визначення місцезнаходження оцінює ваше "
-"місцезнаходження на основі вашої публічної IP-адреси через Mullvad, сервіс, "
-"орієнтований на конфіденційність, що не веде журналів. Ваша IP-адреса не "
-"зберігається і не використовується для створення профілів."
-
-#: contents/ui/configLocation.qml:444
-msgid "Manual"
-msgstr "Ручне"
-
-#: contents/ui/configLocation.qml:449
-msgid "Location name:"
-msgstr "Назва місцезнаходження:"
-
-#: contents/ui/configLocation.qml:499
-msgid ""
-"Type a place name (city, town, postal) to find the coordinates.  The name is "
-"looked up via OpenMeteo's geocoding service, which fills in the latitude and "
-"longitude below."
-msgstr ""
-"Введіть назву місцезнаходження (місто, селище, поштовий індекс), щоб знайти "
-"координати.  Ця назва перевіряється за допомогою служби геокодування "
-"OpenMeteo, яка вказує широту та довготу нижче."
-
-#: contents/ui/configLocation.qml:552
-msgid "Save current location"
-msgstr "Зберегти поточне місцезнаходження"
-
-#: contents/ui/configLocation.qml:568
-msgid "Saved locations"
-msgstr "Збережені місцезнаходження"
-
-#: contents/ui/configLocation.qml:582
-msgid "No saved locations yet."
-msgstr "Збережених місцезнаходжень поки що немає."
-
-#: contents/ui/configLocation.qml:648
-msgid "Active"
-msgstr "Поточне"
-
-#: contents/ui/configLocation.qml:657
-msgid "Remove favorite"
-msgstr "Видалити з обраних"
-
-#: contents/ui/configLocation.qml:657
-msgid "Set as favorite"
-msgstr "Додати до обраних"
-
-#: contents/ui/configLocation.qml:663
-msgid "Edit name or coordinates"
-msgstr "Редагувати назву або координати"
-
-#: contents/ui/configLocation.qml:669
-msgid "Remove"
-msgstr "Видалити"
-
-#: contents/ui/main.qml:133
-msgid "Updated %1m ago"
-msgstr "Оновлено %1хв тому"
-
-#: contents/ui/main.qml:135
-msgid "Updated %1h ago"
-msgstr "Оновлено %1год тому"
-
-#: contents/ui/main.qml:136
-msgid "Updated %1d ago"
-msgstr "Оновлено %1 днів тому"
-
-#: contents/ui/main.qml:184
-msgid "until %1"
-msgstr "до %1"
-
-#: contents/ui/main.qml:210
-msgid "Also active:"
-msgstr "Також активні:"
-
-#: contents/ui/main.qml:300 contents/ui/main.qml:385
-msgid "light"
-msgstr "легкий"
-
-#: contents/ui/main.qml:404 contents/ui/main.qml:508 contents/ui/main.qml:509
-msgid "Today"
-msgstr "Сьогодні"
-
-#: contents/ui/main.qml:407
-msgid "Feels like: %1"
-msgstr "Відчувається як: %1"
-
-#: contents/ui/main.qml:412
-msgid "Humidity: %1"
-msgstr "Вологість: %1"
-
-#: contents/ui/main.qml:417
-msgid "UV Index: %1"
-msgstr "УФ індекс: %1"
-
-#: contents/ui/main.qml:422
-msgid "Precipitation: %1"
-msgstr "Опади: %1"
-
-#: contents/ui/main.qml:427
-msgid "Precip. %1: %2"
-msgstr "Опади %1: %2"
-
-#: contents/ui/main.qml:440
-msgid "Wind: %1"
-msgstr "Вітер: %1"
-
-#: contents/ui/main.qml:444
-msgid "Cloud cover: %1"
-msgstr "Хмарність: %1"
-
-#: contents/ui/main.qml:448
-msgid "Snowfall %1: %2"
-msgstr "Снігопад %1: %2"
-
-#: contents/ui/main.qml:886
-msgid "Clear night"
-msgstr "Ясна ніч"
-
-#: contents/ui/main.qml:886
-msgid "Clear sky"
-msgstr "Ясно"
-
-#: contents/ui/main.qml:887
-msgid "Partly cloudy"
-msgstr "Мінлива хмарність"
-
-#: contents/ui/main.qml:888
-msgid "Overcast"
-msgstr "Хмарно"
-
-#: contents/ui/main.qml:889
-msgid "Fog"
-msgstr "Туман"
-
-#: contents/ui/main.qml:890
-msgid "Freezing rain"
-msgstr "Замерзаючий дощ"
-
-#: contents/ui/main.qml:891
-msgid "Rain"
-msgstr "Дощ"
-
-#: contents/ui/main.qml:892
-msgid "Snow"
-msgstr "Сніг"
-
-#: contents/ui/main.qml:893
-msgid "Showers"
-msgstr "Злива"
-
-#: contents/ui/main.qml:894
-msgid "Snow showers"
-msgstr "Снігопад"
-
-#: contents/ui/main.qml:895
-msgid "Thunderstorm"
-msgstr "Гроза"
-
-#: contents/ui/main.qml:1137
-msgid "Low"
-msgstr "Слабкий"
-
-#: contents/ui/main.qml:1139
-msgid "High"
-msgstr "Сильний"
-
-#: contents/ui/main.qml:1140
-msgid "Very High"
-msgstr "Дуже сильний"
-
-#: contents/ui/main.qml:1545
-msgid "No location set. Open settings to choose where to show the weather."
-msgstr ""
-"Місцезнаходження не вказано. Відкрийте налаштування, щоб вибрати місце, для "
-"якого показувати дані про погоду"
-
-#: contents/ui/main.qml:1548
-msgid "Open settings"
-msgstr "Відкрити налаштування"
-
-#: contents/ui/FullView.qml:145
-msgid "Switch to graph layout"
-msgstr "Перейти до режиму графіка"
-
-#: contents/ui/SimpleView.qml:858
-msgid "Switch to detailed layout"
-msgstr "Перейти до детального режиму перегляду"
-
-#: contents/ui/configAppearance.qml:73 contents/ui/configAppearance.qml:99
-#: contents/ui/configAppearance.qml:276 contents/ui/configAppearance.qml:502
-#: contents/ui/configAppearance.qml:524
-msgid "None"
-msgstr "Жодного"
-
-#: contents/ui/configAppearance.qml:74 contents/ui/configAppearance.qml:105
-msgid "Feels like"
-msgstr "Відчувається як"
-
-#: contents/ui/configAppearance.qml:75 contents/ui/configAppearance.qml:106
-msgid "Humidity"
-msgstr "Вологість"
-
-#: contents/ui/configAppearance.qml:76 contents/ui/configAppearance.qml:107
-msgid "UV Index"
-msgstr "УФ індекс"
-
-#: contents/ui/configAppearance.qml:77
-msgid "Precipitation rate"
-msgstr "Інтенсивність опадів"
-
-#: contents/ui/configAppearance.qml:78
-msgid "Precipitation sum"
-msgstr "Кількість опадів"
-
-#: contents/ui/configAppearance.qml:79 contents/ui/configAppearance.qml:100
-msgid "Wind"
-msgstr "Вітер"
-
-#: contents/ui/configAppearance.qml:80
-msgid "Snowfall today"
-msgstr "Сьогодні снігопад"
-
-#: contents/ui/configAppearance.qml:81 contents/ui/configAppearance.qml:108
-msgid "Cloud cover"
-msgstr "Хмарність"
-
-#: contents/ui/configAppearance.qml:94
-msgid "Sunrise / sunset"
-msgstr "Схід / захід"
-
-#: contents/ui/configAppearance.qml:101
-msgid "Wind + gust"
-msgstr "Вітер + пориви"
-
-#: contents/ui/configAppearance.qml:102
-msgid "Precip chance"
-msgstr "Ймовірність опадів"
-
-#: contents/ui/configAppearance.qml:103
-msgid "Precip amount"
-msgstr "Обсяг опадів"
-
-#: contents/ui/configAppearance.qml:104
-msgid "Snowfall"
-msgstr "Снігопад"
-
-#: contents/ui/configAppearance.qml:123
-msgid "Icon pack:"
-msgstr "Набір значків"
-
-#: contents/ui/configAppearance.qml:127
-msgid "Basmilius (color)"
-msgstr "Basmilius (кольорові)"
-
-#: contents/ui/configAppearance.qml:128
-msgid "System theme"
-msgstr "Тема системи"
-
-#: contents/ui/configAppearance.qml:129
-msgid "Custom folder…"
-msgstr "Власна папка..."
-
-#: contents/ui/configAppearance.qml:138
-msgid "Custom folder:"
-msgstr "Власна папка:"
-
-#: contents/ui/configAppearance.qml:141
-msgid "Choose…"
-msgstr "Оберіть..."
-
-#: contents/ui/configAppearance.qml:154
-msgid "(none selected)"
-msgstr "(не вибрано)"
-
-#: contents/ui/configAppearance.qml:164
-msgid ""
-"Folder with SVGs named like the bundled set (wi-day-sunny.svg, wi-night-"
-"clear.svg, …). Tip: copy contents/icons/basmilius/32/ as a starting point so "
-"every condition is covered, then edit."
-msgstr ""
-"Папка з файлами SVG, назви яких відповідають набору (wi-day-sunny.svg, wi-"
-"night-clear.svg, …). Порада: для початку скопіюйте вміст папки contents/"
-"icons/basmilius/32/, щоб були враховані всі погодні умови, а потім внесіть "
-"зміни."
-
-#: contents/ui/configAppearance.qml:170
-msgid "Choose icon folder"
-msgstr "Виберіть папку зі значками"
-
-#: contents/ui/configAppearance.qml:177
-msgid "Cards"
-msgstr "Картки"
-
-#: contents/ui/configAppearance.qml:178
-msgid "Graph"
-msgstr "Графік"
-
-#: contents/ui/configAppearance.qml:179
-msgid "Panel"
-msgstr "Панель"
-
-#: contents/ui/configAppearance.qml:196 contents/ui/configAppearance.qml:445
-msgid "Forecast days:"
-msgstr "Кількість днів прогнозу:"
-
-#: contents/ui/configAppearance.qml:202 contents/ui/configAppearance.qml:463
-msgid "Header icon size:"
-msgstr "Розмір значка в шапці:"
-
-#: contents/ui/configAppearance.qml:209 contents/ui/configAppearance.qml:470
-msgid "Temperature font:"
-msgstr "Шрифт температури:"
-
-#: contents/ui/configAppearance.qml:216
-msgid "Condition & location font:"
-msgstr "Шрифт погодних умов та місцезнаходження:"
-
-#: contents/ui/configAppearance.qml:223
-msgid "Daily tab icon size:"
-msgstr "Розмір значка щоденного прогнозу:"
-
-#: contents/ui/configAppearance.qml:230
-msgid "Day tabs:"
-msgstr "Вкладки днів:"
-
-#: contents/ui/configAppearance.qml:231
-msgid "Show mm/dd"
-msgstr "Показувати дд.мм"
-
-#: contents/ui/configAppearance.qml:235 contents/ui/configAppearance.qml:477
-msgid "Hourly icon size:"
-msgstr "Розмір значка погодинного прогнозу:"
-
-#: contents/ui/configAppearance.qml:242
-msgid "Hourly temperature font:"
-msgstr "Шрифт погодинної температури:"
-
-#: contents/ui/configAppearance.qml:249
-msgid "Hourly card font:"
-msgstr "Шрифт погодинної картки:"
-
-#: contents/ui/configAppearance.qml:256
-msgid "Day starts at:"
-msgstr "Доба починається о:"
-
-#: contents/ui/configAppearance.qml:261
-msgid "6 AM"
-msgstr "6 ранку"
-
-#: contents/ui/configAppearance.qml:262
-msgid "Midnight"
-msgstr "Опівночі"
-
-#: contents/ui/configAppearance.qml:272 contents/ui/configAppearance.qml:498
-msgid "Animation:"
-msgstr "Анімації:"
-
-#: contents/ui/configAppearance.qml:277
-msgid "Daily tab icons"
-msgstr "Значки щоденного прогнозу"
-
-#: contents/ui/configAppearance.qml:278 contents/ui/configAppearance.qml:503
-msgid "Hourly icons"
-msgstr "Значки погодинного прогнозу"
-
-#: contents/ui/configAppearance.qml:279 contents/ui/configAppearance.qml:505
-msgid "Both"
-msgstr "Обидва"
-
-#: contents/ui/configAppearance.qml:302 contents/ui/configAppearance.qml:538
-msgid "Weather Elements (up to 4)"
-msgstr "Елементи погоди (до 4)"
-
-#: contents/ui/configAppearance.qml:311
-msgid "The element header readouts follow whichever hour you hover."
-msgstr ""
-"Показання в заголовку елемента змінюються відповідно до години, яку ви "
-"виберете."
-
-#: contents/ui/configAppearance.qml:317 contents/ui/configAppearance.qml:544
-msgid "Font:"
-msgstr "Шрифт"
-
-#: contents/ui/configAppearance.qml:324 contents/ui/configAppearance.qml:386
-#: contents/ui/configAppearance.qml:551
-msgid "Element 1:"
-msgstr "Елемент 1:"
-
-#: contents/ui/configAppearance.qml:332 contents/ui/configAppearance.qml:410
-#: contents/ui/configAppearance.qml:559
-msgid "Element 2:"
-msgstr "Елемент 2:"
-
-#: contents/ui/configAppearance.qml:340 contents/ui/configAppearance.qml:567
-msgid "Element 3:"
-msgstr "Елемент 3:"
-
-#: contents/ui/configAppearance.qml:348 contents/ui/configAppearance.qml:575
-msgid "Element 4:"
-msgstr "Елемент 4:"
-
-#: contents/ui/configAppearance.qml:355 contents/ui/configAppearance.qml:582
-msgid "Reset to none"
-msgstr "Очистити"
-
-#: contents/ui/configAppearance.qml:371
-msgid "Hourly cards (2 elements)"
-msgstr "Картки погодинного прогнозу (2 елемента)"
-
-#: contents/ui/configAppearance.qml:380
-msgid ""
-"Shows the main metric, or the fallback on hours the main one has nothing to "
-"show."
-msgstr ""
-"Відображає основний показник, або використовує погодинні дані як запасний "
-"варіант, якщо основний відсутній."
-
-#: contents/ui/configAppearance.qml:394 contents/ui/configAppearance.qml:402
-#: contents/ui/configAppearance.qml:418 contents/ui/configAppearance.qml:426
-msgid "Fallback:"
-msgstr "Резервний варіант:"
-
-#: contents/ui/configAppearance.qml:451
-msgid "Graph detail:"
-msgstr "Деталі графіка:"
-
-#: contents/ui/configAppearance.qml:455
-msgid "Every 2 hours"
-msgstr "Кожні 2 години"
-
-#: contents/ui/configAppearance.qml:456
-msgid "Hourly"
-msgstr "Погодинний"
-
-#: contents/ui/configAppearance.qml:484
-msgid "Hour font:"
-msgstr "Шрифт годин:"
-
-#: contents/ui/configAppearance.qml:491
-msgid "Graph temperature font:"
-msgstr "Шрифт температури на графіку:"
-
-#: contents/ui/configAppearance.qml:504
-msgid "Header icon"
-msgstr "Значок заголовка"
-
-#: contents/ui/configAppearance.qml:518
-msgid "Graph Color:"
-msgstr "Колір графіка:"
-
-#: contents/ui/configAppearance.qml:521
-msgid "Temperature & precipitation"
-msgstr "Температура і опади"
-
-#: contents/ui/configAppearance.qml:522
-msgid "Temperature only"
-msgstr "Лише температура"
-
-#: contents/ui/configAppearance.qml:523
-msgid "Precipitation only"
-msgstr "Лише опади"
-
-#: contents/ui/configAppearance.qml:601
-msgid "Panel icon size:"
-msgstr "Розмір значка на панелі:"
-
-#: contents/ui/configAppearance.qml:608
-msgid "Panel temperature font:"
-msgstr "Шрифт температури на панелі:"
-
-#: contents/ui/configAppearance.qml:615
-msgid "Icon color:"
-msgstr "Колір значка:"
-
-#: contents/ui/configAppearance.qml:616
-msgid "Use colored icon"
-msgstr "Використовувати кольоровий значок"
-
-#: contents/ui/configAppearance.qml:620
-msgid "Panel:"
-msgstr "Панель:"
-
-#: contents/ui/configAppearance.qml:621
-msgid "Detailed View"
-msgstr "Детальний перегляд"
-
-#: contents/ui/configAppearance.qml:628
-msgid "High / low temperature"
-msgstr "Макс. / мін. температура"
-
-#: contents/ui/configAppearance.qml:629
-msgid "Precipitation (chance / amount)"
-msgstr "Опади (ймовірність / кількість)"
-
-#: contents/ui/configAppearance.qml:630
-msgid "Wind (speed / gust)"
-msgstr "Вітер (швидкість / пориви)"
-
-#: contents/ui/configAppearance.qml:636
-msgid "Condition font:"
-msgstr "Шрифт погодних умов:"
-
-#: contents/ui/configAppearance.qml:644
-msgid "Second metric font:"
-msgstr "Шрифт другого показника:"
 
 #: contents/config/config.qml:10
 msgid "Location"
@@ -711,3 +47,982 @@ msgstr "Головне"
 #: contents/config/config.qml:20
 msgid "Appearance"
 msgstr "Зовнішній вигляд"
+
+#: contents/config/config.qml:29
+msgid "Sources"
+msgstr "Джерела"
+
+#: contents/ui/configAppearance.qml:15
+msgid ""
+"How long the graph takes to glide to its new position after one scroll "
+"notch. A bigger scroll step covers more ground, so it wants a longer glide "
+"to feel the same. 0 jumps straight there."
+msgstr ""
+"Скільки часу графік ковзає до нової позиції після одного кроку "
+"прокручування. Більший крок долає більшу відстань, тож потребує довшого "
+"ковзання, щоб здаватися таким самим. 0 — перехід одразу."
+
+#: contents/ui/configAppearance.qml:90 contents/ui/configAppearance.qml:116
+#: contents/ui/configAppearance.qml:358 contents/ui/configAppearance.qml:653
+#: contents/ui/configAppearance.qml:678
+msgid "None"
+msgstr "Жодного"
+
+#: contents/ui/configAppearance.qml:91 contents/ui/configAppearance.qml:122
+msgid "Feels like"
+msgstr "Відчувається як"
+
+#: contents/ui/configAppearance.qml:92 contents/ui/configAppearance.qml:123
+msgid "Humidity"
+msgstr "Вологість"
+
+#: contents/ui/configAppearance.qml:93 contents/ui/configAppearance.qml:124
+msgid "UV Index"
+msgstr "УФ індекс"
+
+#: contents/ui/configAppearance.qml:94
+msgid "Precipitation rate"
+msgstr "Інтенсивність опадів"
+
+#: contents/ui/configAppearance.qml:95
+msgid "Precipitation sum"
+msgstr "Кількість опадів"
+
+#: contents/ui/configAppearance.qml:96 contents/ui/configAppearance.qml:117
+msgid "Wind"
+msgstr "Вітер"
+
+#: contents/ui/configAppearance.qml:97
+msgid "Snowfall today"
+msgstr "Сьогодні снігопад"
+
+#: contents/ui/configAppearance.qml:98 contents/ui/configAppearance.qml:125
+msgid "Cloud cover"
+msgstr "Хмарність"
+
+#: contents/ui/configAppearance.qml:99 contents/ui/configAppearance.qml:126
+msgid "Air pressure"
+msgstr "Атмосферний тиск"
+
+#: contents/ui/configAppearance.qml:111
+msgid "Sunrise / sunset"
+msgstr "Схід / захід"
+
+#: contents/ui/configAppearance.qml:118
+msgid "Wind + gust"
+msgstr "Вітер + пориви"
+
+#: contents/ui/configAppearance.qml:119
+msgid "Precip chance"
+msgstr "Ймовірність опадів"
+
+#: contents/ui/configAppearance.qml:120
+msgid "Precip amount"
+msgstr "Обсяг опадів"
+
+#: contents/ui/configAppearance.qml:121
+msgid "Snowfall"
+msgstr "Снігопад"
+
+#: contents/ui/configAppearance.qml:131
+msgid "Choose icon folder"
+msgstr "Виберіть папку зі значками"
+
+#: contents/ui/configAppearance.qml:142
+msgid "Common"
+msgstr "Загальні"
+
+#: contents/ui/configAppearance.qml:143
+msgid "Cards"
+msgstr "Картки"
+
+#: contents/ui/configAppearance.qml:144
+msgid "Graph"
+msgstr "Графік"
+
+#: contents/ui/configAppearance.qml:145
+msgid "Panel"
+msgstr "Панель"
+
+#: contents/ui/configAppearance.qml:165
+msgid "Icon pack:"
+msgstr "Набір значків"
+
+#: contents/ui/configAppearance.qml:169
+msgid "Basmilius (color)"
+msgstr "Basmilius (кольорові)"
+
+#: contents/ui/configAppearance.qml:170
+msgid "System theme"
+msgstr "Тема системи"
+
+#: contents/ui/configAppearance.qml:171
+msgid "Custom folder…"
+msgstr "Власна папка..."
+
+#: contents/ui/configAppearance.qml:180
+msgid "Custom folder:"
+msgstr "Власна папка:"
+
+#: contents/ui/configAppearance.qml:183
+msgid "Choose…"
+msgstr "Оберіть..."
+
+#: contents/ui/configAppearance.qml:196
+msgid "(none selected)"
+msgstr "(не вибрано)"
+
+#: contents/ui/configAppearance.qml:206
+msgid ""
+"Folder with SVGs named like the bundled set (wi-day-sunny.svg, wi-night-"
+"clear.svg, …). Tip: copy contents/icons/basmilius/32/ as a starting point so "
+"every condition is covered, then edit."
+msgstr ""
+"Папка з файлами SVG, назви яких відповідають набору (wi-day-sunny.svg, wi-"
+"night-clear.svg, …). Порада: для початку скопіюйте вміст папки contents/"
+"icons/basmilius/32/, щоб були враховані всі погодні умови, а потім внесіть "
+"зміни."
+
+#: contents/ui/configAppearance.qml:210
+msgid "Header icon size:"
+msgstr "Розмір значка в шапці:"
+
+#: contents/ui/configAppearance.qml:217
+msgid "Temperature font:"
+msgstr "Шрифт температури:"
+
+#: contents/ui/configAppearance.qml:224 contents/ui/configAppearance.qml:822
+msgid "Condition font:"
+msgstr "Шрифт погодних умов:"
+
+#: contents/ui/configAppearance.qml:231
+msgid "Location font:"
+msgstr "Шрифт місцезнаходження:"
+
+#: contents/ui/configAppearance.qml:238
+msgid "Weather source font:"
+msgstr "Шрифт джерела даних:"
+
+#: contents/ui/configAppearance.qml:243
+msgid ""
+"Sizes the MET Norway / Open-Meteo button; its logo scales with the text."
+msgstr ""
+"Задає розмір кнопки MET Norway / Open-Meteo; логотип масштабується разом із "
+"текстом."
+
+#: contents/ui/configAppearance.qml:247
+msgid "Weather Elements font:"
+msgstr "Шрифт елементів погоди:"
+
+#: contents/ui/configAppearance.qml:254
+msgid "Weather Elements font style:"
+msgstr "Накреслення шрифту елементів погоди:"
+
+#: contents/ui/configAppearance.qml:258
+msgid "Regular"
+msgstr "Звичайний"
+
+#: contents/ui/configAppearance.qml:259
+msgid "SemiBold"
+msgstr "Напівжирний"
+
+#: contents/ui/configAppearance.qml:260
+msgid "Bold"
+msgstr "Жирний"
+
+#: contents/ui/configAppearance.qml:268
+msgid ""
+"SemiBold needs a font that has it. Where yours doesn't, the nearest weight "
+"it has is used — normally Bold."
+msgstr ""
+"Напівжирне накреслення потребує шрифту, який його має. Якщо у вашого шрифту "
+"його немає, береться найближче доступне — зазвичай жирне."
+
+#: contents/ui/configAppearance.qml:272
+msgid "Wind direction arrow:"
+msgstr "Стрілка напрямку вітру:"
+
+#: contents/ui/configAppearance.qml:277
+msgid ""
+"Size of the arrow that follows a wind reading, on the hourly cards and in "
+"both layouts' Weather Elements."
+msgstr ""
+"Розмір стрілки після показника вітру — на погодинних картках і в погодних "
+"елементах обох макетів."
+
+#: contents/ui/configAppearance.qml:291 contents/ui/configAppearance.qml:551
+msgid "Forecast days:"
+msgstr "Кількість днів прогнозу:"
+
+#: contents/ui/configAppearance.qml:297
+msgid "Cards per scroll:"
+msgstr "Карток за прокручування:"
+
+#: contents/ui/configAppearance.qml:303
+msgid "Daily tab icon size:"
+msgstr "Розмір значка щоденного прогнозу:"
+
+#: contents/ui/configAppearance.qml:310
+msgid "Daily tab temperature font:"
+msgstr "Шрифт температури на вкладках днів:"
+
+#: contents/ui/configAppearance.qml:317 contents/ui/configAppearance.qml:621
+msgid "Hourly icon size:"
+msgstr "Розмір значка погодинного прогнозу:"
+
+#: contents/ui/configAppearance.qml:324
+msgid "Hourly temperature font:"
+msgstr "Шрифт погодинної температури:"
+
+#: contents/ui/configAppearance.qml:331
+msgid "Hourly card font:"
+msgstr "Шрифт погодинної картки:"
+
+#: contents/ui/configAppearance.qml:338
+msgid "Day starts at:"
+msgstr "Доба починається о:"
+
+#: contents/ui/configAppearance.qml:343
+msgid "6 AM"
+msgstr "6 ранку"
+
+#: contents/ui/configAppearance.qml:344
+msgid "Midnight"
+msgstr "Опівночі"
+
+#: contents/ui/configAppearance.qml:354 contents/ui/configAppearance.qml:649
+msgid "Animation:"
+msgstr "Анімації:"
+
+#: contents/ui/configAppearance.qml:359
+msgid "Daily tab icons"
+msgstr "Значки щоденного прогнозу"
+
+#: contents/ui/configAppearance.qml:360 contents/ui/configAppearance.qml:654
+msgid "Hourly icons"
+msgstr "Значки погодинного прогнозу"
+
+#: contents/ui/configAppearance.qml:361 contents/ui/configAppearance.qml:656
+msgid "Both"
+msgstr "Обидва"
+
+#: contents/ui/configAppearance.qml:374
+msgid "Card entrance duration:"
+msgstr "Тривалість появи карток:"
+
+#: contents/ui/configAppearance.qml:380 contents/ui/configAppearance.qml:693
+msgid "%1%"
+msgstr "%1 %"
+
+#: contents/ui/configAppearance.qml:383
+msgid ""
+"How long the hourly cards take to fly in when a day opens, as a percentage "
+"of the original pace: lower is faster, 0 turns the animation off."
+msgstr ""
+"Скільки часу погодинні картки влітають під час відкриття дня, у відсотках "
+"від початкового темпу: менше — швидше, 0 вимикає анімацію."
+
+#: contents/ui/configAppearance.qml:387
+msgid "Day tabs:"
+msgstr "Вкладки днів:"
+
+#: contents/ui/configAppearance.qml:388
+msgid "Show the date under each day"
+msgstr "Показувати дату під кожним днем"
+
+#: contents/ui/configAppearance.qml:402 contents/ui/configAppearance.qml:731
+msgid "Weather Elements (up to 4)"
+msgstr "Елементи погоди (до 4)"
+
+#: contents/ui/configAppearance.qml:411
+msgid "The element header readouts follow whichever hour you hover."
+msgstr ""
+"Показання в заголовку елемента змінюються відповідно до години, яку ви "
+"виберете."
+
+#: contents/ui/configAppearance.qml:417 contents/ui/configAppearance.qml:479
+#: contents/ui/configAppearance.qml:737
+msgid "Element 1:"
+msgstr "Елемент 1:"
+
+#: contents/ui/configAppearance.qml:425 contents/ui/configAppearance.qml:503
+#: contents/ui/configAppearance.qml:745
+msgid "Element 2:"
+msgstr "Елемент 2:"
+
+#: contents/ui/configAppearance.qml:433 contents/ui/configAppearance.qml:753
+msgid "Element 3:"
+msgstr "Елемент 3:"
+
+#: contents/ui/configAppearance.qml:441 contents/ui/configAppearance.qml:761
+msgid "Element 4:"
+msgstr "Елемент 4:"
+
+#: contents/ui/configAppearance.qml:448 contents/ui/configAppearance.qml:768
+msgid "Reset to none"
+msgstr "Очистити"
+
+#: contents/ui/configAppearance.qml:464
+msgid "Hourly cards (2 elements)"
+msgstr "Картки погодинного прогнозу (2 елемента)"
+
+#: contents/ui/configAppearance.qml:473
+msgid ""
+"Shows the main metric, or the fallback on hours the main one has nothing to "
+"show."
+msgstr ""
+"Відображає основний показник, або використовує погодинні дані як запасний "
+"варіант, якщо основний відсутній."
+
+#: contents/ui/configAppearance.qml:487 contents/ui/configAppearance.qml:495
+#: contents/ui/configAppearance.qml:511 contents/ui/configAppearance.qml:519
+msgid "Fallback:"
+msgstr "Резервний варіант:"
+
+#: contents/ui/configAppearance.qml:559
+msgid "Scroll step, 12-hour view (hours):"
+msgstr "Крок прокручування, 12-годинний огляд (годин):"
+
+#: contents/ui/configAppearance.qml:565
+msgid "Scroll step, 24-hour view (hours):"
+msgstr "Крок прокручування, 24-годинний огляд (годин):"
+
+#: contents/ui/configAppearance.qml:572
+msgid "Scroll step, 48-hour view (hours):"
+msgstr "Крок прокручування, 48-годинний огляд (годин):"
+
+#: contents/ui/configAppearance.qml:582
+msgid "Scroll animation, 12-hour view:"
+msgstr "Анімація прокручування, 12-годинний огляд:"
+
+#: contents/ui/configAppearance.qml:588 contents/ui/configAppearance.qml:601
+#: contents/ui/configAppearance.qml:614
+msgid "%1 ms"
+msgstr "%1 мс"
+
+#: contents/ui/configAppearance.qml:595
+msgid "Scroll animation, 24-hour view:"
+msgstr "Анімація прокручування, 24-годинний огляд:"
+
+#: contents/ui/configAppearance.qml:608
+msgid "Scroll animation, 48-hour view:"
+msgstr "Анімація прокручування, 48-годинний огляд:"
+
+#: contents/ui/configAppearance.qml:628
+msgid "Hour font:"
+msgstr "Шрифт годин:"
+
+#: contents/ui/configAppearance.qml:635
+msgid "Graph temperature font:"
+msgstr "Шрифт температури на графіку:"
+
+#: contents/ui/configAppearance.qml:642
+msgid "Day label font:"
+msgstr "Шрифт підпису дня:"
+
+#: contents/ui/configAppearance.qml:655
+msgid "Header icon"
+msgstr "Значок заголовка"
+
+#: contents/ui/configAppearance.qml:669
+msgid "Graph color:"
+msgstr "Колір графіка:"
+
+#: contents/ui/configAppearance.qml:674
+msgid "Temperature curve & precipitation"
+msgstr "Крива температури та опади"
+
+#: contents/ui/configAppearance.qml:675
+msgid "Temperature & precipitation"
+msgstr "Температура і опади"
+
+#: contents/ui/configAppearance.qml:676
+msgid "Temperature only"
+msgstr "Лише температура"
+
+#: contents/ui/configAppearance.qml:677
+msgid "Precipitation only"
+msgstr "Лише опади"
+
+#: contents/ui/configAppearance.qml:688
+msgid "Precipitation gradient:"
+msgstr "Градієнт опадів:"
+
+#: contents/ui/configAppearance.qml:696
+msgid ""
+"How dense the shaded band under the precipitation curve is. It fades toward "
+"the floor either way; 0 leaves the curve as a bare line."
+msgstr ""
+"Наскільки щільна затінена смуга під кривою опадів. Вона все одно бліднішає "
+"донизу; 0 залишає саму лінію."
+
+#: contents/ui/configAppearance.qml:700
+msgid "Precipitation labels:"
+msgstr "Підписи опадів:"
+
+#: contents/ui/configAppearance.qml:704
+msgid "Chance and amount"
+msgstr "Ймовірність і кількість"
+
+#: contents/ui/configAppearance.qml:705
+msgid "Amount"
+msgstr "Кількість"
+
+#: contents/ui/configAppearance.qml:706
+msgid "Chance"
+msgstr "Ймовірність"
+
+#: contents/ui/configAppearance.qml:707
+msgid "Hide"
+msgstr "Сховати"
+
+#: contents/ui/configAppearance.qml:717
+msgid "Day markers:"
+msgstr "Позначки днів:"
+
+#: contents/ui/configAppearance.qml:718
+msgid "Show the date next to each day"
+msgstr "Показувати дату біля кожного дня"
+
+#: contents/ui/configAppearance.qml:787
+msgid "Panel icon size:"
+msgstr "Розмір значка на панелі:"
+
+#: contents/ui/configAppearance.qml:794
+msgid "Panel temperature font:"
+msgstr "Шрифт температури на панелі:"
+
+#: contents/ui/configAppearance.qml:801
+msgid "Icon color:"
+msgstr "Колір значка:"
+
+#: contents/ui/configAppearance.qml:802
+msgid "Use colored icon"
+msgstr "Використовувати кольоровий значок"
+
+#: contents/ui/configAppearance.qml:806
+msgid "Panel:"
+msgstr "Панель:"
+
+#: contents/ui/configAppearance.qml:807
+msgid "Detailed View"
+msgstr "Детальний перегляд"
+
+#: contents/ui/configAppearance.qml:814
+msgid "High / low temperature"
+msgstr "Макс. / мін. температура"
+
+#: contents/ui/configAppearance.qml:815
+msgid "Precipitation (chance / amount)"
+msgstr "Опади (ймовірність / кількість)"
+
+#: contents/ui/configAppearance.qml:816
+msgid "Wind (speed / gust)"
+msgstr "Вітер (швидкість / пориви)"
+
+#: contents/ui/configAppearance.qml:830
+msgid "Second metric font:"
+msgstr "Шрифт другого показника:"
+
+#: contents/ui/configGeneral.qml:30
+msgid "Refresh interval (minutes):"
+msgstr "Інтервал оновлення (у хвилинах)"
+
+#: contents/ui/configGeneral.qml:36
+msgid "Weather alerts:"
+msgstr "Погодні попередження"
+
+#: contents/ui/configGeneral.qml:39
+msgid "Show weather alerts"
+msgstr "Показувати погодні попередження"
+
+#: contents/ui/configGeneral.qml:48
+msgid ""
+"Weather alerts come from KDE Public Alert Server. It collects official "
+"weather warnings from agencies around the world so you get worldwide alerts "
+"without contacting, or exposing yourself to each individual agency."
+msgstr ""
+"Погодні попередження надходять із сервера KDE Public Alert Server. Він "
+"збирає офіційні попередження про погоду від служб з усього світу, тож ви "
+"отримуєте сповіщення глобального масштабу, не звертаючись до кожної окремої "
+"служби й не передаючи їй свої дані."
+
+#: contents/ui/configGeneral.qml:53
+msgid "Show alerts at or above:"
+msgstr "Показувати сповіщення при рівні або вище"
+
+#: contents/ui/configGeneral.qml:58
+msgid "Minor"
+msgstr "Незначні"
+
+#: contents/ui/configGeneral.qml:59 contents/ui/main.qml:1594
+msgid "Moderate"
+msgstr "Помірні"
+
+#: contents/ui/configGeneral.qml:60
+msgid "Severe"
+msgstr "Суттєві"
+
+#: contents/ui/configGeneral.qml:61 contents/ui/main.qml:1597
+msgid "Extreme"
+msgstr "Екстремальні"
+
+#: contents/ui/configGeneral.qml:71
+msgid "Temperature unit:"
+msgstr "Одиниця вимірювання температури"
+
+#: contents/ui/configGeneral.qml:74
+msgid "Celsius (°C)"
+msgstr "Градуси Цельсія (°C)"
+
+#: contents/ui/configGeneral.qml:75
+msgid "Fahrenheit (°F)"
+msgstr "Градуси Фаренгейта (°F)"
+
+#: contents/ui/configGeneral.qml:85
+msgid "Wind speed unit:"
+msgstr "Одиниці вимірювання швидкості вітру:"
+
+#: contents/ui/configGeneral.qml:88 contents/ui/configGeneral.qml:104
+msgid "Follow temperature unit"
+msgstr "Використовувати одиницю вимірювання температури"
+
+#: contents/ui/configGeneral.qml:89
+msgid "Kilometers per hour (kmh)"
+msgstr "Кілометри за годину (км/год)"
+
+#: contents/ui/configGeneral.qml:90
+msgid "Miles per hour (mph)"
+msgstr "Милі за годину (mph)"
+
+#: contents/ui/configGeneral.qml:91
+msgid "Meters per second (m/s)"
+msgstr "Метри за секунду (м/с)"
+
+#: contents/ui/configGeneral.qml:101
+msgid "Air pressure unit:"
+msgstr "Одиниця тиску:"
+
+#: contents/ui/configGeneral.qml:105
+msgid "Hectopascals (hPa)"
+msgstr "Гектопаскалі (гПа)"
+
+#: contents/ui/configGeneral.qml:106
+msgid "Inches of mercury (inHg)"
+msgstr "Дюйми ртутного стовпа (inHg)"
+
+#: contents/ui/configGeneral.qml:116
+msgid "Clock format:"
+msgstr "Формат часу:"
+
+#: contents/ui/configGeneral.qml:117
+msgid "Use 24-hour time"
+msgstr "Використовувати 24-годинний формат"
+
+#: contents/ui/configLocation.qml:128
+msgid "Searching…"
+msgstr "Триває пошук..."
+
+#: contents/ui/configLocation.qml:143
+msgid "No match for “%1”. Try just the place name."
+msgstr "Не знайдено відповідностей для «%1». Спробуйте ввести лише назву"
+
+#: contents/ui/configLocation.qml:184
+msgid "%1 matches — pick one:"
+msgstr "%1 відповідностей — виберіть одне:"
+
+#: contents/ui/configLocation.qml:197
+msgid "Set to: %1"
+msgstr "Встановити: %1"
+
+#: contents/ui/configLocation.qml:259
+msgid "Detecting location…"
+msgstr "Визначаємо місцезнаходження..."
+
+#: contents/ui/configLocation.qml:278
+msgid "Could not detect location. Enter it manually below."
+msgstr "Не вдалося визначити місцезнаходження. Введіть його вручну нижче."
+
+#: contents/ui/configLocation.qml:309
+msgid "This location is already saved."
+msgstr "Місцезнаходження збережено."
+
+#: contents/ui/configLocation.qml:340
+msgid "You can have up to %1 favorites."
+msgstr "Ви можете додати до %1 у список обраних."
+
+#: contents/ui/configLocation.qml:368
+msgid "Edit location"
+msgstr "Редагувати місцезнаходження"
+
+#: contents/ui/configLocation.qml:380
+msgid "Name:"
+msgstr "Назва:"
+
+#: contents/ui/configLocation.qml:384 contents/ui/configLocation.qml:521
+msgid "Latitude:"
+msgstr "Широта:"
+
+#: contents/ui/configLocation.qml:390 contents/ui/configLocation.qml:539
+msgid "Longitude:"
+msgstr "Довгота:"
+
+#: contents/ui/configLocation.qml:415
+msgid "Automatic"
+msgstr "Автоматично"
+
+#: contents/ui/configLocation.qml:419
+msgid "Auto-detect:"
+msgstr "Автоматичне визначення:"
+
+#: contents/ui/configLocation.qml:421
+msgid "Detect now"
+msgstr "Визначити зараз"
+
+#: contents/ui/configLocation.qml:435
+msgid ""
+"Auto-detect estimates your location from your public IP address via Mullvad, "
+"a privacy focused, no logging service. Your IP is not stored or profiled."
+msgstr ""
+"Функція автоматичного визначення місцезнаходження оцінює ваше "
+"місцезнаходження на основі вашої публічної IP-адреси через Mullvad, сервіс, "
+"орієнтований на конфіденційність, що не веде журналів. Ваша IP-адреса не "
+"зберігається і не використовується для створення профілів."
+
+#: contents/ui/configLocation.qml:451
+msgid "Manual"
+msgstr "Ручне"
+
+#: contents/ui/configLocation.qml:456
+msgid "Location name:"
+msgstr "Назва місцезнаходження:"
+
+#: contents/ui/configLocation.qml:506
+msgid ""
+"Type a place name (city, town, postal) to find the coordinates.  The name is "
+"looked up via OpenMeteo's geocoding service, which fills in the latitude and "
+"longitude below."
+msgstr ""
+"Введіть назву місцезнаходження (місто, селище, поштовий індекс), щоб знайти "
+"координати.  Ця назва перевіряється за допомогою служби геокодування "
+"OpenMeteo, яка вказує широту та довготу нижче."
+
+#: contents/ui/configLocation.qml:559
+msgid "Save current location"
+msgstr "Зберегти поточне місцезнаходження"
+
+#: contents/ui/configLocation.qml:575
+msgid "Saved locations"
+msgstr "Збережені місцезнаходження"
+
+#: contents/ui/configLocation.qml:589
+msgid "No saved locations yet."
+msgstr "Збережених місцезнаходжень поки що немає."
+
+#: contents/ui/configLocation.qml:655
+msgid "Active"
+msgstr "Поточне"
+
+#: contents/ui/configLocation.qml:664
+msgid "Remove favorite"
+msgstr "Видалити з обраних"
+
+#: contents/ui/configLocation.qml:664
+msgid "Set as favorite"
+msgstr "Додати до обраних"
+
+#: contents/ui/configLocation.qml:670
+msgid "Edit name or coordinates"
+msgstr "Редагувати назву або координати"
+
+#: contents/ui/configLocation.qml:676
+msgid "Remove"
+msgstr "Видалити"
+
+#: contents/ui/configSources.qml:38
+msgid "Weather data"
+msgstr "Погодні дані"
+
+#: contents/ui/configSources.qml:41
+msgid ""
+"The active source is chosen with the toolbar button in the widget, and "
+"applies to every saved location."
+msgstr ""
+"Активне джерело вибирається кнопкою на панелі інструментів віджета й діє для "
+"всіх збережених місцезнаходжень."
+
+#: contents/ui/configSources.qml:72
+msgid "Other sources"
+msgstr "Інші джерела"
+
+#: contents/ui/configSources.qml:79
+msgid ""
+"Severe-weather alerts via the <a href=\"https://invent.kde.org/webapps/foss-"
+"public-alert-server\">KDE FOSS Public Alert Server</a>."
+msgstr ""
+"Попередження про небезпечну погоду через <a href=\"https://invent.kde.org/"
+"webapps/foss-public-alert-server\">KDE FOSS Public Alert Server</a>."
+
+#: contents/ui/configSources.qml:80
+msgid ""
+"Place search via <a href=\"https://open-meteo.com\">Open-Meteo geocoding</"
+"a>; location auto-detect via <a href=\"https://mullvad.net\">Mullvad</a>."
+msgstr ""
+"Пошук місць через <a href=\"https://open-meteo.com\">геокодування Open-"
+"Meteo</a>; автовизначення місцезнаходження через <a href=\"https://"
+"mullvad.net\">Mullvad</a>."
+
+#: contents/ui/configSources.qml:81
+msgid ""
+"Icons derived from <a href=\"https://github.com/basmilius/weather-"
+"icons\">Meteocons</a> by Bas Milius (MIT)."
+msgstr ""
+"Піктограми на основі <a href=\"https://github.com/basmilius/weather-"
+"icons\">Meteocons</a> від Bas Milius (MIT)."
+
+#: contents/ui/configSources.qml:92
+msgid "Each data source keeps its own licence — see the links above."
+msgstr "Кожне джерело даних має власну ліцензію — див. посилання вище."
+
+#: contents/ui/FullView.qml:200
+msgid "Switch to graph layout"
+msgstr "Перейти до режиму графіка"
+
+#: contents/ui/LocationButton.qml:68
+msgid "Change location"
+msgstr "Змінити місцезнаходження"
+
+#: contents/ui/main.qml:182
+msgid "Updated %1m ago"
+msgstr "Оновлено %1хв тому"
+
+#: contents/ui/main.qml:184
+msgid "Updated %1h ago"
+msgstr "Оновлено %1год тому"
+
+#: contents/ui/main.qml:185
+msgid "Updated %1d ago"
+msgstr "Оновлено %1 днів тому"
+
+#: contents/ui/main.qml:233
+msgid "until %1"
+msgstr "до %1"
+
+#: contents/ui/main.qml:259
+msgid "Also active:"
+msgstr "Також активні:"
+
+#: contents/ui/main.qml:357 contents/ui/main.qml:487
+msgid "light"
+msgstr "легкий"
+
+#: contents/ui/main.qml:409
+msgid "%1 inHg"
+msgstr "%1 inHg"
+
+#: contents/ui/main.qml:410
+msgid "%1 hPa"
+msgstr "%1 гПа"
+
+#: contents/ui/main.qml:506 contents/ui/main.qml:653 contents/ui/main.qml:654
+msgid "Today"
+msgstr "Сьогодні"
+
+#: contents/ui/main.qml:509
+msgid "Feels like: %1"
+msgstr "Відчувається як: %1"
+
+#: contents/ui/main.qml:514
+msgid "Humidity: %1"
+msgstr "Вологість: %1"
+
+#: contents/ui/main.qml:519
+msgid "UV Index: %1"
+msgstr "УФ індекс: %1"
+
+#: contents/ui/main.qml:524
+msgid "Precipitation: %1"
+msgstr "Опади: %1"
+
+#: contents/ui/main.qml:529
+msgid "Precip. %1: %2"
+msgstr "Опади %1: %2"
+
+#: contents/ui/main.qml:547
+msgid "Wind: %1"
+msgstr "Вітер: %1"
+
+#: contents/ui/main.qml:551
+msgid "Cloud cover: %1"
+msgstr "Хмарність: %1"
+
+#: contents/ui/main.qml:555
+msgid "Pressure: %1"
+msgstr "Тиск: %1"
+
+#: contents/ui/main.qml:559
+msgid "Snowfall %1: %2"
+msgstr "Снігопад %1: %2"
+
+#: contents/ui/main.qml:1308
+msgid "Clear night"
+msgstr "Ясна ніч"
+
+#: contents/ui/main.qml:1308
+msgid "Clear sky"
+msgstr "Ясно"
+
+#: contents/ui/main.qml:1309
+msgid "Partly cloudy"
+msgstr "Мінлива хмарність"
+
+#: contents/ui/main.qml:1310
+msgid "Overcast"
+msgstr "Хмарно"
+
+#: contents/ui/main.qml:1311
+msgid "Fog"
+msgstr "Туман"
+
+#: contents/ui/main.qml:1312
+msgid "Freezing rain"
+msgstr "Замерзаючий дощ"
+
+#: contents/ui/main.qml:1313
+msgid "Rain"
+msgstr "Дощ"
+
+#: contents/ui/main.qml:1314
+msgid "Snow"
+msgstr "Сніг"
+
+#: contents/ui/main.qml:1315
+msgid "Showers"
+msgstr "Злива"
+
+#: contents/ui/main.qml:1316
+msgid "Snow showers"
+msgstr "Снігопад"
+
+#: contents/ui/main.qml:1317
+msgid "Thunderstorm"
+msgstr "Гроза"
+
+#: contents/ui/main.qml:1593
+msgid "Low"
+msgstr "Слабкий"
+
+#: contents/ui/main.qml:1595
+msgid "High"
+msgstr "Сильний"
+
+#: contents/ui/main.qml:1596
+msgid "Very High"
+msgstr "Дуже сильний"
+
+#: contents/ui/main.qml:2065
+msgid "No location set. Open settings to choose where to show the weather."
+msgstr ""
+"Місцезнаходження не вказано. Відкрийте налаштування, щоб вибрати місце, для "
+"якого показувати дані про погоду"
+
+#: contents/ui/main.qml:2068
+msgid "Open settings"
+msgstr "Відкрити налаштування"
+
+#: contents/ui/main.qml:2086
+msgid "Can't reach %1 yet. Retrying automatically."
+msgstr "Поки не вдається зв’язатися з %1. Триває повторна спроба."
+
+#: contents/ui/main.qml:2089
+msgid "Retry now"
+msgstr "Повторити зараз"
+
+#: contents/ui/PinButton.qml:38
+msgid "Unpin window"
+msgstr "Відкріпити вікно"
+
+#: contents/ui/PinButton.qml:38
+msgid "Keep window open"
+msgstr "Тримати вікно відкритим"
+
+#: contents/ui/ProviderButton.qml:63
+msgid "Switch to %1"
+msgstr "Перейти на %1"
+
+#: contents/ui/providers/MetNo.qml:44
+msgid "Weather data from MET Norway (met.no)"
+msgstr "Погодні дані від MET Norway (met.no)"
+
+#: contents/ui/providers/OpenMeteo.qml:58
+msgid "Weather data by Open-Meteo.com"
+msgstr "Погодні дані від Open-Meteo.com"
+
+#: contents/ui/SimpleView.qml:1426
+msgid "Switch to card layout"
+msgstr "Перейти до режиму карток"
+
+#: contents/ui/WeatherToolbar.qml:89
+msgid "Zoom in to 24 hours"
+msgstr "Збільшити до 24 годин"
+
+#: contents/ui/WeatherToolbar.qml:90
+msgid "Zoom in to 12 hours"
+msgstr "Збільшити до 12 годин"
+
+#: contents/ui/WeatherToolbar.qml:98
+msgid "Zoom out to 24 hours"
+msgstr "Зменшити до 24 годин"
+
+#: contents/ui/WeatherToolbar.qml:99
+msgid "Zoom out to 48 hours"
+msgstr "Зменшити до 48 годин"
+
+#: contents/ui/WeatherToolbar.qml:110
+msgid "Refresh"
+msgstr "Оновити"
+
+#~ msgid "Font:"
+#~ msgstr "Шрифт"
+
+#~ msgid "Hide the background"
+#~ msgstr "Сховати тло"
+
+#~ msgid ""
+#~ "Draw the precipitation curve as a bare line, without the shaded band "
+#~ "beneath it."
+#~ msgstr "Малювати криву опадів самою лінією, без затіненої смуги під нею."
+
+#~ msgid "Rate"
+#~ msgstr "Ймовірність"
+
+#~ msgid "Condition & location font:"
+#~ msgstr "Шрифт погодних умов та місцезнаходження:"
+
+#~ msgid "Graph detail:"
+#~ msgstr "Деталі графіка:"
+
+#~ msgid "Every 2 hours"
+#~ msgstr "Кожні 2 години"
+
+#~ msgid "Hourly"
+#~ msgstr "Погодинний"
+
+#~ msgid "Switch to detailed layout"
+#~ msgstr "Перейти до детального режиму перегляду"
+
+#~ msgid ""
+#~ "Weather alerts come from the KDE Public Alert Server, not from government "
+#~ "servers directly. Agencies like the NWS publish their official warnings "
+#~ "as open CAP feeds. KDE's open-source server continuously aggregates "
+#~ "hundreds of those feeds worldwide into one place, and the widget just "
+#~ "asks for it. So you get the official alerts without contacting or "
+#~ "revealing yourself to every agency that issues them."
+#~ msgstr ""
+#~ "Погодні попередження надходять із сервера KDE Public Alert Server, а не "
+#~ "безпосередньо з урядових серверів. Такі відомства, як NWS, публікують "
+#~ "свої офіційні попередження у вигляді відкритих каналів CAP. Сервер KDE з "
+#~ "відкритим кодом постійно об’єднує сотнітаких каналів з усього світу в "
+#~ "одному місці, а віджет просто запитує ці дані. Таким чином, ви отримуєте "
+#~ "офіційні попередження, не звертаючись і не розкриваючи свою особу кожному "
+#~ "відомству, яке їх видає."

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- KlimeWeather "Keep window open" toolbar icon. Pinned: the pin cut out of a disc, shown while the popup is kept open or the button is hovered.
+       Drawn to match the Breeze window decoration's "On all desktops" button.
+       Copyright 2026  pku188 — SPDX-License-Identifier: GPL-2.0-or-later -->
+  <style type="text/css" id="current-color-scheme">.ColorScheme-Text { color:#232629; }</style>
+  <path class="ColorScheme-Text" fill="currentColor" fill-rule="evenodd" d="M2 12A10 10 0 1 1 22 12A10 10 0 1 1 2 12ZM5.69 17.43L9.37 13.76L7.28 11.67A0.74 0.74 0 0 1 8.33 10.61L8.99 11.28L14.57 5.69A0.9 0.9 0 0 1 15.85 5.69L18.31 8.15A0.9 0.9 0 0 1 18.31 9.43L12.72 15.01L13.39 15.67A0.74 0.74 0 0 1 12.33 16.72L10.24 14.63L6.57 18.31A0.62 0.62 0 0 1 5.69 17.43Z"/>
+</svg>

@@ -1,7 +1,7 @@
 /*
- * Appearance settings — a shared icon-pack picker above per-layout tabs
- * (Detailed / Simple / Panel), each holding only that layout's own settings.
- * Copyright 2026  bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
+ * Appearance settings — a Common tab for what both layouts share, then one tab
+ * each for the card layout, the graph layout and the panel.
+ * Copyright 2026  pku188, bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
  */
 import QtQuick
 import QtQuick.Controls
@@ -11,6 +11,8 @@ import org.kde.kirigami as Kirigami
 
 Item {
     id: page
+    // shared by the three scroll-animation spins below
+    readonly property string slideTip: i18n("How long the graph takes to glide to its new position after one scroll notch. A bigger scroll step covers more ground, so it wants a longer glide to feel the same. 0 jumps straight there.")
 
     // cfg_* are auto-bound to the config keys by Plasma. ids live anywhere in
     // this file (file-wide scope), so the controls can sit inside the tabs while
@@ -24,34 +26,49 @@ Item {
     property alias cfg_heroIconSize:       heroSpin.value
     property alias cfg_tempFontSize:       tempSpin.value
     property alias cfg_dailyIconSize:      dailySpin.value
+    property alias cfg_dailyTempFontSize:  dailyTempSpin.value
+    property alias cfg_windArrowSize:      windArrowSpin.value
     property alias cfg_showDayDate:        dayDateCheck.checked
     property alias cfg_hourlyIconSize:     hourlySpin.value
     property alias cfg_hourlyTempFontSize: hourlyTempSpin.value
     property alias cfg_hourlyCardFontSize: hourlyCardSpin.value
     property alias cfg_conditionFontSize:  condFontSpin.value
+    property alias cfg_locationFontSize:   locFontSpin.value
+    property alias cfg_providerFontSize:   providerFontSpin.value
     property bool  cfg_animatedDailyIcons
     property bool  cfg_animatedHourlyIcons
     property string cfg_headerMetric1
     property string cfg_headerMetric2
     property string cfg_headerMetric3
     property string cfg_headerMetric4
-    property alias  cfg_headerInfoFontSize: detHeaderFontSpin.value
-    // Simple layout (forecast days + graph detail moved here from General)
-    property alias cfg_simpleDailyDays:        simpleDaysSpin.value
-    property bool  cfg_simpleHourly
-    property alias cfg_simpleHeroIconSize:     simpleHeroSpin.value
-    property alias cfg_simpleTempFontSize:     simpleTempSpin.value
+    property alias  cfg_headerInfoFontSize: elementsFontSpin.value
+    property int    cfg_headerInfoFontWeight
+    property alias  cfg_cardsPerScroll:     cardScrollSpin.value
+    property alias  cfg_cardDealDurationPercent: cardDealSpin.value
+    // Simple layout (forecast days moved here from General). The graph zoom has no
+    // entry here: it is toggled from the graph's own toolbar, and declaring it would let
+    // Apply write back the value this page loaded, undoing a toolbar zoom made meanwhile.
     property alias cfg_simpleHourlyIconSize:   simpleIconSpin.value
     property alias cfg_simpleHourFontSize:     simpleHourSpin.value
     property alias cfg_simpleGraphTempFontSize: simpleGraphTempSpin.value
+    property alias cfg_simpleDayMarkerFontSize: simpleDayMarkerSpin.value
+    property alias cfg_simpleDailyDays:         graphDaysSpin.value
+    property alias cfg_graphScrollHoursDay:     graphScrollDaySpin.value
+    property alias cfg_graphScrollHoursDetail:  graphScrollDetailSpin.value
+    property alias cfg_graphScrollHoursWide:    graphScrollWideSpin.value
+    property alias cfg_graphSlideMsDetail:      graphSlideDetailSpin.value
+    property alias cfg_graphSlideMsDay:         graphSlideDaySpin.value
+    property alias cfg_graphSlideMsWide:        graphSlideWideSpin.value
     property bool  cfg_simpleAnimatedIcons
     property bool  cfg_simpleHeaderAnim
-    property alias cfg_graphColorMode:         graphColorCombo.currentIndex
+    property int   cfg_graphColorMode
+    property alias cfg_precipBandOpacity:      precipBandSpin.value
+    property int   cfg_precipLabelMode
+    property alias cfg_showDayMarkerDate:      dayMarkerDateCheck.checked
     property string cfg_simpleHeaderMetric1
     property string cfg_simpleHeaderMetric2
     property string cfg_simpleHeaderMetric3
     property string cfg_simpleHeaderMetric4
-    property alias  cfg_simpleHeaderInfoFontSize: simpHeaderFontSpin.value
     property string cfg_hourlyMetric1
     property string cfg_hourlyMetric2
     property string cfg_hourlyMetric1Fallback
@@ -78,18 +95,18 @@ Item {
         { text: i18n("Precipitation sum"),       id: "precipSum"  },
         { text: i18n("Wind"),                    id: "wind"       },
         { text: i18n("Snowfall today"),          id: "snowSum"    },
-        { text: i18n("Cloud cover"),             id: "cloud"      }
+        { text: i18n("Cloud cover"),             id: "cloud"      },
+        { text: i18n("Air pressure"),            id: "pressure"   }
     ]
     function findMetricIndex(arr, id) {
         for (var i = 0; i < arr.length; ++i)
             if (arr[i].id === id) return i;
         return 0;
     }
-    function metricIndexOf(id)        { return findMetricIndex(metricOptions,        id) }
     function detailMetricIndexOf(id)  { return findMetricIndex(detailMetricOptions,  id) }
     function hourlyMetricIndexOf(id)  { return findMetricIndex(hourlyMetricOptions,  id) }
-    // Detailed layout additionally offers sunrise/sunset; the Simple header keeps the
-    // base set, so these stay Detailed-only (its combos still use metricOptions).
+    // Weather Elements options, shared by the card and graph headers: the base set
+    // plus sunrise/sunset.
     readonly property var detailMetricOptions: metricOptions.concat([
         { text: i18n("Sunrise / sunset"), id: "sun" }
     ])
@@ -105,75 +122,24 @@ Item {
         { text: i18n("Feels like"),    id: "feelsLike" },
         { text: i18n("Humidity"),      id: "humidity"  },
         { text: i18n("UV Index"),      id: "uv"        },
-        { text: i18n("Cloud cover"),   id: "cloud"     }
+        { text: i18n("Cloud cover"),   id: "cloud"     },
+        { text: i18n("Air pressure"),  id: "pressure"  }
     ]
+
+    FolderDialog {
+        id: iconFolderDialog
+        title: i18n("Choose icon folder")
+        onAccepted: page.cfg_customIconDir = selectedFolder
+    }
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.topMargin: Kirigami.Units.gridUnit   // don't sit flush against the top
         spacing: Kirigami.Units.largeSpacing
-
-        // ── shared: the condition-icon pack applies to BOTH layouts, so it sits
-        //    above the tabs rather than inside one of them ──
-        Kirigami.FormLayout {
-            Layout.fillWidth: true
-
-            ConfigComboBox {
-                id: iconPackCombo
-                Kirigami.FormData.label: i18n("Icon pack:")
-                textRole: "text"
-                // each option stores its pack id (matches the registry in main.qml)
-                model: [
-                    { text: i18n("Basmilius (color)"), id: "basmilius" },
-                    { text: i18n("System theme"),       id: "system"    },
-                    { text: i18n("Custom folder…"),     id: "custom"    }
-                ]
-                Component.onCompleted: {
-                    for (var i = 0; i < model.length; ++i)
-                        if (model[i].id === page.cfg_iconPack) { currentIndex = i; break; }
-                }
-                onActivated: page.cfg_iconPack = model[currentIndex].id
-            }
-            RowLayout {
-                Kirigami.FormData.label: i18n("Custom folder:")
-                visible: page.cfg_iconPack === "custom"
-                Button {
-                    text: i18n("Choose…")
-                    icon.name: "folder-open"
-                    onClicked: iconFolderDialog.open()
-                }
-                Label {
-                    Layout.fillWidth: true
-                    // cap the layout contribution so a long path can't inflate the
-                    // form width (elide trims rendering, not implicitWidth)
-                    Layout.preferredWidth: Kirigami.Units.gridUnit * 10
-                    elide: Text.ElideMiddle
-                    opacity: 0.7
-                    text: page.cfg_customIconDir
-                          ? page.cfg_customIconDir.replace(/^file:\/\//, "")
-                          : i18n("(none selected)")
-                }
-            }
-            Label {
-                visible: page.cfg_iconPack === "custom"
-                Layout.fillWidth: true
-                Layout.preferredWidth: Kirigami.Units.gridUnit * 16
-                wrapMode: Text.WordWrap
-                font: Kirigami.Theme.smallFont
-                opacity: 0.7
-                text: i18n("Folder with SVGs named like the bundled set (wi-day-sunny.svg, wi-night-clear.svg, …). Tip: copy contents/icons/basmilius/32/ as a starting point so every condition is covered, then edit.")
-            }
-        }
-
-        FolderDialog {
-            id: iconFolderDialog
-            title: i18n("Choose icon folder")
-            onAccepted: page.cfg_customIconDir = selectedFolder
-        }
 
         TabBar {
             id: tabBar
             Layout.fillWidth: true
+            TabButton { text: i18n("Common") }
             TabButton { text: i18n("Cards") }
             TabButton { text: i18n("Graph") }
             TabButton { text: i18n("Panel") }
@@ -183,6 +149,135 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             currentIndex: tabBar.currentIndex
+
+            // ── Common to both layouts ──
+            // The header is built the same way in the card and graph layouts — same
+            // icon, temperature, condition, location and source button, in the same
+            // spots — so these size them in both rather than twice over.
+            ScrollView {
+                contentWidth: availableWidth
+                Kirigami.FormLayout {
+                    Layout.alignment: Qt.AlignTop
+                    // The condition-icon pack applies to both layouts and the panel,
+                    // which is what makes it a Common setting.
+                    ConfigComboBox {
+                        id: iconPackCombo
+                        Kirigami.FormData.label: i18n("Icon pack:")
+                        textRole: "text"
+                        // each option stores its pack id (matches the registry in main.qml)
+                        model: [
+                            { text: i18n("Basmilius (color)"), id: "basmilius" },
+                            { text: i18n("System theme"),       id: "system"    },
+                            { text: i18n("Custom folder…"),     id: "custom"    }
+                        ]
+                        Component.onCompleted: {
+                            for (var i = 0; i < model.length; ++i)
+                                if (model[i].id === page.cfg_iconPack) { currentIndex = i; break; }
+                        }
+                        onActivated: page.cfg_iconPack = model[currentIndex].id
+                    }
+                    RowLayout {
+                        Kirigami.FormData.label: i18n("Custom folder:")
+                        visible: page.cfg_iconPack === "custom"
+                        Button {
+                            text: i18n("Choose…")
+                            icon.name: "folder-open"
+                            onClicked: iconFolderDialog.open()
+                        }
+                        Label {
+                            Layout.fillWidth: true
+                            // cap the layout contribution so a long path can't inflate the
+                            // form width (elide trims rendering, not implicitWidth)
+                            Layout.preferredWidth: Kirigami.Units.gridUnit * 10
+                            elide: Text.ElideMiddle
+                            opacity: 0.7
+                            text: page.cfg_customIconDir
+                                  ? page.cfg_customIconDir.replace(/^file:\/\//, "")
+                                  : i18n("(none selected)")
+                        }
+                    }
+                    Label {
+                        visible: page.cfg_iconPack === "custom"
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: Kirigami.Units.gridUnit * 16
+                        wrapMode: Text.WordWrap
+                        font: Kirigami.Theme.smallFont
+                        opacity: 0.7
+                        text: i18n("Folder with SVGs named like the bundled set (wi-day-sunny.svg, wi-night-clear.svg, …). Tip: copy contents/icons/basmilius/32/ as a starting point so every condition is covered, then edit.")
+                    }
+                    ConfigSpinBox {
+                        id: heroSpin
+                        Kirigami.FormData.label: i18n("Header icon size:")
+                        from: 48
+                        to: 200
+                        stepSize: 4
+                    }
+                    ConfigSpinBox {
+                        id: tempSpin
+                        Kirigami.FormData.label: i18n("Temperature font:")
+                        from: 24
+                        to: 120
+                        stepSize: 2
+                    }
+                    ConfigSpinBox {
+                        id: condFontSpin
+                        Kirigami.FormData.label: i18n("Condition font:")
+                        from: 12
+                        to: 64
+                        stepSize: 1
+                    }
+                    ConfigSpinBox {
+                        id: locFontSpin
+                        Kirigami.FormData.label: i18n("Location font:")
+                        from: 12
+                        to: 64
+                        stepSize: 1
+                    }
+                    ConfigSpinBox {
+                        id: providerFontSpin
+                        Kirigami.FormData.label: i18n("Weather source font:")
+                        from: 8
+                        to: 40
+                        stepSize: 1
+                        ToolTip.visible: hovered
+                        ToolTip.text: i18n("Sizes the MET Norway / Open-Meteo button; its logo scales with the text.")
+                    }
+                    ConfigSpinBox {
+                        id: elementsFontSpin
+                        Kirigami.FormData.label: i18n("Weather Elements font:")
+                        from: 7
+                        to: 32
+                        stepSize: 1
+                    }
+                    ConfigComboBox {
+                        id: elementsWeightCombo
+                        Kirigami.FormData.label: i18n("Weather Elements font style:")
+                        textRole: "text"
+                        // the value is the font weight itself
+                        model: [
+                            { text: i18n("Regular"),  value: 400 },
+                            { text: i18n("SemiBold"), value: 600 },
+                            { text: i18n("Bold"),     value: 700 }
+                        ]
+                        Component.onCompleted: {
+                            for (var i = 0; i < model.length; ++i)
+                                if (model[i].value === page.cfg_headerInfoFontWeight) { currentIndex = i; break; }
+                        }
+                        onActivated: page.cfg_headerInfoFontWeight = model[currentIndex].value
+                        ToolTip.visible: hovered
+                        ToolTip.text: i18n("SemiBold needs a font that has it. Where yours doesn't, the nearest weight it has is used — normally Bold.")
+                    }
+                    ConfigSpinBox {
+                        id: windArrowSpin
+                        Kirigami.FormData.label: i18n("Wind direction arrow:")
+                        from: 10
+                        to: 48
+                        stepSize: 1
+                        ToolTip.visible: hovered
+                        ToolTip.text: i18n("Size of the arrow that follows a wind reading, on the hourly cards and in both layouts' Weather Elements.")
+                    }
+                }
+            }
 
             // ── Detailed layout ──
             ScrollView {
@@ -198,25 +293,10 @@ Item {
                             to: 7
                         }
                         ConfigSpinBox {
-                            id: heroSpin
-                            Kirigami.FormData.label: i18n("Header icon size:")
-                            from: 48
-                            to: 200
-                            stepSize: 4
-                        }
-                        ConfigSpinBox {
-                            id: tempSpin
-                            Kirigami.FormData.label: i18n("Temperature font:")
-                            from: 24
-                            to: 120
-                            stepSize: 2
-                        }
-                        ConfigSpinBox {
-                            id: condFontSpin
-                            Kirigami.FormData.label: i18n("Condition & location font:")
-                            from: 12
-                            to: 64
-                            stepSize: 1
+                            id: cardScrollSpin
+                            Kirigami.FormData.label: i18n("Cards per scroll:")
+                            from: 1
+                            to: 12
                         }
                         ConfigSpinBox {
                             id: dailySpin
@@ -225,10 +305,12 @@ Item {
                             to: 64
                             stepSize: 2
                         }
-                        CheckBox {
-                            id: dayDateCheck
-                            Kirigami.FormData.label: i18n("Day tabs:")
-                            text: i18n("Show mm/dd")
+                        ConfigSpinBox {
+                            id: dailyTempSpin
+                            Kirigami.FormData.label: i18n("Daily tab temperature font:")
+                            from: 8
+                            to: 32
+                            stepSize: 1
                         }
                         ConfigSpinBox {
                             id: hourlySpin
@@ -287,6 +369,24 @@ Item {
                                 page.cfg_animatedHourlyIcons = model[currentIndex].h;
                             }
                         }
+                        ConfigSpinBox {
+                            id: cardDealSpin
+                            Kirigami.FormData.label: i18n("Card entrance duration:")
+                            // Percentage of the original pace, so lower is faster and 0
+                            // is no entrance at all — see dealPercent in FullView.qml.
+                            from: 0
+                            to: 150
+                            stepSize: 10
+                            textFromValue: (value, locale) => i18n("%1%", value)
+                            valueFromText: (text, locale) => parseInt(text.replace(/[^0-9]/g, "") || "0", 10)
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("How long the hourly cards take to fly in when a day opens, as a percentage of the original pace: lower is faster, 0 turns the animation off.")
+                        }
+                        CheckBox {
+                            id: dayDateCheck
+                            Kirigami.FormData.label: i18n("Day tabs:")
+                            text: i18n("Show the date under each day")
+                        }
 
                     }
                     Kirigami.FormLayout {
@@ -311,13 +411,6 @@ Item {
                                 ToolTip.text: i18n("The element header readouts follow whichever hour you hover.")
                             }
                             Item { Layout.fillWidth: true }
-                        }
-                        ConfigSpinBox {
-                            id: detHeaderFontSpin
-                            Kirigami.FormData.label: i18n("Font:")
-                            from: 7
-                            to: 32
-                            stepSize: 1
                         }
                         ConfigComboBox {
                             id: detMetric1
@@ -440,37 +533,88 @@ Item {
                     spacing: Kirigami.Units.gridUnit * 2
                     Kirigami.FormLayout {
                     Layout.alignment: Qt.AlignTop
+                    // No "forecast days" here any more: the graph is fixed at today
+                    // + 2 days, the span both providers can draw as a real curve.
+                    // The card layout's own day count lives in its tab.
+                    // One step per zoom level: the two views show a very different
+                    // number of hours, so a single shared value would feel wrong in
+                    // one of them.
+                    // The steps move in whole label intervals (every hour is labelled at
+                    // 12 hours, every 2nd at 24, every 4th at 48). A step that doesn't
+                    // divide that way lands the window on the other parity, so every
+                    // temperature label on screen changes at once: measured at 25 of 25
+                    // labels for an odd step in the 24-hour view, against none for an even
+                    // one. Typed-in values are still accepted; the arrows just keep to the
+                    // steps that stay smooth.
                     ConfigSpinBox {
-                        id: simpleDaysSpin
+                        id: graphDaysSpin
                         Kirigami.FormData.label: i18n("Forecast days:")
-                        from: 1
-                        to: 7
-                    }
-                    ConfigComboBox {
-                        id: sampleStepCombo
-                        Kirigami.FormData.label: i18n("Graph detail:")
-                        textRole: "text"
-                        // false = every 2 hours (12 pts/day), true = hourly (13)
-                        model: [
-                            { text: i18n("Every 2 hours"), value: false },
-                            { text: i18n("Hourly"),        value: true  }
-                        ]
-                        Component.onCompleted: currentIndex = page.cfg_simpleHourly ? 1 : 0
-                        onActivated: page.cfg_simpleHourly = model[currentIndex].value
+                        // the day pills and the graph grow to the left; the location
+                        // above them follows the first pill (see HeaderRightBlock)
+                        from: 3
+                        to: 5
                     }
                     ConfigSpinBox {
-                        id: simpleHeroSpin
-                        Kirigami.FormData.label: i18n("Header icon size:")
-                        from: 32
-                        to: 160
+                        id: graphScrollDetailSpin
+                        Kirigami.FormData.label: i18n("Scroll step, 12-hour view (hours):")
+                        from: 1
+                        to: 12
+                    }
+                    ConfigSpinBox {
+                        id: graphScrollDaySpin
+                        Kirigami.FormData.label: i18n("Scroll step, 24-hour view (hours):")
+                        from: 2
+                        to: 24
+                        stepSize: 2
+                    }
+                    ConfigSpinBox {
+                        id: graphScrollWideSpin
+                        Kirigami.FormData.label: i18n("Scroll step, 48-hour view (hours):")
+                        from: 4
+                        to: 48
                         stepSize: 4
                     }
+                    // Kept as a block of their own below the steps rather than paired
+                    // with each one: the three steps are read against each other, and so
+                    // are the three durations.
                     ConfigSpinBox {
-                        id: simpleTempSpin
-                        Kirigami.FormData.label: i18n("Temperature font:")
-                        from: 24
-                        to: 120
-                        stepSize: 2
+                        id: graphSlideDetailSpin
+                        Kirigami.FormData.label: i18n("Scroll animation, 12-hour view:")
+                        from: 0
+                        to: 2000
+                        stepSize: 50
+                        // the unit lives on the value, which keeps the label column
+                        // narrow enough for a small config window
+                        textFromValue: (value, locale) => i18n("%1 ms", value)
+                        valueFromText: (text, locale) => parseInt(text.replace(/[^0-9]/g, "") || "0", 10)
+                        ToolTip.visible: hovered
+                        ToolTip.text: slideTip
+                    }
+                    ConfigSpinBox {
+                        id: graphSlideDaySpin
+                        Kirigami.FormData.label: i18n("Scroll animation, 24-hour view:")
+                        from: 0
+                        to: 2000
+                        stepSize: 50
+                        // the unit lives on the value, which keeps the label column
+                        // narrow enough for a small config window
+                        textFromValue: (value, locale) => i18n("%1 ms", value)
+                        valueFromText: (text, locale) => parseInt(text.replace(/[^0-9]/g, "") || "0", 10)
+                        ToolTip.visible: hovered
+                        ToolTip.text: slideTip
+                    }
+                    ConfigSpinBox {
+                        id: graphSlideWideSpin
+                        Kirigami.FormData.label: i18n("Scroll animation, 48-hour view:")
+                        from: 0
+                        to: 2000
+                        stepSize: 50
+                        // the unit lives on the value, which keeps the label column
+                        // narrow enough for a small config window
+                        textFromValue: (value, locale) => i18n("%1 ms", value)
+                        valueFromText: (text, locale) => parseInt(text.replace(/[^0-9]/g, "") || "0", 10)
+                        ToolTip.visible: hovered
+                        ToolTip.text: slideTip
                     }
                     ConfigSpinBox {
                         id: simpleIconSpin
@@ -491,6 +635,13 @@ Item {
                         Kirigami.FormData.label: i18n("Graph temperature font:")
                         from: 8
                         to: 40
+                        stepSize: 1
+                    }
+                    ConfigSpinBox {
+                        id: simpleDayMarkerSpin
+                        Kirigami.FormData.label: i18n("Day label font:")
+                        from: 8
+                        to: 32
                         stepSize: 1
                     }
                     ConfigComboBox {
@@ -515,14 +666,56 @@ Item {
                     }
                     ConfigComboBox {
                         id: graphColorCombo
-                        Kirigami.FormData.label: i18n("Graph Color:")
-                        // index maps directly to graphColorMode (0..3)
+                        Kirigami.FormData.label: i18n("Graph color:")
+                        textRole: "text"
+                        // the VALUE is graphColorMode, not the index, so the list can
+                        // be reordered without renumbering anyone's saved setting
                         model: [
-                            i18n("Temperature & precipitation"),
-                            i18n("Temperature only"),
-                            i18n("Precipitation only"),
-                            i18n("None")
+                            { text: i18n("Temperature curve & precipitation"), value: 4 },
+                            { text: i18n("Temperature & precipitation"),       value: 0 },
+                            { text: i18n("Temperature only"),                  value: 1 },
+                            { text: i18n("Precipitation only"),                value: 2 },
+                            { text: i18n("None"),                              value: 3 }
                         ]
+                        Component.onCompleted: {
+                            for (var i = 0; i < model.length; ++i)
+                                if (model[i].value === page.cfg_graphColorMode) { currentIndex = i; break; }
+                        }
+                        onActivated: page.cfg_graphColorMode = model[currentIndex].value
+                    }
+                    ConfigSpinBox {
+                        id: precipBandSpin
+                        Kirigami.FormData.label: i18n("Precipitation gradient:")
+                        from: 0
+                        to: 90
+                        stepSize: 5
+                        // the unit lives on the value, as with the card entrance
+                        textFromValue: (value, locale) => i18n("%1%", value)
+                        valueFromText: (text, locale) => parseInt(text.replace(/[^0-9]/g, "") || "0", 10)
+                        ToolTip.visible: hovered
+                        ToolTip.text: i18n("How dense the shaded band under the precipitation curve is. It fades toward the floor either way; 0 leaves the curve as a bare line.")
+                    }
+                    ConfigComboBox {
+                        id: precipLabelCombo
+                        Kirigami.FormData.label: i18n("Precipitation labels:")
+                        textRole: "text"
+                        // value is a bit pair, not the index: 1 = the chance, 2 = the amount
+                        model: [
+                            { text: i18n("Chance and amount"), value: 3 },
+                            { text: i18n("Amount"),            value: 2 },
+                            { text: i18n("Chance"),            value: 1 },
+                            { text: i18n("Hide"),              value: 0 }
+                        ]
+                        Component.onCompleted: {
+                            for (var i = 0; i < model.length; ++i)
+                                if (model[i].value === page.cfg_precipLabelMode) { currentIndex = i; break; }
+                        }
+                        onActivated: page.cfg_precipLabelMode = model[currentIndex].value
+                    }
+                    CheckBox {
+                        id: dayMarkerDateCheck
+                        Kirigami.FormData.label: i18n("Day markers:")
+                        text: i18n("Show the date next to each day")
                     }
 
                     }
@@ -539,44 +732,37 @@ Item {
                         }
                         Item { Layout.fillWidth: true }
                     }
-                    ConfigSpinBox {
-                        id: simpHeaderFontSpin
-                        Kirigami.FormData.label: i18n("Font:")
-                        from: 7
-                        to: 32
-                        stepSize: 1
-                    }
                     ConfigComboBox {
                         id: simpMetric1
                         Kirigami.FormData.label: i18n("Element 1:")
                         textRole: "text"
-                        model: page.metricOptions
-                        Component.onCompleted: currentIndex = page.metricIndexOf(page.cfg_simpleHeaderMetric1)
-                        onActivated: page.cfg_simpleHeaderMetric1 = page.metricOptions[currentIndex].id
+                        model: page.detailMetricOptions
+                        Component.onCompleted: currentIndex = page.detailMetricIndexOf(page.cfg_simpleHeaderMetric1)
+                        onActivated: page.cfg_simpleHeaderMetric1 = page.detailMetricOptions[currentIndex].id
                     }
                     ConfigComboBox {
                         id: simpMetric2
                         Kirigami.FormData.label: i18n("Element 2:")
                         textRole: "text"
-                        model: page.metricOptions
-                        Component.onCompleted: currentIndex = page.metricIndexOf(page.cfg_simpleHeaderMetric2)
-                        onActivated: page.cfg_simpleHeaderMetric2 = page.metricOptions[currentIndex].id
+                        model: page.detailMetricOptions
+                        Component.onCompleted: currentIndex = page.detailMetricIndexOf(page.cfg_simpleHeaderMetric2)
+                        onActivated: page.cfg_simpleHeaderMetric2 = page.detailMetricOptions[currentIndex].id
                     }
                     ConfigComboBox {
                         id: simpMetric3
                         Kirigami.FormData.label: i18n("Element 3:")
                         textRole: "text"
-                        model: page.metricOptions
-                        Component.onCompleted: currentIndex = page.metricIndexOf(page.cfg_simpleHeaderMetric3)
-                        onActivated: page.cfg_simpleHeaderMetric3 = page.metricOptions[currentIndex].id
+                        model: page.detailMetricOptions
+                        Component.onCompleted: currentIndex = page.detailMetricIndexOf(page.cfg_simpleHeaderMetric3)
+                        onActivated: page.cfg_simpleHeaderMetric3 = page.detailMetricOptions[currentIndex].id
                     }
                     ConfigComboBox {
                         id: simpMetric4
                         Kirigami.FormData.label: i18n("Element 4:")
                         textRole: "text"
-                        model: page.metricOptions
-                        Component.onCompleted: currentIndex = page.metricIndexOf(page.cfg_simpleHeaderMetric4)
-                        onActivated: page.cfg_simpleHeaderMetric4 = page.metricOptions[currentIndex].id
+                        model: page.detailMetricOptions
+                        Component.onCompleted: currentIndex = page.detailMetricIndexOf(page.cfg_simpleHeaderMetric4)
+                        onActivated: page.cfg_simpleHeaderMetric4 = page.detailMetricOptions[currentIndex].id
                     }
                     Button {
                         text: i18n("Reset to none")

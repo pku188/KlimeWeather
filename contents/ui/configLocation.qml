@@ -3,7 +3,7 @@
  * manual entry (Open-Meteo geocoding), and saved locations. No map picker /
  * QtLocation: it would fetch OSM map tiles, leaking your area of interest to the
  * tile server — the name search and auto-detect cover the use case privately.
- * Copyright 2026  bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2026  pku188, bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
  */
 import QtQuick
 import QtQuick.Controls
@@ -16,6 +16,7 @@ ScrollView {
     // plain property (not aliased to the name field) so the Manual fields can be
     // left blank on open without wiping the stored location name
     property string cfg_locationName
+    property string cfg_locationTimezone
     property double cfg_latitude
     property double cfg_longitude
     property string cfg_savedLocations
@@ -38,12 +39,17 @@ ScrollView {
     // ── helpers ───────────────────────────────────────────────────────────
     // set the staged location; field text is written explicitly because user
     // edits break the declarative text bindings
-    function _setLocation(name, lat, lon) {
+    // `tz` is the location's IANA zone when we know it (geocoded results carry
+    // one). ALWAYS assigned, including to "" — carrying the previous city's zone
+    // over to a new coordinate would render the new one on the old clock, which is
+    // worse than falling back to the viewer's.
+    function _setLocation(name, lat, lon, tz) {
         cfg_latitude = Math.round(lat * 1e6) / 1e6;
         cfg_longitude = Math.round(lon * 1e6) / 1e6;
         latField.text = String(cfg_latitude);
         lonField.text = String(cfg_longitude);
         if (name && name.length > 0) { nameField.text = name; cfg_locationName = name; }
+        cfg_locationTimezone = tz || "";
         cfg_locationConfigured = true;   // dismisses the first-run hint
     }
 
@@ -154,6 +160,7 @@ ScrollView {
                         if (isNaN(lat) || isNaN(lon)) continue;
                         out.push({ name: page._formatGeoName(r) || r.name || qq, lat: lat, lon: lon,
                                    cc: (r.country_code || "").toUpperCase(),   // for first-setup unit auto-pick
+                                   tz: r.timezone || "",                       // IANA zone — see cfg_locationTimezone
                                    hay: ((r.admin1 || "") + " " + (r.admin2 || "") + " " + (r.admin3 || "")
                                          + " " + (r.country || "") + " " + (r.country_code || "")).toLowerCase() });
                     }
@@ -186,7 +193,7 @@ ScrollView {
         resultsPopup.close();
         searchDebounce.stop();
         _autoUnitFor(r.cc);                   // first-setup: °F/°C from the result's country (before _setLocation)
-        _setLocation(r.name, r.lat, r.lon);
+        _setLocation(r.name, r.lat, r.lon, r.tz);
         searchStatus = i18n("Set to: %1", r.name);
     }
 
@@ -262,7 +269,7 @@ ScrollView {
                     if (!isNaN(lat) && !isNaN(lon)) {
                         var name = d.city && d.city.length ? d.city : "";
                         page._autoUnitFor(d.country_code || d.country);   // first-setup: °F/°C from country (before _setLocation)
-                        page._setLocation(name, lat, lon);
+                        page._setLocation(name, lat, lon, "");   // IP geolocation gives no zone
                         page.detectStatus = "";   // coords now shown in the Manual fields below
                         return;
                     }
@@ -303,14 +310,14 @@ ScrollView {
                 return;
             }
         }
-        locs.push({ name: cfg_locationName, lat: cfg_latitude, lon: cfg_longitude });
+        locs.push({ name: cfg_locationName, lat: cfg_latitude, lon: cfg_longitude, tz: cfg_locationTimezone });
         cfg_savedLocations = JSON.stringify(locs);
         savedHint = "";
     }
     function useSaved(idx) {
         var locs = _parseSaved();
         if (idx < 0 || idx >= locs.length) return;
-        _setLocation(locs[idx].name, locs[idx].lat, locs[idx].lon);
+        _setLocation(locs[idx].name, locs[idx].lat, locs[idx].lon, locs[idx].tz);
     }
     function removeSaved(idx) {
         var locs = _parseSaved();
@@ -351,7 +358,7 @@ ScrollView {
         locs[idx].lon = lon;
         cfg_savedLocations = JSON.stringify(locs);
         // editing the entry that is currently active also updates the staged location
-        if (wasActive) _setLocation(name, lat, lon);
+        if (wasActive) _setLocation(name, lat, lon, locs[idx].tz);
     }
 
     // ── edit dialog for a saved entry (rename / adjust coordinates) ───────
@@ -521,7 +528,7 @@ ScrollView {
                 placeholderText: ""
                 inputMethodHints: Qt.ImhFormattedNumbersOnly
                 validator: DoubleValidator { bottom: -90; top: 90; decimals: 6 }
-                onTextEdited: { page.cfg_latitude = parseFloat(text) || 0; page.cfg_locationConfigured = true; }
+                onTextEdited: { page.cfg_latitude = parseFloat(text) || 0; page.cfg_locationTimezone = ""; page.cfg_locationConfigured = true; }
                 // swallow Enter so it doesn't trigger the config dialog's default
                 // button (which would close it)
                 Keys.onReturnPressed: function (e) { e.accepted = true; }
@@ -536,7 +543,7 @@ ScrollView {
                 placeholderText: ""
                 inputMethodHints: Qt.ImhFormattedNumbersOnly
                 validator: DoubleValidator { bottom: -180; top: 180; decimals: 6 }
-                onTextEdited: { page.cfg_longitude = parseFloat(text) || 0; page.cfg_locationConfigured = true; }
+                onTextEdited: { page.cfg_longitude = parseFloat(text) || 0; page.cfg_locationTimezone = ""; page.cfg_locationConfigured = true; }
                 Keys.onReturnPressed: function (e) { e.accepted = true; }
                 Keys.onEnterPressed:  function (e) { e.accepted = true; }
             }

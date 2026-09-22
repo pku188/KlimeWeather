@@ -2,7 +2,7 @@
  * General settings — units and refresh.
  * (Location → configLocation.qml; forecast days, graph detail and the per-layout
  *  header-info pickers → configAppearance.qml, inside the layout tabs.)
- * Copyright 2026  bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2026  pku188, bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
  */
 import QtQuick
 import QtQuick.Controls
@@ -19,6 +19,7 @@ Kirigami.FormLayout {
     property alias  cfg_showAlerts: alertsCheck.checked
     property int    cfg_minAlertSeverity
     property string cfg_windUnit
+    property string cfg_pressureUnit
     property alias  cfg_use24Hour: timeFormatCheck.checked
 
     // breathing room so the settings don't sit flush against the top
@@ -94,6 +95,21 @@ Kirigami.FormLayout {
                 if (model[i].value === page.cfg_windUnit) { currentIndex = i; break; }
         }
         onActivated: page.cfg_windUnit = model[currentIndex].value
+    }
+    ConfigComboBox {
+        id: pressureUnitCombo
+        Kirigami.FormData.label: i18n("Air pressure unit:")
+        textRole: "text"
+        model: [
+            { text: i18n("Follow temperature unit"),     value: "auto" },
+            { text: i18n("Hectopascals (hPa)"),          value: "hPa"  },
+            { text: i18n("Inches of mercury (inHg)"),    value: "inHg" }
+        ]
+        Component.onCompleted: {
+            for (var i = 0; i < model.length; ++i)
+                if (model[i].value === page.cfg_pressureUnit) { currentIndex = i; break; }
+        }
+        onActivated: page.cfg_pressureUnit = model[currentIndex].value
     }
     CheckBox {
         id: timeFormatCheck

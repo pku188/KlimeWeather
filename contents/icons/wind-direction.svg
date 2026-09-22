@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- KlimeWeather wind-direction arrow: points the way the wind blows (the views rotate
+       it by the wind angle). Half solid, half outlined, after the icon the user supplied.
+       Copyright 2026  pku188 — SPDX-License-Identifier: GPL-2.0-or-later -->
+  <style type="text/css" id="current-color-scheme">.ColorScheme-Text { color:#232629; }</style>
+  <g class="ColorScheme-Text" fill="currentColor" stroke="currentColor"
+     stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round">
+    <path fill="none" d="M12 1.2L21.5 22.8L12 19.24L2.5 22.8Z"/>
+    <path d="M12 1.2L21.5 22.8L12 19.24Z"/>
+  </g>
+</svg>

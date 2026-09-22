@@ -1,103 +1,99 @@
 
-# Bare Weather
-A simple, interactive weather widget that minds its own business. For KDE Plasma.
+# KlimeWeather
 
-## Showcase
+Weather widget for KDE Plasma, without the noise.
 
-**Card Layout**
-- **Animated Icons** - All icons in header, day tabs, and hourly cards are animated (Can be toggled off) 
-- **Color Coded headers** - Weather element headers are color coded with the conditions and synced to the hour as you scroll or drag through the timeline, or to the day as you switch day tabs.  
-- **Daily Forecast** - Glance across the tabs and the icons give you the gist of the day's condition and temperature. Choose the starting hour between 12AM or 6AM when switching day tabs so the timeline opens closer to when you start the day.
-- **Hourly cards** - Scroll or drag through the whole forecast, the day tabs follows.  Cards are color coded when there is snow, rain, or a mixture of both.
-<img width="628" height="456" alt="untitled33" src="https://github.com/user-attachments/assets/ac8539cc-4074-48bc-a53b-68ce5523c393" />
+Two weather sources, two layouts, and readouts you choose. Plasma 6.
 
+This is a fork of the [Bare Weather](https://github.com/bvlthvzvr/BareWeather) widget with various QoL improvements.
 
+<img width="956" height="442" alt="klime-weather-1" src="https://pkucaj.com/github/img/klime-weather-1.png" />
 
+## Widget features
 
+### Two weather sources
 
-
+- **Open-Meteo** and **MET Norway** — switched with the source button in the popup.
 
 
+### Two layouts, one click apart
+
+- **Graph** — a temperature curve and precipitation band taking hourly readings in a 12, 24 or 48 hours graph view, with sunrise/sunset markers and day buttons.
+- **Cards** — day tabs with the date and high/low, over a scrollable strip of hourly cards.
+
+### Readouts you pick
+
+- Point anywhere along the graph to read that hour's conditions.
+- Up to four **Weather Elements** in the header: air pressure, feels like, humidity, UV,
+precipitation rate or daily sum, wind (with a direction arrow), cloud cover, sunrise/sunset.
+- Units: °C/°F, km/h, mph or m/s, hPa or inHg, 12- or 24-hour clock. Dates follow your
+  system's date format.
 
 
+### Other characteristics
 
-**Graph Layout**
-- **Temperature Curve** - A quick glance over the next 12 hours forecast. The curve animates as you scroll or drag through the hour and day. 
-- **Precipitation Curve** - A separate curve in blue representing the precipitation chance throughout the forecast. The curve also shows the precipitation amount when it detects it. The curve tints toward white when there is snow. 
-- **Day Tabs** - The curve animates when switching between days.
-- **Timeline** - Pick how dense the curve is between displaying every hour or every 2 hours. 
-<img width="758" height="458" alt="untitled" src="https://github.com/user-attachments/assets/7e58dc9b-17cc-4c72-aeb8-d4ded116bd6b" />
-
-
-
-
-
-
-## Privacy
-
-Pared to the bare necessities. **No account, no API key, nor does it offer other weather service options that requires one, and nothing the widget use to profile, or monetize where and who you are.** The widget use Open-Meteo as the only provider, KDE Public Alert for weather alerts, and Mullvad for auto detect location.  Location search runs through Open-Meteo,  same provider as the weather, so there's no extra third party needed. 
-
-**Bare Weather under the hood**
-
-| Service                                                                                                | Purpose                                                         | When                                                                                     |
-| ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| **Open-Meteo** (`api.open-meteo.com`)<br><br>**Open-Meteo geocoding** (`geocoding-api.open-meteo.com`) | the weather itself<br><br>turning a place name into coordinates | **always**, once you've set a location<br><br>**only** when you use the **Search** field |
-| **KDE FOSS Public Alert Server** (`alerts.kde.org`)                                                    | weather alerts (worldwide)                               | **only** if you turn *Weather alerts* on                                                 |
-| **Mullvad** (`am.i.mullvad.net`)                                                                       | guessing your location from your IP                                 | **only** if you use *Auto-detect*                                                        |
+- **Icons throughout the toolbar** — refresh, zoom, layout switch and pin each have
+  their own icon, themed to your colour scheme.
+- **Personalize almost anything** — nearly every piece of text has its own font-size setting,
+with both layouts having additional customization options
+- **Redrawn wind direction icon** — a clear arrow at a size you choose, turning to
+the exact reported angle instead of snapping to the fixed set of compass points.
+- **Severe-weather alerts** from the KDE FOSS Public Alert Server, from a severity you set.
+- **Saved locations with favourites** — search by name, or detect one automatically.
+- **Scroll through the forecast** — the mouse wheel moves through hours and days.
+  How far and fast one notch travels is configurable per layout and graph view (12/24/48 hours).
 
 
-**What's done on privacy:**
-- **Auto-detect and alerts are both off by default**. The widget makes no IP-geolocation call and no alert request until you use them.
-- The only IP-geolocation provider is Mullvad, picked because it's a privacy
-  company with a public no-logging stance.
-- Weather alerts come from KDE Public Alert Server. **It collects official severe weather warnings  around the world so you get worldwide alerts without contacting, or exposing yourself to each individual agency.**
-- **No map picker** as it requires dependency to use them.  And exposes your IP to something the auto detection and manual location lookup already handles.
-- **Coordinates get rounded to about 1 km/.62mi (2 decimals)** on every weather and alert
-  request, **even if you enter the exact coordinate**. 
-- Open-Meteo needs no account or key and does no tracking. [Terms & Privacy](https://open-meteo.com/en/terms)
+### Faster and smoother
+
+- **The graph builds only what it draws** — the widget elements, like layout types, graph
+views and provider's data are built in the background, so switching them is instant
+and never flashes an empty frame.
+- **Never opens empty** — the last forecast is saved to disk, so after a reboot the
+  widget shows weather immediately instead of waiting for the network to come up.
+  If a fetch does fail, it says so and keeps retrying.
+- **The graph curve is rendered on the GPU**, on its own thread, so dragging through
+  the hours stays smooth instead of re-rasterising the full width every frame.
+- **The card initial animation is quicker by default**, and adjustable if you want it
+  slower or off.
+- **Refreshes are conditional** — when the forecast has not changed, the server answers
+  with a few bytes instead of the whole payload.
+- **Refresh after each hour updates cards in place**, instead of recreating the full set.
 
 
-## Language
-
-Translations welcome. If you'd like the widget in your language, it's roughly as easy as filling out a form, no coding.
-1. Download the template [`po/weather.pot`](https://github.com/bvlthvzvr/BareWeather/blob/main/po/weather.pot)
-2. Rename it to your language , ex `de.po` for German, `fr.po` for French. Then fill in the translations. Compress it to a zip folder.
-3. Send it back by [Email](mailto:bareweather.recreate814@silomails.com) or by [opening an issue](https://github.com/bvlthvzvr/BareWeather/issues/new) and attaching the file. Otherwise Open PR.
-
-### Translators
-
-Grateful for everyone helping the widget speak your language! Thank you!
-
-🇩🇪 German [Need Update](https://github.com/bvlthvzvr/BareWeather/issues/6) - [AbeGasame](https://github.com/AbeGasame)
-
-🇺🇦 Ukrainian - [yigorsm](https://github.com/yigorsm)
-
-🇵🇱 Polish - Damian
 
 ## Install
 
 ### KDE Store
 
 Right click your panel or desktop -> **Add Widgets…** -> **Get New Widgets** ->
-**Download New Plasma Widgets**, then search for **Bare Weather** 
+**Download New Plasma Widgets**, then search for **KlimeWeather** 
 
 ### From a release file
 
-1. Download the latest version from the [Releases](https://github.com/bvlthvzvr/BareWeather/releases) page.
+1. Download the latest version from the [Releases](https://github.com/pku188/KlimeWeather/releases) page.
 2. Install it — either:
    - **GUI:** Add Widgets… -> Get New Widgets -> **Install Widget from Local File…**, or
    - **Terminal:**
      ```bash
-     kpackagetool6 --type Plasma/Applet --install bare-weather.plasmoid
+     kpackagetool6 --type Plasma/Applet --install KlimeWeather.plasmoid
      ```
+
+### From source
+
+```bash
+python3 tools/build-plasmoid.py
+kpackagetool6 --type Plasma/Applet --upgrade KlimeWeather.plasmoid
+```
 
 ## Credits
 
-- Bare Weather is inspire by [Advanced Weather Widget](https://github.com/pnedyalkov91/advanced-weather-widget)
-- Weather data from [Open-Meteo](https://open-meteo.com) (CC-BY 4.0).
+- Fork of the [Bare Weather](https://github.com/bvlthvzvr/BareWeather)
+- Weather data from [Open-Meteo](https://open-meteo.com)
+- Weather data from [MET Norway](https://www.met.no/en)
 - Icons derived from [Meteocons](https://github.com/basmilius/weather-icons) by
   Bas Milius (MIT). See `contents/icons/*/ATTRIBUTION.md` for details.
-- Severe-weather alerts via the [KDE FOSS Public Alert Server](https://invent.kde.org/webapps/foss-public-alert-server) (AGPL).
+- Severe-weather alerts via the [KDE FOSS Public Alert Server](https://invent.kde.org/webapps/foss-public-alert-server) (AGPL)
 - Auto-detect via [Mullvad](https://mullvad.net)
 
 ## License

@@ -9,6 +9,14 @@
          locationConfigured below) and shows a "set your location" prompt instead
          of a stand-in city. Coordinates stay 0 and are never fetched until the
          user sets a location, which flips locationConfigured true. -->
+    <!-- Which weather API supplies the forecast. GLOBAL, not per-location:
+         saved locations are plain coordinates, so every one of them works with
+         every provider and switching providers never asks for a location twice.
+         Must match a key in main.qml's `providers` registry; an unknown value
+         falls back to openmeteo. -->
+    <entry name="weatherProvider" type="String">
+      <default>metno</default>
+    </entry>
     <entry name="latitude" type="Double">
       <default>0</default>
     </entry>
@@ -25,6 +33,14 @@
     <!-- latches true the first time the user sets their own location (any
          method); false out of the box drives the first-run "set your location"
          hint in the popup, which hides once a real location is chosen -->
+    <!-- IANA zone of the active location ("Europe/Oslo"), captured from the
+         geocoder. Resolved to a live UTC offset through Plasma's time dataengine
+         so a provider that reports no timezone (met.no) can still be rendered in
+         the location's own clock. Empty = fall back to the viewer's zone, which
+         is what a hand-entered coordinate or a pre-existing saved location gets. -->
+    <entry name="locationTimezone" type="String">
+      <default></default>
+    </entry>
     <entry name="locationConfigured" type="Bool">
       <default>false</default>
     </entry>
@@ -35,37 +51,48 @@
          from the first location's country during setup. Gates the auto-pick so it
          never overrides a deliberate choice. -->
     <entry name="unitConfigured" type="Bool">
-      <default>false</default>
+      <default>true</default>
     </entry>
     <!-- wind speed unit: auto (follows temperatureUnit), kmh, mph or ms -->
     <entry name="windUnit" type="String">
       <default>auto</default>
     </entry>
+    <!-- air pressure unit: auto (follows temperatureUnit), hPa or inHg -->
+    <entry name="pressureUnit" type="String">
+      <default>auto</default>
+    </entry>
     <!-- show clock times in 24-hour format; default false = 12-hour with AM/PM -->
     <entry name="use24Hour" type="Bool">
-      <default>false</default>
+      <default>true</default>
     </entry>
     <entry name="dailyDays" type="Int">
       <default>5</default>
     </entry>
-    <!-- forecast day count for the simple (graph) layout (independent of dailyDays) -->
+    <!-- Days the graph layout spans, today included (independent of dailyDays).
+         3 to 5: three is what both providers can draw as a real hourly curve; past
+         that, MET Norway's days are built from stretched 6-hour blocks. -->
     <entry name="simpleDailyDays" type="Int">
-      <default>5</default>
+      <default>4</default>
     </entry>
-    <!-- simple-layout graph sampling: true = every hour, false = every 2 hours -->
+    <!-- Graph zoom: 0 = 12 hours, 1 = 24 hours, 2 = 48 hours. -->
+    <entry name="graphZoom" type="Int">
+      <default>1</default>
+    </entry>
+    <!-- Deprecated: the two-level zoom graphZoom replaced (true = the 12-hour view).
+         Read once at startup to carry the choice over, then cleared. -->
     <entry name="simpleHourly" type="Bool">
       <default>false</default>
     </entry>
     <!-- up to 4 metrics shown in the DETAILED layout header next to the temperature -->
-    <entry name="headerMetric1" type="String"><default>feelsLike</default></entry>
-    <entry name="headerMetric2" type="String"><default>humidity</default></entry>
-    <entry name="headerMetric3" type="String"><default>uv</default></entry>
+    <entry name="headerMetric1" type="String"><default>sun</default></entry>
+    <entry name="headerMetric2" type="String"><default>precipSum</default></entry>
+    <entry name="headerMetric3" type="String"><default>pressure</default></entry>
     <entry name="headerMetric4" type="String"><default>none</default></entry>
     <!-- independent header metrics for the SIMPLE layout -->
-    <entry name="simpleHeaderMetric1" type="String"><default>feelsLike</default></entry>
-    <entry name="simpleHeaderMetric2" type="String"><default>humidity</default></entry>
-    <entry name="simpleHeaderMetric3" type="String"><default>uv</default></entry>
-    <entry name="simpleHeaderMetric4" type="String"><default>none</default></entry>
+    <entry name="simpleHeaderMetric1" type="String"><default>uv</default></entry>
+    <entry name="simpleHeaderMetric2" type="String"><default>precipSum</default></entry>
+    <entry name="simpleHeaderMetric3" type="String"><default>pressure</default></entry>
+    <entry name="simpleHeaderMetric4" type="String"><default>wind</default></entry>
     <entry name="hourlyMetric1" type="String"><default>wind</default></entry>
     <entry name="hourlyMetric2" type="String"><default>precip</default></entry>
     <!-- per-slot fallbacks, tried in order when the primary readout has no value
@@ -73,8 +100,8 @@
          to wind) -->
     <entry name="hourlyMetric1Fallback" type="String"><default>none</default></entry>
     <entry name="hourlyMetric1Fallback2" type="String"><default>none</default></entry>
-    <entry name="hourlyMetric2Fallback" type="String"><default>none</default></entry>
-    <entry name="hourlyMetric2Fallback2" type="String"><default>none</default></entry>
+    <entry name="hourlyMetric2Fallback" type="String"><default>precipAmt</default></entry>
+    <entry name="hourlyMetric2Fallback2" type="String"><default>uv</default></entry>
     <!-- hour a non-today day opens at in the Detailed hourly timeline:
          6 = 6 AM (skip the overnight cards), 0 = midnight. Today always opens
          at the current hour regardless. -->
@@ -86,7 +113,7 @@
          Alert Server at alerts.kde.org); off by default so the widget makes no
          alert request unless the user opts in -->
     <entry name="showAlerts" type="Bool">
-      <default>false</default>
+      <default>true</default>
     </entry>
     <!-- minimum alert severity to display (CAP rank): 1 Minor, 2 Moderate,
          3 Severe, 4 Extreme. Default 2 = Moderate+ (Minor/Unknown filtered) -->
@@ -97,19 +124,28 @@
       <default>false</default>
     </entry>
     <entry name="heroIconSize" type="Int">
-      <default>88</default>
+      <default>64</default>
     </entry>
     <entry name="tempFontSize" type="Int">
-      <default>88</default>
+      <default>48</default>
     </entry>
     <entry name="dailyIconSize" type="Int">
-      <default>36</default>
+      <default>46</default>
     </entry>
+    <!-- card-layout day tabs: show the date (day and month) under each day name -->
     <entry name="showDayDate" type="Bool">
       <default>true</default>
     </entry>
+    <!-- card-layout day tabs: pixel size of the "low | high" temperatures -->
+    <entry name="dailyTempFontSize" type="Int">
+      <default>16</default>
+    </entry>
+    <!-- pixel size of the wind-direction arrow (hourly cards + both Wind elements) -->
+    <entry name="windArrowSize" type="Int">
+      <default>21</default>
+    </entry>
     <entry name="hourlyIconSize" type="Int">
-      <default>38</default>
+      <default>46</default>
     </entry>
     <entry name="hourlyInfoFontSize" type="Int">
       <default>11</default>
@@ -119,11 +155,19 @@
       <default>13</default>
     </entry>
     <entry name="hourlyTempFontSize" type="Int">
-      <default>15</default>
+      <default>18</default>
     </entry>
-    <!-- font for the detailed-layout condition text + location name -->
+    <!-- Header fonts, shared by BOTH layouts (Appearance → Common): the condition text
+         under the temperature, the location button, and the weather-source button (its
+         logo scales with it). Both layouts place these identically, so one size each. -->
     <entry name="conditionFontSize" type="Int">
-      <default>28</default>
+      <default>20</default>
+    </entry>
+    <entry name="locationFontSize" type="Int">
+      <default>18</default>
+    </entry>
+    <entry name="providerFontSize" type="Int">
+      <default>15</default>
     </entry>
     <!-- which popup layout to open with: false = Detailed (cards), true = Simple
          (graph). Defaults to the card layout. -->
@@ -134,46 +178,84 @@
          main.qml drives the popup window directly (Window.window) to restore the
          active layout's size on open / layout switch and capture user drags here;
          see the per-layout popup-size note in DEVELOPMENT.md for why. -->
+    <!-- Entrance "deal" animation for the hourly cards, as a PERCENTAGE of the
+         original duration — lower is faster, and it scales the per-card animation
+         and the stagger between cards together. 100 = the original pace,
+         60 = the default, 50 = twice as fast, 0 = no animation.
+         See dealDuration in FullView.qml. -->
+    <entry name="cardDealDurationPercent" type="Int">
+      <default>60</default>
+    </entry>
+    <!-- How many hour cards one mouse-wheel notch moves the card strip. -->
+    <entry name="cardsPerScroll" type="Int">
+      <default>3</default>
+    </entry>
+    <!-- How many hours one mouse-wheel notch moves the graph, per zoom level.
+         Defaults are a quarter of each zoom's visible window. -->
+    <entry name="graphScrollHoursDay" type="Int">
+      <default>4</default>
+    </entry>
+    <entry name="graphScrollHoursDetail" type="Int">
+      <default>2</default>
+    </entry>
+    <entry name="graphScrollHoursWide" type="Int">
+      <default>24</default>
+    </entry>
+    <!-- How long one mouse-wheel notch takes to slide the graph, per zoom level,
+         in milliseconds. Separate from the step above because the two together
+         set the speed: the same 350 ms reads as gentle over a 2-hour step and
+         as a lurch over a 24-hour one. 0 = jump straight there. -->
+    <entry name="graphSlideMsDetail" type="Int">
+      <default>350</default>
+    </entry>
+    <entry name="graphSlideMsDay" type="Int">
+      <default>600</default>
+    </entry>
+    <entry name="graphSlideMsWide" type="Int">
+      <default>1000</default>
+    </entry>
     <entry name="detailPopupWidth" type="Int">
-      <default>0</default>
+      <default>920</default>
     </entry>
     <entry name="detailPopupHeight" type="Int">
-      <default>0</default>
+      <default>480</default>
     </entry>
     <entry name="simplePopupWidth" type="Int">
-      <default>0</default>
+      <default>920</default>
     </entry>
     <entry name="simplePopupHeight" type="Int">
-      <default>0</default>
+      <default>480</default>
     </entry>
     <!-- Latches true when the user manually resizes the Simple popup's WIDTH, so
          auto-fit-to-day-tabs stops overriding their size. Cleared when the day
          count changes (an explicit re-fit gesture). -->
     <entry name="simplePopupManual" type="Bool">
-      <default>false</default>
+      <default>true</default>
     </entry>
     <entry name="simpleHourlyIconSize" type="Int">
       <default>34</default>
     </entry>
     <entry name="simpleAnimatedIcons" type="Bool">
-      <default>false</default>
+      <default>true</default>
     </entry>
     <!-- animate the header (hero) icon in the simple layout -->
     <entry name="simpleHeaderAnim" type="Bool">
       <default>true</default>
     </entry>
-    <entry name="simpleHeroIconSize" type="Int">
-      <default>86</default>
+    <!-- Internal, set once at startup: the location fonts used to follow the condition
+         fonts, so on the first run after the split they are copied from them, keeping
+         the size a user had set. After that the two are independent. -->
+    <entry name="locationFontsSplit" type="Bool">
+      <default>true</default>
     </entry>
-    <entry name="simpleTempFontSize" type="Int">
-      <default>86</default>
-    </entry>
-    <!-- font for the header-info metric lines shown next to the temperature -->
+    <!-- Weather Elements (the metric lines beside the temperature): font size and
+         weight, shared by both layouts. Weight is 400 Regular, 600 SemiBold or 700
+         Bold; a font without a SemiBold draws the nearest face, normally its Bold. -->
     <entry name="headerInfoFontSize" type="Int">
-      <default>12</default>
+      <default>14</default>
     </entry>
-    <entry name="simpleHeaderInfoFontSize" type="Int">
-      <default>12</default>
+    <entry name="headerInfoFontWeight" type="Int">
+      <default>600</default>
     </entry>
     <!-- Simple-layout graph hour-axis label font (the "6 PM 7 PM …" row) -->
     <entry name="simpleHourFontSize" type="Int">
@@ -183,10 +265,31 @@
     <entry name="simpleGraphTempFontSize" type="Int">
       <default>16</default>
     </entry>
+    <!-- Simple-layout graph new-day marker label font (the "Fri, 18/09" at midnight) -->
+    <entry name="simpleDayMarkerFontSize" type="Int">
+      <default>14</default>
+    </entry>
     <!-- Simple-layout graph colouring: 0 = temp+precip, 1 = temp only,
-         2 = precip only, 3 = none (flat neutral) -->
+         2 = precip only, 3 = none (flat neutral), 4 = precip plus the temperature
+         LINE, leaving the temperature wash neutral -->
     <entry name="graphColorMode" type="Int">
+      <default>4</default>
+    </entry>
+    <!-- How dense the shaded band under the precipitation curve is, as the opacity
+         of its top edge in percent; it fades from there toward the floor either way.
+         0 leaves the curve as a bare line. -->
+    <entry name="precipBandOpacity" type="Int">
+      <default>25</default>
+    </entry>
+    <!-- Which halves of a precipitation readout the graph prints, as a bit pair:
+         1 = the chance, 2 = the amount, so 3 = both and 0 = neither. -->
+    <entry name="precipLabelMode" type="Int">
       <default>2</default>
+    </entry>
+    <!-- Whether a new-day marker on the graph reads "<weekday>, <date>" or the
+         weekday alone. -->
+    <entry name="showDayMarkerDate" type="Bool">
+      <default>true</default>
     </entry>
     <entry name="animatedDailyIcons" type="Bool">
       <default>true</default>
@@ -198,11 +301,11 @@
       <default>130</default>
     </entry>
     <entry name="panelFontPercent" type="Int">
-      <default>48</default>
+      <default>72</default>
     </entry>
     <!-- use the colored icon variant in the panel instead of the white one -->
     <entry name="panelColorIcon" type="Bool">
-      <default>false</default>
+      <default>true</default>
     </entry>
     <!-- show condition text + H/L below the temperature instead of just the temperature -->
     <entry name="panelDetailed" type="Bool">

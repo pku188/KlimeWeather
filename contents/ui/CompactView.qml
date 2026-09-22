@@ -1,6 +1,6 @@
 /*
  * Compact (panel/tray) representation — white icon + temperature.
- * Copyright 2026  bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright 2026  pku188, bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
  */
 import QtQuick
 import QtQuick.Layouts
@@ -69,10 +69,13 @@ Item {
 
         // Bundled white SVG packs render flat via a plain Image (no icon-engine
         // recolouring); theme packs need Kirigami.Icon to resolve "weather-*"
-        // names, so the two swap by visibility (Row skips the hidden one).
+        // names, so the two swap by visibility (Row skips the hidden one). With no
+        // forecast yet every pack falls back to the theme's "weather-none-available"
+        // name, which only the Kirigami.Icon can load.
         Image {
             id: icon
             visible: weatherRoot && weatherRoot.hasLocation && !weatherRoot.iconPackIsTheme
+                     && weatherRoot.heroCode >= 0
             anchors.verticalCenter: parent.verticalCenter
             height: Math.round(compact.height * compact.iconPercent / 100 * compact.panelIconScale())
             width: height
@@ -85,7 +88,8 @@ Item {
         Kirigami.Icon {
             id: themeIcon
             // theme renderer also carries the "mark-location" pin when unset
-            visible: weatherRoot && (!weatherRoot.hasLocation || weatherRoot.iconPackIsTheme)
+            visible: weatherRoot && (!weatherRoot.hasLocation || weatherRoot.iconPackIsTheme
+                                     || weatherRoot.heroCode < 0)
             anchors.verticalCenter: parent.verticalCenter
             height: Math.round(compact.height * compact.iconPercent / 100)
             width: height

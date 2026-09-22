@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Build bare-weather.plasmoid — a clean, installable package.
+"""Build KlimeWeather.plasmoid — a clean, installable package.
 
 A .plasmoid is just a zip of the widget package. We ship ONLY what the widget
 needs at runtime — metadata.json, contents/, LICENSE — and leave out everything
 else (git, dev tooling, translation sources, local notes, editor/QML caches).
 
 Usage:  python3 tools/build-plasmoid.py
-Output: ./bare-weather.plasmoid  (in the repo root)
+Output: ./KlimeWeather.plasmoid  (in the repo root)
 """
 
 import os
@@ -16,7 +16,7 @@ import zipfile
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(REPO)
 
-OUT = "bare-weather.plasmoid"
+OUT = "KlimeWeather.plasmoid"
 INCLUDE = ["metadata.json", "LICENSE", "contents"]   # the only runtime essentials
 SKIP_SUFFIX = (".qmlc", ".jsc", "~", ".swp", ".bak")  # editor / QML-cache cruft
 SKIP_NAME = {".directory", ".DS_Store"}               # OS junk

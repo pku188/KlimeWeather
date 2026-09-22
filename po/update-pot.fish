@@ -4,8 +4,8 @@
 cd (dirname (status filename))/..
 xgettext --from-code=UTF-8 --language=JavaScript \
   --keyword=i18n:1 --keyword=i18nc:1c,2 --keyword=i18np:1,2 --keyword=i18ncp:1c,2,3 \
-  --package-name="org.bvlthvzvr.weather" \
-  --msgid-bugs-address="https://github.com/bvlthvzvr/BareWeather/issues" \
+  --package-name="io.github.pku188.klimeweather" \
+  --msgid-bugs-address="https://github.com/pku188/KlimeWeather/issues" \
   -o po/weather.pot (find contents -name '*.qml')
 
 # xgettext flags "Updated %1d ago" as javascript-format (because 'd' is a printf
@@ -20,7 +20,7 @@ set -l tmp (mktemp)
 sed -n '/^msgid ""/,$p' po/weather.pot > $tmp
 begin
     printf '%s\n' \
-        "# Bare Weather — KDE Plasma weather widget." \
+        "# KlimeWeather — KDE Plasma weather widget." \
         "# Translation template, under the same GPL-2.0-or-later license as the widget." \
         "#" \
         "# ==========================================================================" \
@@ -30,7 +30,7 @@ begin
         "#   3. For each entry, put your translation inside the empty msgstr \"\":" \
         "#        msgid  = original English — DO NOT edit it" \
         "#        msgstr = your translation goes here" \
-        "#   4. Send it back (pull request or issue) — will ships in the next release." \
+        "#   4. Send it back (pull request or issue) — it ships in the next release." \
         "#" \
         "# NOTES:" \
         "#   - Placeholders like %1, %2 must also appear in your translation." \

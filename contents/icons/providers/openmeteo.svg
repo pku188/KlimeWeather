@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- KlimeWeather popup icon: active weather source, Open-Meteo.
+       A redrawing of the Open-Meteo logo mark (sun behind a cloud), shown to credit the source.
+       Copyright 2026  pku188 — SPDX-License-Identifier: GPL-2.0-or-later -->
+  <style type="text/css" id="current-color-scheme">.ColorScheme-Text { color:#232629; }</style>
+  <path class="ColorScheme-Text" fill="none" stroke="currentColor" stroke-width="1.54" stroke-linecap="round" stroke-linejoin="round" d="M4.52 21.13A2.75 2.75 0 1 1 5.23 15.72A5.83 5.83 0 0 1 16.65 16.1A2.53 2.53 0 1 1 17.06 21.13Z"/>
+  <path class="ColorScheme-Text" fill="none" stroke="currentColor" stroke-width="1.54" stroke-linecap="round" stroke-linejoin="round" d="M12.44 8.33A3.08 3.08 0 0 1 17.72 11.39"/>
+  <path class="ColorScheme-Text" fill="none" stroke="currentColor" stroke-width="1.54" stroke-linecap="round" stroke-linejoin="round" d="M10.43 5.81L9.65 5.03M14.86 3.97L14.86 2.87M19.29 5.81L20.07 5.03M21.13 10.24L22.23 10.24M19.29 14.67L20.07 15.45"/>
+</svg>
