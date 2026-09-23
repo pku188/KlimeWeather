@@ -159,7 +159,7 @@ Item {
     readonly property bool colorPrecip:   colorMode === 0 || colorMode === 2 || colorMode === 4
     // Which halves of a precipitation readout print (config precipLabelMode, a bit
     // pair): 1 = the chance %, 2 = the snow / rain amount. Hiding one does not change
-    // which hours qualify or how the 48-hour spells are thinned; it can only let
+    // which hours qualify or how the 24- and 48-hour spells are thinned; it can only let
     // neighbours merge, where they now print the same thing (see readoutPlan).
     readonly property bool showPrecipPct: !weatherRoot || (weatherRoot.precipLabelMode & 1) !== 0
     readonly property bool showPrecipAmt: !weatherRoot || (weatherRoot.precipLabelMode & 2) !== 0
@@ -516,8 +516,9 @@ Item {
     // of at least pctLabelMin (_readoutWanted) — the same test at every zoom and for
     // every provider. A SPELL is a run of consecutive qualifying hours, unbroken.
     //
-    // At 12 and 24 hours every qualifying hour is labelled. At 48 hours the columns
-    // are too narrow for that, so each spell is thinned to:
+    // At 12 hours every qualifying hour is labelled. At 24 and 48 hours that reads
+    // too densely (the 12-hour view is there for the full detail), so each spell is
+    // thinned to:
     //   • its first hour, and every second hour after that;
     //   • plus its wettest hour, judged on the AMOUNT alone (and only when some hour
     //     in the spell actually has one) — and the hours either side of that peak
@@ -529,7 +530,7 @@ Item {
     // hourly grid — the same split amount on every hour — and what a flat stretch of
     // one chance looks like. A run only keeps its label if the step above labelled
     // some hour of it; for an even-length run the middle hour already labelled is
-    // preferred, so at 48 hours no two labels ever end up on neighbouring hours.
+    // preferred, so at 24 and 48 hours no two labels ever end up on neighbouring hours.
     //
     // Worked out once per forecast, zoom and readout setting — never per scroll — so
     // a label belongs to its hour.
@@ -560,7 +561,7 @@ Item {
         if (!samples || !samples.length || !weatherRoot || !weatherRoot.units) return null;
         if (showPrecipAmt === undefined || showPrecipPct === undefined) return null;
         var n = samples.length, shown = [], i, j, k;
-        var thin = labelStride >= 4;   // 48 hours
+        var thin = labelStride >= 2;   // 24 and 48 hours
         for (i = 0; i < n; ++i) shown.push(false);
         for (i = 0; i < n; i = j + 1) {
             j = i;
@@ -1841,8 +1842,8 @@ Item {
                             readonly property bool chanceOn: index < simple.curChanceOn.length && simple.curChanceOn[index] === 1
                             readonly property real sVal: index < simple.curSnow.length   ? simple.curSnow[index]   : 0
                             // The hour this column shows (the nearest one mid-scroll, the
-                            // nearer snapshot mid-morph), and whether the 48-hour readout
-                            // plan labels it. Always true at 12 and 24 hours.
+                            // nearer snapshot mid-morph), and whether the readout plan
+                            // labels it.
                             readonly property int nearG: simple.dayMorphT < 1
                                 ? (simple.dayMorphT < 0.5 ? simple.morphFromBase : simple.morphToBase) + index
                                 : (simple.curFrac < 0.5 ? simple.hourFloor : simple.hourCeil) + index
