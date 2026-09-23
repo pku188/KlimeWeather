@@ -71,8 +71,9 @@ Kirigami.FormLayout {
         Kirigami.FormData.label: i18n("Temperature unit:")
         textRole: "text"
         model: [
-            { text: i18n("Celsius (°C)"),    value: "celsius"    },
-            { text: i18n("Fahrenheit (°F)"), value: "fahrenheit" }
+            { text: i18n("Follow system locale"), value: "system"     },
+            { text: i18n("Celsius (°C)"),         value: "celsius"    },
+            { text: i18n("Fahrenheit (°F)"),      value: "fahrenheit" }
         ]
         Component.onCompleted: {
             for (var i = 0; i < model.length; ++i)
@@ -85,10 +86,11 @@ Kirigami.FormLayout {
         Kirigami.FormData.label: i18n("Wind speed unit:")
         textRole: "text"
         model: [
-            { text: i18n("Follow temperature unit"), value: "auto" },
+            { text: i18n("Follow system locale"),       value: "auto" },
             { text: i18n("Kilometers per hour (kmh)"), value: "kmh" },
             { text: i18n("Miles per hour (mph)"),       value: "mph" },
-            { text: i18n("Meters per second (m/s)"),    value: "ms"  }
+            { text: i18n("Meters per second (m/s)"),    value: "ms"  },
+            { text: i18n("Knots (kn)"),                 value: "kn"  }
         ]
         Component.onCompleted: {
             for (var i = 0; i < model.length; ++i)
@@ -101,9 +103,10 @@ Kirigami.FormLayout {
         Kirigami.FormData.label: i18n("Air pressure unit:")
         textRole: "text"
         model: [
-            { text: i18n("Follow temperature unit"),     value: "auto" },
+            { text: i18n("Follow system locale"),        value: "auto" },
             { text: i18n("Hectopascals (hPa)"),          value: "hPa"  },
-            { text: i18n("Inches of mercury (inHg)"),    value: "inHg" }
+            { text: i18n("Inches of mercury (inHg)"),    value: "inHg" },
+            { text: i18n("Millimeters of mercury (mmHg)"), value: "mmHg" }
         ]
         Component.onCompleted: {
             for (var i = 0; i < model.length; ++i)

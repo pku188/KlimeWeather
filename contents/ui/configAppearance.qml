@@ -35,6 +35,8 @@ Item {
     property alias cfg_conditionFontSize:  condFontSpin.value
     property alias cfg_locationFontSize:   locFontSpin.value
     property alias cfg_providerFontSize:   providerFontSpin.value
+    property int   cfg_cardAnimation
+    // the older per-part switches, read only while cardAnimation was never chosen
     property bool  cfg_animatedDailyIcons
     property bool  cfg_animatedHourlyIcons
     property string cfg_headerMetric1
@@ -59,6 +61,8 @@ Item {
     property alias cfg_graphSlideMsDetail:      graphSlideDetailSpin.value
     property alias cfg_graphSlideMsDay:         graphSlideDaySpin.value
     property alias cfg_graphSlideMsWide:        graphSlideWideSpin.value
+    property int   cfg_graphAnimation
+    // the older per-part switches, read only while graphAnimation was never chosen
     property bool  cfg_simpleAnimatedIcons
     property bool  cfg_simpleHeaderAnim
     property int   cfg_graphColorMode
@@ -358,21 +362,18 @@ Item {
                             id: forecastAnimCombo
                             Kirigami.FormData.label: i18n("Animation:")
                             textRole: "text"
-                            // each option maps to the daily/hourly animation booleans
+                            // each option adds to the one above it (main.qml cardAnimation)
                             model: [
-                                { text: i18n("None"),            d: false, h: false },
-                                { text: i18n("Daily tab icons"), d: true,  h: false },
-                                { text: i18n("Hourly icons"),    d: false, h: true  },
-                                { text: i18n("Both"),            d: true,  h: true  }
+                                { text: i18n("None"),                       value: 0 },
+                                { text: i18n("Header icon"),                value: 1 },
+                                { text: i18n("Header and daily tab icons"), value: 2 },
+                                { text: i18n("Full layout"),                value: 3 }
                             ]
-                            Component.onCompleted: {
-                                var d = page.cfg_animatedDailyIcons, h = page.cfg_animatedHourlyIcons;
-                                currentIndex = (d && h) ? 3 : (h ? 2 : (d ? 1 : 0));
-                            }
-                            onActivated: {
-                                page.cfg_animatedDailyIcons  = model[currentIndex].d;
-                                page.cfg_animatedHourlyIcons = model[currentIndex].h;
-                            }
+                            // never chosen: what main.qml derives from the older switches
+                            Component.onCompleted: currentIndex = page.cfg_cardAnimation >= 0
+                                ? Math.min(3, page.cfg_cardAnimation)
+                                : (page.cfg_animatedHourlyIcons ? 3 : page.cfg_animatedDailyIcons ? 2 : 0)
+                            onActivated: page.cfg_cardAnimation = model[currentIndex].value
                         }
                         ConfigSpinBox {
                             id: cardDealSpin
@@ -653,21 +654,17 @@ Item {
                         id: simpleAnimCombo
                         Kirigami.FormData.label: i18n("Animation:")
                         textRole: "text"
-                        // each option maps to the hourly-icon / header-icon animation booleans
+                        // each option adds to the one above it (main.qml graphAnimation)
                         model: [
-                            { text: i18n("None"),         hourly: false, header: false },
-                            { text: i18n("Hourly icons"), hourly: true,  header: false },
-                            { text: i18n("Header icon"),  hourly: false, header: true  },
-                            { text: i18n("Both"),         hourly: true,  header: true  }
+                            { text: i18n("None"),        value: 0 },
+                            { text: i18n("Header icon"), value: 1 },
+                            { text: i18n("Full layout"), value: 2 }
                         ]
-                        Component.onCompleted: {
-                            var ho = page.cfg_simpleAnimatedIcons, he = page.cfg_simpleHeaderAnim;
-                            currentIndex = (ho && he) ? 3 : (he ? 2 : (ho ? 1 : 0));
-                        }
-                        onActivated: {
-                            page.cfg_simpleAnimatedIcons = model[currentIndex].hourly;
-                            page.cfg_simpleHeaderAnim    = model[currentIndex].header;
-                        }
+                        // never chosen: what main.qml derives from the older switches
+                        Component.onCompleted: currentIndex = page.cfg_graphAnimation >= 0
+                            ? Math.min(2, page.cfg_graphAnimation)
+                            : (page.cfg_simpleAnimatedIcons ? 2 : page.cfg_simpleHeaderAnim ? 1 : 0)
+                        onActivated: page.cfg_graphAnimation = model[currentIndex].value
                     }
                     ConfigComboBox {
                         id: graphColorCombo
