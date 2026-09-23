@@ -21,10 +21,16 @@ Item {
 
     property var weatherRoot
 
-    // animated hero for the current condition (or "" → static fallback icon).
-    // Gated by the simple-layout header-animation toggle.
-    readonly property string heroAnimSrc: (weatherRoot && weatherRoot.simpleHeaderAnim)
-        ? weatherRoot.heroAnim(weatherRoot.heroCode, weatherRoot.heroDay, weatherRoot.heroCloud) : ""
+    // Animated icons are built only once the popup has been opened and the curve
+    // has risen into shape: until then the static icons show, which look the same
+    // at rest, so neither the first frame nor the reveal waits on building them.
+    // Stays true — built icons are kept and just hold still while the popup is closed.
+    property bool iconsLive: false
+    Timer {
+        id: iconsLiveTimer
+        interval: revealAnim.duration + 50
+        onTriggered: if (simple.onScreen && simple.visible) simple.iconsLive = true
+    }
 
     // `hourPos` is the left-edge position (in sample-index units) of the sliding
     // window over the continuous timeline; the columns stay fixed and the curve
@@ -1243,6 +1249,7 @@ Item {
         hourPos = 0;   // always reopen on today
         chosenDay = -1;
         revealAnim.restart();
+        if (!iconsLive) iconsLiveTimer.restart();
     }
     Component.onCompleted: entranceReveal()
 
@@ -1465,8 +1472,8 @@ Item {
                 selectedDay: simple.selectedDay
                 // the hour under the pointer, else the one the graph is focused on
                 sample: simple.hoveredSample || simple.focusedSample
-                // heroAnimSrc is already "" when the header animation is off
-                animSource: simple.heroAnimSrc
+                animate: simple.weatherRoot ? simple.weatherRoot.simpleHeaderAnim : false
+                animCanBuild: simple.iconsLive
                 animPlaying: simple.onScreen
             }
 
@@ -2090,6 +2097,9 @@ Item {
                                     height: width
                                     roundToIconSize: false   // render at the exact size; don't snap to 22/32
                                     anchors.verticalCenter: parent.verticalCenter
+                                    // the monochrome pack is drawn in the theme's text colour
+                                    isMask: weatherRoot ? weatherRoot.iconPackIsMask : false
+                                    color: Kirigami.Theme.textColor
                                     source: (weatherRoot && dayMarker.dayEntry)
                                             ? weatherRoot.conditionIcon(dayMarker.dayEntry.code, 1)
                                             : "weather-clear-night"
@@ -2217,44 +2227,25 @@ Item {
                             height: width
                             x: cx - width / 2
                             anchors.verticalCenter: parent.verticalCenter
-                            // probability-aware code: a likely-rain hour shows rain even if the code reads cloudy
-                            readonly property int iconCode: (weatherRoot && modelData)
-                                ? weatherRoot.precipAwareCode(modelData.code, modelData.precip, modelData.precipAmt, modelData.snow, modelData.temp) : 0
-                            // Always resolve the WebP so the static (non-animated) graph icon is
-                            // the SAME artwork as the animated card icon — just frozen (playing
-                            // gated below on simpleAnimatedIcons). Falls back to the static SVG only
-                            // for conditions heroAnim has no WebP for (returns ""), matching the card.
                             // the pool only holds labelled hours now (see filmBase), so this
                             // is just "is there a sample here"
                             readonly property bool shown: modelData !== null
-                            readonly property string animSrc: (weatherRoot && modelData && shown)
-                                ? weatherRoot.heroAnim(hrIconC.iconCode, modelData.day, modelData.cloud) : ""
-                            // per-condition fine-tune (sunny trimmed); guard null model
-                            readonly property real iScale: (weatherRoot && hrIconC.modelData)
-                                ? weatherRoot.iconScale(hrIconC.iconCode, hrIconC.modelData.day) : 1
-                            Kirigami.Icon {
-                                anchors.centerIn: parent
-                                width: Math.round(parent.width * (weatherRoot && hrIconC.modelData ? weatherRoot.staticIconZoom(hrIconC.iconCode, hrIconC.modelData.day) : 1))
-                                height: width
-                                roundToIconSize: false   // honor the exact zoom; don't snap to 32/48
-                                visible: hrIconC.animSrc.length === 0
-                                source: (weatherRoot && hrIconC.modelData && hrIconC.shown)
-                                        ? weatherRoot.conditionIcon(hrIconC.iconCode, hrIconC.modelData.day, hrIconC.modelData.cloud)
-                                        : ""
-                            }
-                            AnimatedImage {
-                                anchors.centerIn: parent
-                                width: Math.round(parent.width * hrIconC.iScale)
-                                height: width
-                                visible: hrIconC.animSrc.length > 0
-                                source: hrIconC.animSrc
-                                // animate only when the graph's hourly-anim option is on; otherwise
-                                // hold frame 0 (a static poster that matches the card's animated art)
-                                playing: weatherRoot && weatherRoot.simpleAnimatedIcons && visible && simple.onScreen && !simple.scrolling
-                                cache: false
-                                smooth: true
-                                mipmap: true
-                                fillMode: Image.PreserveAspectFit
+                            ConditionIcon {
+                                anchors.fill: parent
+                                weatherRoot: simple.weatherRoot
+                                // probability-aware code: a likely-rain hour shows rain even if the code reads cloudy
+                                code: (weatherRoot && hrIconC.modelData)
+                                    ? weatherRoot.precipAwareCode(hrIconC.modelData.code, hrIconC.modelData.precip,
+                                                                  hrIconC.modelData.precipAmt, hrIconC.modelData.snow,
+                                                                  hrIconC.modelData.temp) : -1
+                                day: hrIconC.modelData ? hrIconC.modelData.day : 1
+                                cloud: hrIconC.modelData ? hrIconC.modelData.cloud : NaN
+                                animate: weatherRoot ? weatherRoot.simpleAnimatedIcons : false
+                                // These slots are recycled: mid-scroll a slot takes a new hour at
+                                // every step. A condition already on screen switches at once (the
+                                // animation is shared); one never built waits for the graph to rest.
+                                canBuild: simple.iconsLive && !simple.scrolling
+                                playing: simple.onScreen && !simple.scrolling
                             }
                         }
                     }

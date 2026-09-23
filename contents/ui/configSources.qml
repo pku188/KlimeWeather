@@ -78,7 +78,7 @@ ColumnLayout {
         opacity: 0.9
         text: "• " + i18n("Severe-weather alerts via the <a href=\"https://invent.kde.org/webapps/foss-public-alert-server\">KDE FOSS Public Alert Server</a>.")
               + "<br>• " + i18n("Place search via <a href=\"https://open-meteo.com\">Open-Meteo geocoding</a>; location auto-detect via <a href=\"https://mullvad.net\">Mullvad</a>.")
-              + "<br>• " + i18n("Icons derived from <a href=\"https://github.com/basmilius/weather-icons\">Meteocons</a> by Bas Milius (MIT).")
+              + "<br>• " + i18n("Icons derived from <a href=\"https://github.com/basmilius/meteocons\">Meteocons</a> by Bas Milius (MIT).")
         onLinkActivated: function (link) { Qt.openUrlExternally(link); }
         HoverHandler { cursorShape: Qt.PointingHandCursor }
     }

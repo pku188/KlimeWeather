@@ -199,7 +199,7 @@
       <default>2</default>
     </entry>
     <entry name="graphScrollHoursWide" type="Int">
-      <default>24</default>
+      <default>8</default>
     </entry>
     <!-- How long one mouse-wheel notch takes to slide the graph, per zoom level,
          in milliseconds. Separate from the step above because the two together
@@ -322,9 +322,10 @@
     <entry name="panelSecondLinePercent" type="Int">
       <default>37</default>
     </entry>
-    <!-- condition-icon pack: "basmilius" (bundled SVG), "system" (theme weather-* icons), or "custom" -->
+    <!-- condition-icon pack: a bundled Meteocons style ("meteocons-fill", "-flat", "-line",
+         "-monochrome"), "system" (theme weather-* icons), or "custom" -->
     <entry name="iconPack" type="String">
-      <default>basmilius</default>
+      <default>meteocons-fill</default>
     </entry>
     <!-- folder of the user's own icons when iconPack = "custom" (a file:// URL) -->
     <entry name="customIconDir" type="String">

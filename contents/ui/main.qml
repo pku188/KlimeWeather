@@ -1320,21 +1320,39 @@ PlasmoidItem {
 
     // ── Icon packs (registry) ─────────────────────────────────────────────
     // Each entry says how to turn a WMO code into an icon source:
-    //   dir/whiteDir/ext → bundled SVG pack using the wi-* stem names below
-    //   theme:true       → freedesktop "weather-*" names from the user's icon
-    //                      theme (no bundled files; follows the desktop theme)
-    // Adding a pack = one entry here (+ its files under contents/icons/<name>/).
+    //   dir        → a bundled Meteocons style, with the wi-* stem names below
+    //                in <dir>static/ and their SMIL-animated twins in <dir>animated/
+    //   mask:true  → one-colour artwork, drawn in the theme's text colour
+    //   theme:true → freedesktop "weather-*" names from the user's icon theme
+    //                (no bundled files; follows the desktop theme)
+    //   custom     → the user's own folder of wi-*.svg files
+    // Adding a pack = one entry here (+ its files under contents/icons/).
     readonly property var iconPacks: ({
-        "basmilius": { dir: "../icons/basmilius/32/", whiteDir: "../icons/basmilius-white/32/",
-                       ext: ".svg", animated: true },
-        "system":    { theme: true, animated: false },
-        "custom":    { custom: true, ext: ".svg", animated: false }
+        "meteocons-fill":       { dir: "../icons/meteocons/fill/",       animated: true },
+        "meteocons-flat":       { dir: "../icons/meteocons/flat/",       animated: true },
+        "meteocons-line":       { dir: "../icons/meteocons/line/",       animated: true },
+        "meteocons-monochrome": { dir: "../icons/meteocons/monochrome/", animated: true, mask: true },
+        "system":               { theme: true, animated: false },
+        "custom":               { custom: true, ext: ".svg", animated: false }
     })
+    // "basmilius", the pack these replaced (Meteocons too: flat stills, and fill
+    // animations baked to WebP), and anything unknown fall back to the fill style.
     readonly property string iconPackId: iconPacks[Plasmoid.configuration.iconPack]
-                                         ? Plasmoid.configuration.iconPack : "basmilius"
+                                         ? Plasmoid.configuration.iconPack : "meteocons-fill"
     readonly property var _pack: iconPacks[iconPackId]
     // true when the active pack uses theme names (needs Kirigami.Icon, not Image)
     readonly property bool iconPackIsTheme: _pack.theme === true
+    // one of the bundled Meteocons styles (their proportions drive iconZoom & co.)
+    readonly property bool iconPackIsMeteocons: _pack.dir !== undefined
+    // one-colour artwork that views tint with the theme's text colour
+    readonly property bool iconPackIsMask: _pack.mask === true
+    // The panel's default icon is a white silhouette of the Meteocons artwork,
+    // whichever pack the popup uses — outline styles are too fine to read at
+    // panel size.
+    readonly property string panelWhiteDir: "../icons/basmilius-white/32/"
+    // The popup's shared animated icons (AnimatedIconCache), set by the full
+    // representation it lives in; null until then, and in the panel.
+    property var iconCache: null
 
     // Probability-aware icon code: when an hour's chance of precipitation is high
     // (≥ rainIconThreshold) but its weather_code is only clear/cloudy, show a rain
@@ -1387,10 +1405,9 @@ PlasmoidItem {
     // cloud% at/above which DAYTIME snow drops the sun-and-cloud glyph for the
     // sun-free "overcast snow" icon — 85 = the METAR/WMO "overcast" (8/8) cutoff.
     readonly property real overcastCloudCover: 85
-    // True only for daytime snow under (near-)full overcast — both the static
-    // stem (→ wi-overcast-snow) and heroAnim (→ "" so it falls back to that
-    // static icon, since there is no overcast-snow GIF) gate on this one predicate
-    // so the animated and static paths can never disagree. Night snow is untouched.
+    // True only for daytime snow under (near-)full overcast — conditionStem gates
+    // on it (→ wi-overcast-snow), and the static and animated icons share that
+    // stem, so they can never disagree. Night snow is untouched.
     function isOvercastDaySnow(code, day, cloudCover) {
         return day !== 0
             && ((code >= 71 && code <= 77) || code === 85 || code === 86)
@@ -1442,7 +1459,7 @@ PlasmoidItem {
         return code;
     }
 
-    // ── WMO weather code → basmilius condition stem (night-aware) ─────────
+    // ── WMO weather code → wi-* condition stem (night-aware) ──────────────
     // cloudCover (optional %) lets daytime snow swap the sun-and-cloud glyph for
     // the sun-free overcast-snow icon when the sky is (near-)fully overcast.
     function conditionStem(code, day, cloudCover) {
@@ -1451,10 +1468,9 @@ PlasmoidItem {
         if (code === 2)                    return night ? "wi-night-alt-partly-cloudy" : "wi-day-cloudy";
         if (code === 3)                    return night ? "wi-night-cloudy" : "wi-cloudy";
         if (code === 45 || code === 48)    return night ? "wi-night-fog" : "wi-day-fog";
-        // Daytime precip uses SUN-FREE stems (wi-rain/snow/sleet/thunderstorm, derived
-        // by stripping the sun from the basmilius wi-day-* glyphs) so the panel/static
-        // icon matches the sunless animated WebP heroes — and so a 100%-overcast rain
-        // hour doesn't show a sun. Night keeps wi-night-alt-* (moon matches the night WebP).
+        // Daytime precip uses SUN-FREE stems (wi-rain/snow/sleet/thunderstorm) so a
+        // 100%-overcast rain hour doesn't show a sun. Night keeps wi-night-alt-*, with
+        // the moon.
         // freezing drizzle/rain (56/57/66/67) — the sleet glyph (rain + snowflakes)
         if (code === 56 || code === 57 || code === 66 || code === 67)
             return night ? "wi-night-alt-sleet" : "wi-sleet";
@@ -1492,9 +1508,15 @@ PlasmoidItem {
         var stem = stemOverride || conditionStem(code, day, cloudCover);
         if (_pack.custom && Plasmoid.configuration.customIconDir)
             return Plasmoid.configuration.customIconDir + "/" + stem + _pack.ext;
-        // bundled pack (or custom with no folder chosen → fall back to basmilius)
-        var dir = _pack.dir || iconPacks.basmilius.dir;
-        return Qt.resolvedUrl(dir) + stem + (_pack.ext || ".svg");
+        // bundled pack (or custom with no folder chosen → fall back to the fill style)
+        var dir = _pack.dir || iconPacks["meteocons-fill"].dir;
+        return Qt.resolvedUrl(dir) + "static/" + stem + ".svg";
+    }
+    // The animated twin of conditionIcon, or "" when the pack has none. Only
+    // ConditionIcon asks for it, and only where a view animates icons.
+    function conditionIconAnimated(code, day, cloudCover) {
+        if (code < 0 || !_pack.animated) return "";
+        return Qt.resolvedUrl(_pack.dir) + "animated/" + conditionStem(code, day, cloudCover) + ".svg";
     }
     // White (monochrome) variant — used for the panel/tray icon.
     function conditionIconWhite(code, day, cloudCover, stemOverride) {
@@ -1503,17 +1525,16 @@ PlasmoidItem {
         var stem = stemOverride || conditionStem(code, day, cloudCover);
         if (_pack.custom && Plasmoid.configuration.customIconDir)
             return Plasmoid.configuration.customIconDir + "/" + stem + _pack.ext;
-        var dir = _pack.whiteDir || iconPacks.basmilius.whiteDir;
-        return Qt.resolvedUrl(dir) + stem + (_pack.ext || ".svg");
+        return Qt.resolvedUrl(panelWhiteDir) + stem + ".svg";
     }
 
     // Sunrise/sunset glyphs for the SimpleView temperature curve are DECORATION,
-    // not condition icons, so they always come from the bundled Basmilius colour
-    // pack regardless of the active icon pack: the System theme has no
-    // sunrise/sunset glyph (conditionIcon would yield a plain sun) and a Custom
-    // folder may not include wi-sunrise/wi-sunset at all.
+    // not condition icons, so they come from their own bundled pair regardless of
+    // the active icon pack: the System theme has no sunrise/sunset glyph
+    // (conditionIcon would yield a plain sun) and a Custom folder may not include
+    // wi-sunrise/wi-sunset at all.
     function sunEventIcon(rise) {
-        return Qt.resolvedUrl(iconPacks.basmilius.dir) + (rise ? "wi-sunrise" : "wi-sunset") + ".svg";
+        return Qt.resolvedUrl("../icons/sun-events/") + (rise ? "wi-sunrise" : "wi-sunset") + ".svg";
     }
 
     // The clear-night moon artwork (wi-night-clear) packs more visual mass into its
@@ -1523,67 +1544,25 @@ PlasmoidItem {
     function heroScale(code, day) {
         // Other packs (system theme, custom folder) have their own proportions, so
         // render them at the plain configured size rather than leaking these factors.
-        if (iconPackId !== "basmilius") return 1.0;
+        if (!iconPackIsMeteocons) return 1.0;
         var night = (day === 0);
         if (night && (code === 0 || code === 1)) return 0.90;   // tame the heavy clear-night moon
         return 1.10;                                            // all other conditions a touch larger
     }
 
-    // Static-icon zoom to match the ANIMATED icons' framing. The Meteocons v3 art
-    // fills only ~half its 128 box, so the baked WebPs are centre-cropped 232→160
-    // (=1.45×) to fill the icon box. The static SVGs keep the full, mostly-empty
-    // box, so with animations OFF they render ~45 % smaller than the GIFs. Apply the
-    // same 1.45× crop to the static icons (centre + scale, transparent margins
-    // overflow harmlessly) so toggling animations doesn't change the apparent size.
-    // Basmilius-only: theme/custom packs fill their own boxes, so they stay 1.0.
+    // Zoom that makes a Meteocons icon fill its box. The artwork covers only about
+    // half of its 128-unit canvas, so it is drawn ~1.45× larger and centred (the
+    // empty margins overflow harmlessly). Static and animated icons share their
+    // geometry, so both take the same factor. Meteocons-only: theme and custom
+    // packs fill their own boxes, so they stay 1.0.
     // Per-condition because the glyphs fill their box by very different amounts: the
     // clear-DAY sun already fills ~75 % (rays spread wide), so the full 1.45× makes it
     // overflow and read large — it needs much less zoom than the ~50 %-fill moon.
-    function staticIconZoom(code, day) {
-        if (iconPackId !== "basmilius") return 1.0;
+    function iconZoom(code, day) {
+        if (!iconPackIsMeteocons) return 1.0;
         if (day !== 0 && (code === 0 || code === 1)) return 1.20;   // sunny: lands at ~0.90 of the box
         if (code === 45 || code === 48) return (232 / 160) * 1.15;  // fog: a touch larger (sun/moon cut at the fog bank reads small)
         return 232 / 160;                                           // others: ~1.45× to fill the empty box
-    }
-
-    // ANIMATED-path scale (independent of staticIconZoom). The WebPs fill their frame
-    // differently than the SVGs — the baked sun fills ~90 %, vs the SVG sun's ~75 %.
-    // So the two paths need DIFFERENT factors to land the sun at the same displayed
-    // size (~0.90 of the box): static gets 1.20 above, animated gets 1.0 here. Tune
-    // the animated sun here, the static sun in staticIconZoom — they no longer share.
-    // Per-condition zoom so each animated WebP's artwork fills the box to ~the sun's
-    // extent. The art frames its subjects at different sizes: sun/moon nearly fill the
-    // 160px frame (~0.90/0.86), while clouds & precip sit smaller (~0.75–0.79) and fog
-    // smallest (~0.72). Factors measured from each frame-0 opaque bbox (sun = reference).
-    function iconScale(code, day) {
-        if (iconPackId !== "basmilius") return 1.0;
-        if (code === 0 || code === 1)   return 1.0;    // sun/moon: already ~fill the frame (reference)
-        if (code === 45 || code === 48) return 1.25;   // fog: sits smallest in its frame
-        if (code === 3)                 return 1.15;   // overcast cloud: wide but a touch smaller
-        return 1.20;                                   // partly-cloudy / rain / snow / sleet / thunder (~0.75 fill)
-    }
-
-    // Animated hero (WebP baked from Meteocons) for the header, or "" when the
-    // condition has no animation (falls back to the static icon).
-    readonly property string _animDir: Qt.resolvedUrl("../icons/animated/")
-    function heroAnim(code, day, cloudCover) {
-        if (code < 0 || !_pack.animated) return "";
-        // Daytime overcast snow → its own no-sun animation (matches the static
-        // wi-overcast-snow icon; both gate on isOvercastDaySnow so they agree).
-        if (isOvercastDaySnow(code, day, cloudCover)) return _animDir + "overcast-snow.webp";
-        var night = (day === 0);
-        if (code === 0 || code === 1)   return _animDir + (night ? "starry-night.webp" : "clear.webp");
-        if (code === 2)                 return _animDir + (night ? "partly-cloudy-night.webp" : "partly-cloudy-day.webp");
-        if (code === 3)                 return _animDir + (night ? "overcast-night.webp" : "clouds.webp");
-        if (code === 45 || code === 48) return _animDir + (night ? "fog-night.webp" : "fog-day.webp");   // sun/moon + drifting haze, rays rotating (custom-built from the fill SVG via tools/icon-pipeline/animate_fog.py). Meteocons' Lottie fog hides the sun behind dense haze, so we reproduce its SMIL ourselves.
-        if (code >= 95)                 return _animDir + "thunderstorms.webp";
-        if ((code >= 71 && code <= 77) || code === 85 || code === 86)
-                                        return _animDir + (night ? "snow-night.webp" : "snow-day.webp");
-        if (code === 56 || code === 57 || code === 66 || code === 67)
-                                        return _animDir + (night ? "sleet-night.webp" : "sleet-day.webp");
-        if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82))
-                                        return _animDir + (night ? "rain-night.webp" : "rain-day.webp");
-        return "";
     }
 
     // ── UV index → text with WHO category ─────────────────────────────────
@@ -1791,6 +1770,11 @@ PlasmoidItem {
     // implicit/minimum sizing so the popup sizes correctly for either layout.
     fullRepresentation: Item {
         id: fullRep
+        AnimatedIconCache {
+            id: iconCacheItem
+            Component.onCompleted: root.iconCache = iconCacheItem
+            Component.onDestruction: if (root.iconCache === iconCacheItem) root.iconCache = null
+        }
         readonly property var view: !root.hasLocation ? null
                                   : (root.simpleLayout ? simpleLoader.item : detailLoader.item)
         // Pin the WIDTH to the saved size once set. We drive the popup window

@@ -32,10 +32,15 @@ precipitation rate or daily sum, wind (with a direction arrow), cloud cover, sun
 
 ### Other characteristics
 
+- **Adaptive layout** — colors of the widget inherit the system's color scheme.
+
+- **Meteocons icons in four styles** — fill, flat, line or monochrome (drawn in your color
+  scheme's text color), animated or still: each layout's Animation setting decides which
+  icons move. Your system icon theme or a folder of your own icons work too.
 - **Icons throughout the toolbar** — refresh, zoom, layout switch and pin each have
   their own icon, themed to your colour scheme.
 - **Personalize almost anything** — nearly every piece of text has its own font-size setting,
-with both layouts having additional customization options
+with both layouts having additional customization options.
 - **Redrawn wind direction icon** — a clear arrow at a size you choose, turning to
 the exact reported angle instead of snapping to the fixed set of compass points.
 - **Severe-weather alerts** from the KDE FOSS Public Alert Server, from a severity you set.
@@ -46,20 +51,26 @@ the exact reported angle instead of snapping to the fixed set of compass points.
 
 ### Faster and smoother
 
-- **The graph builds only what it draws** — the widget elements, like layout types, graph
-views and provider's data are built in the background, so switching them is instant
-and never flashes an empty frame.
+- **Icons are vector, not video** — the animated icons are Meteocons' own SVG animations,
+  played by Qt Quick, instead of 3 MB of pre-rendered WebP frames. The widget package
+  shrank over three times and the popup opens noticeably faster now. Each different
+  icon is rendered once and shared across all weather images of the same type.
+
 - **Never opens empty** — the last forecast is saved to disk, so after a reboot the
   widget shows weather immediately instead of waiting for the network to come up.
   If a fetch does fail, it says so and keeps retrying.
-- **The graph curve is rendered on the GPU**, on its own thread, so dragging through
-  the hours stays smooth instead of re-rasterising the full width every frame.
+- **The graph builds only what it draws** — the widget elements, like layout types, graph
+views and provider's data are built in the background, so switching them is instant
+and never flashes an empty frame.
+- **Only visible cards are drawn** — cards outside the visible strip are now hidden from the
+renderer, which halves the CPU usage.
 - **The card initial animation is quicker by default**, and adjustable if you want it
   slower or off.
+- **The graph curve is rendered on the GPU**, on its own thread, so dragging through
+  the hours stays smooth instead of re-rasterising the full width every frame.
 - **Refreshes are conditional** — when the forecast has not changed, the server answers
   with a few bytes instead of the whole payload.
 - **Refresh after each hour updates cards in place**, instead of recreating the full set.
-
 
 
 ## Install
@@ -91,7 +102,7 @@ kpackagetool6 --type Plasma/Applet --upgrade KlimeWeather.plasmoid
 - Fork of the [Bare Weather](https://github.com/bvlthvzvr/BareWeather)
 - Weather data from [Open-Meteo](https://open-meteo.com)
 - Weather data from [MET Norway](https://www.met.no/en)
-- Icons derived from [Meteocons](https://github.com/basmilius/weather-icons) by
+- Icons derived from [Meteocons](https://github.com/basmilius/meteocons) by
   Bas Milius (MIT). See `contents/icons/*/ATTRIBUTION.md` for details.
 - Severe-weather alerts via the [KDE FOSS Public Alert Server](https://invent.kde.org/webapps/foss-public-alert-server) (AGPL)
 - Auto-detect via [Mullvad](https://mullvad.net)

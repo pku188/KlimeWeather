@@ -1,7 +1,46 @@
-# Icon pipeline — Meteocons v3 → this widget's pack
+# Icon pipeline
 
-Reproducible steps to (re)generate the bundled icon pack from Meteocons.
-**No build step ships with the plasmoid** — this is a one-off authoring tool.
+Reproducible steps to (re)generate the widget's bundled icons.
+**No build step ships with the plasmoid** — these are one-off authoring tools.
+
+## Condition icons — the Meteocons packs (`contents/icons/meteocons/`)
+
+The four icon packs (fill, flat, line, monochrome) come straight from the
+published npm packages, animated and static:
+
+```fish
+npm pack @meteocons/svg @meteocons/svg-static     # svg-0.1.0.tgz, svg-static-0.1.0.tgz
+mkdir anim static
+tar xzf svg-0.1.0.tgz -C anim; tar xzf svg-static-0.1.0.tgz -C static
+python3 meteocons_packs.py anim/package static/package ../../contents/icons/meteocons
+```
+
+`meteocons_packs.py` holds the stem map (widget `wi-*` stem → Meteocons icon) and
+rewrites two things Qt draws differently from a browser: alpha masks become
+luminance masks (Qt ignores `mask-type`, so suns, moons and back clouds vanished),
+and the animations are rewritten into the SMIL and CSS subset `VectorImage` plays
+correctly (it drops opacity animations and ignores easing, key times and begin
+offsets). See `contents/icons/meteocons/ATTRIBUTION.md`.
+
+- **Static** icons are drawn by QtSvg (`Kirigami.Icon`), which handles luminance
+  masks since Qt 6.7.
+- **Animated** icons are drawn by Qt Quick's `VectorImage` (SMIL animations need
+  Qt 6.10). It draws masks with a shader, so **verify them on the GPU**: the
+  offscreen platform uses the software scene graph, where masked parts are simply
+  missing. A headless nested KWin gives a real GPU without opening a window:
+  ```fish
+  kwin_wayland --virtual --socket wl-test --no-lockscreen \
+      --exit-with-session "env QT_QPA_PLATFORM=wayland WAYLAND_DISPLAY=wl-test qml6 probe.qml"
+  ```
+
+## Panel white set and sun-event glyphs (older pipeline, still shipped)
+
+`contents/icons/basmilius-white/` (the panel's white icons) and
+`contents/icons/sun-events/` (the graph's sunrise/sunset markers) were made from
+Meteocons v3.0.0-next.10 with the steps below, when QtSvg could not draw masks at
+all. The WebP heroes these steps also produced (`bake_v3.sh`, `render_frames.py`,
+`pad_lottie.py`, `animate_fog.py`) are retired: the Meteocons packs animate their
+SVGs directly. The scripts stay for reference.
 
 ## Why each step exists
 - **The widget renders static SVGs through QtSvg** (`Kirigami.Icon`), which
@@ -60,5 +99,5 @@ Edit BOTH the baked webp (re-run the Lottie through `bake_v3.sh`) AND the static
    both: it supports SVG masks and composites optimized GIF frames that Qt does not.
 
 ## Stem ↔ Meteocons name maps
-See `contents/icons/basmilius/ATTRIBUTION.md` (static) and
-`contents/icons/animated/ATTRIBUTION.md` (animated).
+See `contents/icons/meteocons/ATTRIBUTION.md` (the icon packs) and
+`contents/icons/basmilius-white/ATTRIBUTION.md` (the panel set).

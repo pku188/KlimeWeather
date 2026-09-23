@@ -164,11 +164,16 @@ Item {
                         id: iconPackCombo
                         Kirigami.FormData.label: i18n("Icon pack:")
                         textRole: "text"
-                        // each option stores its pack id (matches the registry in main.qml)
+                        // each option stores its pack id (matches the registry in main.qml);
+                        // a saved id missing here (the retired "basmilius") selects the
+                        // first entry, which is also what main.qml falls back to
                         model: [
-                            { text: i18n("Basmilius (color)"), id: "basmilius" },
-                            { text: i18n("System theme"),       id: "system"    },
-                            { text: i18n("Custom folder…"),     id: "custom"    }
+                            { text: i18n("Meteocons (fill)"),       id: "meteocons-fill"       },
+                            { text: i18n("Meteocons (flat)"),       id: "meteocons-flat"       },
+                            { text: i18n("Meteocons (line)"),       id: "meteocons-line"       },
+                            { text: i18n("Meteocons (monochrome)"), id: "meteocons-monochrome" },
+                            { text: i18n("System theme"),           id: "system"               },
+                            { text: i18n("Custom folder…"),         id: "custom"               }
                         ]
                         Component.onCompleted: {
                             for (var i = 0; i < model.length; ++i)
@@ -203,7 +208,7 @@ Item {
                         wrapMode: Text.WordWrap
                         font: Kirigami.Theme.smallFont
                         opacity: 0.7
-                        text: i18n("Folder with SVGs named like the bundled set (wi-day-sunny.svg, wi-night-clear.svg, …). Tip: copy contents/icons/basmilius/32/ as a starting point so every condition is covered, then edit.")
+                        text: i18n("Folder with SVGs named like the bundled set (wi-day-sunny.svg, wi-night-clear.svg, …). Tip: copy contents/icons/meteocons/fill/static/ as a starting point so every condition is covered, then edit.")
                     }
                     ConfigSpinBox {
                         id: heroSpin
