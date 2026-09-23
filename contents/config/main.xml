@@ -44,8 +44,10 @@
     <entry name="locationConfigured" type="Bool">
       <default>false</default>
     </entry>
+    <!-- temperature unit: celsius, fahrenheit, or system (the system locale's
+         measurement system, LC_MEASUREMENT: °F where it is US imperial) -->
     <entry name="temperatureUnit" type="String">
-      <default>celsius</default>
+      <default>system</default>
     </entry>
     <!-- whether the temperature unit has been decided — by the user, or auto-picked
          from the first location's country during setup. Gates the auto-pick so it
@@ -53,15 +55,23 @@
     <entry name="unitConfigured" type="Bool">
       <default>true</default>
     </entry>
-    <!-- wind speed unit: auto (follows temperatureUnit), kmh, mph or ms -->
+    <!-- wind speed unit: auto (follows the system locale's measurement system), kmh,
+         mph, ms or kn -->
     <entry name="windUnit" type="String">
       <default>auto</default>
     </entry>
-    <!-- air pressure unit: auto (follows temperatureUnit), hPa or inHg -->
+    <!-- air pressure unit: auto (follows the system locale's measurement system), hPa,
+         inHg or mmHg -->
     <entry name="pressureUnit" type="String">
       <default>auto</default>
     </entry>
-    <!-- show clock times in 24-hour format; default false = 12-hour with AM/PM -->
+    <!-- Clock format: 0 follows the system default (the locale's own time format),
+         1 = 12-hour, 2 = 24-hour. -1 = never chosen: derived from use24Hour below,
+         the older checkbox, so an upgrade keeps a deliberate 12-hour choice. -->
+    <entry name="clockFormat" type="Int">
+      <default>-1</default>
+    </entry>
+    <!-- older "Use 24-hour time" checkbox, now only read to derive clockFormat -->
     <entry name="use24Hour" type="Bool">
       <default>true</default>
     </entry>
@@ -235,10 +245,17 @@
     <entry name="simpleHourlyIconSize" type="Int">
       <default>34</default>
     </entry>
+    <!-- Which icons animate in the graph layout: 0 none, 1 the header icon, 2 the
+         full layout. -1 = never chosen: derived from simpleAnimatedIcons and
+         simpleHeaderAnim below, the older per-part switches, so an upgrade keeps
+         what was set. -->
+    <entry name="graphAnimation" type="Int">
+      <default>1</default>
+    </entry>
+    <!-- older graph switches, now only read to derive graphAnimation -->
     <entry name="simpleAnimatedIcons" type="Bool">
       <default>true</default>
     </entry>
-    <!-- animate the header (hero) icon in the simple layout -->
     <entry name="simpleHeaderAnim" type="Bool">
       <default>true</default>
     </entry>
@@ -291,6 +308,14 @@
     <entry name="showDayMarkerDate" type="Bool">
       <default>true</default>
     </entry>
+    <!-- Which icons animate in the card layout: 0 none, 1 the header icon, 2 the
+         header and daily tab icons, 3 the full layout. -1 = never chosen: derived
+         from animatedDailyIcons and animatedHourlyIcons below, the older per-part
+         switches, so an upgrade keeps what was set. -->
+    <entry name="cardAnimation" type="Int">
+      <default>1</default>
+    </entry>
+    <!-- older card switches, now only read to derive cardAnimation -->
     <entry name="animatedDailyIcons" type="Bool">
       <default>true</default>
     </entry>

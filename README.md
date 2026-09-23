@@ -26,8 +26,8 @@ This is a fork of the [Bare Weather](https://github.com/bvlthvzvr/BareWeather) w
 - Point anywhere along the graph to read that hour's conditions.
 - Up to four **Weather Elements** in the header: air pressure, feels like, humidity, UV,
 precipitation rate or daily sum, wind (with a direction arrow), cloud cover, sunrise/sunset.
-- Units: °C/°F, km/h, mph or m/s, hPa or inHg, 12- or 24-hour clock. Dates follow your
-  system's date format.
+- Units: °C/°F (or your system locale's), km/h, mph, m/s or knots, hPa, inHg or mmHg,
+  12- or 24-hour clock (or your system's). Dates follow your system's date format.
 
 
 ### Other characteristics
@@ -59,8 +59,7 @@ the exact reported angle instead of snapping to the fixed set of compass points.
   widget shows weather immediately instead of waiting for the network to come up.
   If a fetch does fail, it says so and keeps retrying.
 - **The graph builds only what it draws** — the widget elements, like layout types, graph
-views and provider's data are built in the background, so switching them is instant
-and never flashes an empty frame.
+views are built in the background, so switching them is instant and never flashes an empty frame.
 - **Only visible cards are drawn** — cards outside the visible strip are now hidden from the
 renderer, which halves the CPU usage.
 - **The card initial animation is quicker by default**, and adjustable if you want it

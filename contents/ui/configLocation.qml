@@ -66,9 +66,12 @@ ScrollView {
     })
     // Call BEFORE _setLocation (which flips locationConfigured): only the very first
     // location set, with the unit not yet decided, auto-picks — so an already-set-up
-    // widget that changes location is never flipped.
+    // widget that changes location is never flipped. A unit following the system
+    // locale (the default) is left alone: the locale says what the user reads, the
+    // place only what they look up — a US user checking Paris still wants °F.
     function _autoUnitFor(country) {
-        if (cfg_unitConfigured || cfg_locationConfigured || !country) return;
+        if (cfg_unitConfigured || cfg_locationConfigured || !country
+                || cfg_temperatureUnit === "system") return;
         cfg_temperatureUnit = _fahrenheitPlaces[("" + country).trim().toUpperCase()]
                             ? "fahrenheit" : "celsius";
         cfg_unitConfigured = true;

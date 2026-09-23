@@ -20,7 +20,8 @@ Kirigami.FormLayout {
     property int    cfg_minAlertSeverity
     property string cfg_windUnit
     property string cfg_pressureUnit
-    property alias  cfg_use24Hour: timeFormatCheck.checked
+    property int    cfg_clockFormat
+    property bool   cfg_use24Hour             // the older checkbox, read only while clockFormat was never chosen
 
     // breathing room so the settings don't sit flush against the top
     Item { implicitHeight: Kirigami.Units.gridUnit }
@@ -71,8 +72,9 @@ Kirigami.FormLayout {
         Kirigami.FormData.label: i18n("Temperature unit:")
         textRole: "text"
         model: [
-            { text: i18n("Celsius (°C)"),    value: "celsius"    },
-            { text: i18n("Fahrenheit (°F)"), value: "fahrenheit" }
+            { text: i18n("Follow system locale"), value: "system"     },
+            { text: i18n("Celsius (°C)"),         value: "celsius"    },
+            { text: i18n("Fahrenheit (°F)"),      value: "fahrenheit" }
         ]
         Component.onCompleted: {
             for (var i = 0; i < model.length; ++i)
@@ -85,10 +87,11 @@ Kirigami.FormLayout {
         Kirigami.FormData.label: i18n("Wind speed unit:")
         textRole: "text"
         model: [
-            { text: i18n("Follow temperature unit"), value: "auto" },
+            { text: i18n("Follow system locale"),       value: "auto" },
             { text: i18n("Kilometers per hour (kmh)"), value: "kmh" },
             { text: i18n("Miles per hour (mph)"),       value: "mph" },
-            { text: i18n("Meters per second (m/s)"),    value: "ms"  }
+            { text: i18n("Meters per second (m/s)"),    value: "ms"  },
+            { text: i18n("Knots (kn)"),                 value: "kn"  }
         ]
         Component.onCompleted: {
             for (var i = 0; i < model.length; ++i)
@@ -101,9 +104,10 @@ Kirigami.FormLayout {
         Kirigami.FormData.label: i18n("Air pressure unit:")
         textRole: "text"
         model: [
-            { text: i18n("Follow temperature unit"),     value: "auto" },
+            { text: i18n("Follow system locale"),        value: "auto" },
             { text: i18n("Hectopascals (hPa)"),          value: "hPa"  },
-            { text: i18n("Inches of mercury (inHg)"),    value: "inHg" }
+            { text: i18n("Inches of mercury (inHg)"),    value: "inHg" },
+            { text: i18n("Millimeters of mercury (mmHg)"), value: "mmHg" }
         ]
         Component.onCompleted: {
             for (var i = 0; i < model.length; ++i)
@@ -111,9 +115,22 @@ Kirigami.FormLayout {
         }
         onActivated: page.cfg_pressureUnit = model[currentIndex].value
     }
-    CheckBox {
-        id: timeFormatCheck
+    ConfigComboBox {
+        id: clockFormatCombo
         Kirigami.FormData.label: i18n("Clock format:")
-        text: i18n("Use 24-hour time")
+        textRole: "text"
+        // value is the stored mode (main.qml clockFormat), not the index
+        model: [
+            { text: i18n("Follow system default"), value: 0 },
+            { text: i18n("12-hour time"),          value: 1 },
+            { text: i18n("24-hour time"),          value: 2 }
+        ]
+        // never chosen: what main.qml derives from the older checkbox
+        Component.onCompleted: {
+            var m = page.cfg_clockFormat >= 0 ? page.cfg_clockFormat : (page.cfg_use24Hour ? 0 : 1);
+            for (var i = 0; i < model.length; ++i)
+                if (model[i].value === m) { currentIndex = i; break; }
+        }
+        onActivated: page.cfg_clockFormat = model[currentIndex].value
     }
 }

@@ -68,7 +68,18 @@ PlasmoidItem {
     // false until the user sets a location (any method); gates fetching and drives
     // the "no location" empty state. Out of the box there is no default city.
     readonly property bool   hasLocation:  Plasmoid.configuration.locationConfigured
-    readonly property string units: Plasmoid.configuration.temperatureUnit || "celsius"
+    // What the system locale measures in — Plasma's Region & Language → Measurement
+    // Units, i.e. LC_MEASUREMENT: Locale.MetricSystem, ImperialUSSystem or
+    // ImperialUKSystem. Every unit set to "Follow system locale" reads it directly,
+    // each by that locale's own custom (see units, windUnitApi, pressureUnitApi).
+    readonly property int localeMeasurement: Qt.locale().measurementSystem
+    // The temperature unit, and with it the imperial/metric choice for precipitation.
+    // "system": °F where the locale is US imperial. The UK's imperial system still
+    // gives its temperatures in °C, so it stays Celsius.
+    readonly property string temperatureUnitSetting: Plasmoid.configuration.temperatureUnit || "system"
+    readonly property string units: temperatureUnitSetting === "system"
+        ? (localeMeasurement === Locale.ImperialUSSystem ? "fahrenheit" : "celsius")
+        : temperatureUnitSetting
     readonly property int    dailyDays:      Plasmoid.configuration.dailyDays      || 5
     // Days the graph spans, today included: 3 by default, up to 5 (Appearance →
     // Graph). Three is what BOTH providers can draw at hourly resolution — met.no's
@@ -110,14 +121,31 @@ PlasmoidItem {
     readonly property int    conditionFontSize:   Plasmoid.configuration.conditionFontSize   || 28
     readonly property int    locationFontSize:    Plasmoid.configuration.locationFontSize    || 28
     readonly property int    providerFontSize:    Plasmoid.configuration.providerFontSize    || 16
-    readonly property bool   animatedDailyIcons:  Plasmoid.configuration.animatedDailyIcons  ?? true
-    readonly property bool   animatedHourlyIcons: Plasmoid.configuration.animatedHourlyIcons ?? true
     readonly property bool   simpleLayout:         Plasmoid.configuration.simpleLayout         || false
     readonly property int    simpleHourlyIconSize: Plasmoid.configuration.simpleHourlyIconSize || 34
-    readonly property bool   simpleAnimatedIcons:  Plasmoid.configuration.simpleAnimatedIcons  || false
-    readonly property bool   simpleHeaderAnim:     Plasmoid.configuration.simpleHeaderAnim     ?? true
-    // regular-layout header (hero) icon animates unless forecast animation is None
-    readonly property bool   fullHeaderAnim:       animatedDailyIcons || animatedHourlyIcons
+    // Which icons animate (Appearance → Cards / Graph → Animation). Card layout:
+    // 0 none, 1 the header icon, 2 the header and the daily tabs, 3 the full layout.
+    // Graph layout: 0 none, 1 the header icon, 2 the full layout. A setting never
+    // chosen (-1) is derived from the older per-part switches, so an upgrade keeps
+    // what the user had: the old "Daily tab icons" becomes header and tabs, and any
+    // old choice that animated the hourly icons becomes the full layout.
+    readonly property int cardAnimation: {
+        var m = Plasmoid.configuration.cardAnimation ?? -1;
+        if (m >= 0) return Math.min(3, m);
+        if (Plasmoid.configuration.animatedHourlyIcons ?? true) return 3;
+        return (Plasmoid.configuration.animatedDailyIcons ?? true) ? 2 : 0;
+    }
+    readonly property int graphAnimation: {
+        var m = Plasmoid.configuration.graphAnimation ?? -1;
+        if (m >= 0) return Math.min(2, m);
+        if (Plasmoid.configuration.simpleAnimatedIcons ?? true) return 2;
+        return (Plasmoid.configuration.simpleHeaderAnim ?? true) ? 1 : 0;
+    }
+    readonly property bool   fullHeaderAnim:      cardAnimation >= 1
+    readonly property bool   animatedDailyIcons:  cardAnimation >= 2
+    readonly property bool   animatedHourlyIcons: cardAnimation >= 3
+    readonly property bool   simpleHeaderAnim:    graphAnimation >= 1
+    readonly property bool   simpleAnimatedIcons: graphAnimation >= 2
     readonly property int    graphColorMode:       Plasmoid.configuration.graphColorMode       ?? 2
     readonly property int    precipBandOpacity:    Math.max(0, Math.min(90, Plasmoid.configuration.precipBandOpacity ?? 30))
     readonly property int    precipLabelMode:      Math.max(0, Math.min(3, Plasmoid.configuration.precipLabelMode ?? 3))
@@ -132,20 +160,24 @@ PlasmoidItem {
     readonly property int    panelConditionPercent:  Plasmoid.configuration.panelConditionPercent  || 40
     readonly property int    panelSecondLinePercent: Plasmoid.configuration.panelSecondLinePercent || 37
 
-    // Wind speed unit. "auto" follows the temperature unit (mph with °F, kmh
-    // with °C) — what the widget always did; "kmh"/"mph"/"ms" pin it instead.
+    // Wind speed unit. "auto" follows the system locale: mph wherever it is imperial —
+    // the UK's too, which gives wind in mph though its temperatures are in °C — and
+    // kmh where it is metric. "kmh"/"mph"/"ms"/"kn" pin it instead. (Until 2026-09 "auto"
+    // followed the temperature unit, which left the UK on kmh.)
     // windUnitApi is the unit wind speeds are converted to (convertUnits);
     // windUnitLabel is what the UI prints.
     readonly property string windUnit:    Plasmoid.configuration.windUnit || "auto"
     readonly property string windUnitApi: (windUnit !== "auto") ? windUnit
-                                        : (units === "fahrenheit" ? "mph" : "kmh")
+                                        : (localeMeasurement === Locale.MetricSystem ? "kmh" : "mph")
     readonly property string windUnitLabel: (windUnitApi === "mph") ? "mph"
-                                          : (windUnitApi === "ms")  ? "m/s" : "kmh"
-    // Air pressure unit, the same shape as the wind one: "auto" follows the temperature
-    // unit (inHg is the customary unit wherever °F is), hPa or inHg pin it.
+                                          : (windUnitApi === "ms")  ? "m/s"
+                                          : (windUnitApi === "kn")  ? "kn" : "kmh"
+    // Air pressure unit, the same shape as the wind one: "auto" follows the system
+    // locale — inHg where it is US imperial, hPa elsewhere (the UK quotes hPa/millibars);
+    // hPa, inHg or mmHg pin it.
     readonly property string pressureUnit:    Plasmoid.configuration.pressureUnit || "auto"
     readonly property string pressureUnitApi: (pressureUnit !== "auto") ? pressureUnit
-                                            : (units === "fahrenheit" ? "inHg" : "hPa")
+                                            : (localeMeasurement === Locale.ImperialUSSystem ? "inHg" : "hPa")
 
     property real apparentTemp: NaN
     property real humidity:     NaN
@@ -277,7 +309,22 @@ PlasmoidItem {
     }
     // Simple-layout graph hour-axis label font (the "6 PM 7 PM …" row)
     readonly property int simpleHourFontSize: Plasmoid.configuration.simpleHourFontSize || 13
-    readonly property bool use24Hour: Plasmoid.configuration.use24Hour
+    // Clock format (General → Clock format): 0 follows the system default, 1 is
+    // 12-hour, 2 is 24-hour. The system default is the locale's own time format —
+    // LC_TIME, which Plasma's Region & Language sets — and it is 12-hour where that
+    // format carries an AM/PM marker ("h:mm AP" in en_US, "HH:mm" in en_GB). Never
+    // chosen (-1): the older "Use 24-hour time" checkbox decides. It was on by
+    // default, so only a cleared box can have been a choice — that one stays
+    // 12-hour, everything else follows the system.
+    readonly property int clockFormat: {
+        var m = Plasmoid.configuration.clockFormat ?? -1;
+        if (m >= 0) return Math.min(2, m);
+        return Plasmoid.configuration.use24Hour === false ? 1 : 0;
+    }
+    // quoted text in a format is literal, so an "a" in it is no AM/PM marker
+    readonly property bool localeUses12Hour:
+        /[aA]/.test(Qt.locale().timeFormat(Locale.ShortFormat).replace(/'[^']*'/g, ""))
+    readonly property bool use24Hour: clockFormat === 2 || (clockFormat === 0 && !localeUses12Hour)
     // Simple-layout graph per-point temperature label font (the "41° 40° …");
     // decoupled from the Detailed cards' hourlyTempFontSize.
     readonly property int simpleGraphTempFontSize: Plasmoid.configuration.simpleGraphTempFontSize || 16
@@ -398,15 +445,17 @@ PlasmoidItem {
         }
         return 1.5;
     }
-    // Air pressure → "1013 hPa" / "29.92 inHg". Both providers publish it at sea level
+    // Air pressure → "1013 hPa" / "29.92 inHg" / "760 mmHg". Both providers publish it at sea level
     // in hPa (the contract's unit), converted here like precipitation and snowfall are —
     // nothing plots pressure, so the model keeps the contract's unit throughout.
     // hPa is rounded whole: a tenth is below what a forecast can mean, and the extra
     // digit only makes the readout harder to scan. inHg keeps the two decimals it is
-    // always quoted with (a whole inHg would be a 34 hPa step).
+    // always quoted with (a whole inHg would be a 34 hPa step); mmHg is whole, as it is
+    // quoted (a millimetre of mercury is 1.33 hPa).
     function pressureStr(hPa) {
         if (isNaN(hPa)) return "";
         if (pressureUnitApi === "inHg") return i18n("%1 inHg", (hPa * 0.02952998).toFixed(2));
+        if (pressureUnitApi === "mmHg") return i18n("%1 mmHg", Math.round(hPa * 0.75006158));
         return i18n("%1 hPa", Math.round(hPa));
     }
     // per-hour precipitation amount → "1.2 mm" / "0.05 in" (imperial follows °F).
@@ -610,7 +659,7 @@ PlasmoidItem {
         return d.toLocaleTimeString(Qt.locale(), "h:mm AP").replace(/\s*AM/, "a").replace(/\s*PM/, "p");
     }
 
-    // Wind speed → "6.0 mph" / "12.3 kmh" / "3.4 m/s" (see windUnit).
+    // Wind speed → "6.0 mph" / "12.3 kmh" / "3.4 m/s" / "6.6 kn" (see windUnit).
     // One decimal, everywhere a wind speed is spelled out. Shared so the sustained
     // value can't change precision depending on whether a gust is shown next to it —
     // the header used to print "11.2 kmh" on its own but "11 G20 kmh" the moment a
@@ -879,6 +928,7 @@ PlasmoidItem {
     function _userWind(kmh) {
         if (windUnitApi === "mph") return kmh / 1.609344;
         if (windUnitApi === "ms")  return kmh / 3.6;
+        if (windUnitApi === "kn")  return kmh / 1.852;
         return kmh;
     }
     // Returns a converted COPY: the raw model must stay in °C / km/h to be converted
