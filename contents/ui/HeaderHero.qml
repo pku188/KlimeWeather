@@ -20,8 +20,9 @@ RowLayout {
     property var metrics: []          // Weather Element ids to list, up to four
     property int selectedDay: 0       // the day the day-based elements report on
     property var sample: null         // the hour the elements read, and the wind arrow follows
-    property string animSource: ""    // the animated icon, or "" for the static one
-    property bool animPlaying: false
+    property bool animate: false      // the animated icon, when the view has it on
+    property bool animCanBuild: true  // the view's go-ahead to build it (see ConditionIcon)
+    property bool animPlaying: false  // and to let it move
     // the icon+temperature row's width: the view keeps its location clear of it
     readonly property real heroTempWidth: heroTemp.width
     readonly property int conditionPull: toolbar ? toolbar.conditionPull : 0
@@ -52,28 +53,15 @@ RowLayout {
                 Layout.alignment: Qt.AlignVCenter
                 Layout.topMargin: -Math.round(Kirigami.Units.gridUnit * 0.45)   // lift the icon a little
 
-                // static basmilius icon when the condition has no animation — zoomed
-                // to match the animated icons' baked-in 1.45× crop (see staticIconZoom)
-                Kirigami.Icon {
-                    anchors.centerIn: parent
-                    width: Math.round(parent.width * (weatherRoot ? weatherRoot.staticIconZoom(weatherRoot.heroCode, weatherRoot.heroDay) : 1))
-                    height: width
-                    roundToIconSize: false   // honor the exact zoom; don't snap to 32/48
-                    visible: heroRow.animSource.length === 0
-                    source: weatherRoot ? weatherRoot.conditionIcon(weatherRoot.heroCode, weatherRoot.heroDay, weatherRoot.heroCloud)
-                                        : "weather-none-available"
-                }
-                // animated hero (GIF/WebP) otherwise
-                AnimatedImage {
+                ConditionIcon {
                     anchors.fill: parent
-                    visible: heroRow.animSource.length > 0
-                    source: heroRow.animSource
-                    // the view decides when it moves (it may hold frame 0 instead)
-                    playing: visible && heroRow.animPlaying
-                    cache: false
-                    smooth: true
-                    mipmap: true
-                    fillMode: Image.PreserveAspectFit
+                    weatherRoot: heroRow.weatherRoot
+                    code: weatherRoot ? weatherRoot.heroCode : -1
+                    day: weatherRoot ? weatherRoot.heroDay : 1
+                    cloud: weatherRoot ? weatherRoot.heroCloud : NaN
+                    animate: heroRow.animate
+                    canBuild: heroRow.animCanBuild
+                    playing: heroRow.animPlaying
                 }
             }
             Label {

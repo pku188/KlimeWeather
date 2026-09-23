@@ -151,13 +151,17 @@ Item {
     // hourly card animations pause during this for smooth scrolling
     readonly property bool scrolling: hourlyFlick.moving || scrollAnim.running
 
-    // Animated hero source for the current condition ("" → use static icon).
-    // Suppressed when forecast animation is set to None (fullHeaderAnim false).
-    // Always resolve the WebP so the hero shows the SAME artwork whether animation is on
-    // or off (frozen frame 0 when off — see `playing` below). Static SVG only for
-    // conditions heroAnim has no WebP for. Keeps the hero consistent with the cards.
-    readonly property string _heroAnim: (weatherRoot)
-        ? weatherRoot.heroAnim(weatherRoot.heroCode, weatherRoot.heroDay, weatherRoot.heroCloud) : ""
+    // Animated icons are built only once the popup has been opened and the cards
+    // have been dealt: until then the static icons show, which look the same at
+    // rest, so neither the first frame nor the deal waits on building them. Stays
+    // true — built icons are kept and just hold still while the popup is closed.
+    property bool iconsLive: false
+    Timer {
+        id: iconsLiveTimer
+        // the deal's length: its per-card stagger (capped at ten cards) plus one card's own
+        interval: 10 * full.dealStagger + full.dealDuration + 50
+        onTriggered: if (full.onScreen && full.visible) full.iconsLive = true
+    }
 
     // bumping this re-deals the hourly cards (entrance animation). Fires on
     // creation, on every popup open, and on becoming visible again — the view is
@@ -172,6 +176,7 @@ Item {
     function redeal() {
         dealBase = leadingEntry(hourlyFlick.contentX);
         dealRun++;
+        if (!iconsLive) iconsLiveTimer.restart();
     }
     Component.onCompleted: { syncTimelineModel(); redeal(); }
     onVisibleChanged: if (visible) redeal()
@@ -445,9 +450,9 @@ Item {
                 // live block
                 sample: full.hoveredHourSample
                         || (full.weatherRoot ? full.weatherRoot.currentHourSample : null)
-                // always the animated artwork; it only moves while forecast animation is on
-                animSource: full._heroAnim
-                animPlaying: full.onScreen && full.weatherRoot && full.weatherRoot.fullHeaderAnim
+                animate: full.weatherRoot ? full.weatherRoot.fullHeaderAnim : false
+                animCanBuild: full.iconsLive
+                animPlaying: full.onScreen
             }
 
             Item { Layout.fillWidth: true }
@@ -569,42 +574,17 @@ Item {
                             font.bold: dayTab.index === 0   // today's date stands out; stays dimmed
                             opacity: 0.55
                         }
-                        Item {
-                            id: dayIcon
+                        ConditionIcon {
                             Layout.alignment: Qt.AlignHCenter
                             Layout.preferredWidth:  weatherRoot ? weatherRoot.dailyIconSize : 24
                             Layout.preferredHeight: weatherRoot ? weatherRoot.dailyIconSize : 24
-
-                            // Always resolve the WebP so the static (anim-off) tab matches the animated
-                            // one and the hourly cards — frozen frame 0 when off (playing gated below).
-                            // Daily tabs always use the day variant. Falls back to SVG only when "".
-                            readonly property string animSrc: (weatherRoot && dayTab.modelData)
-                                ? weatherRoot.heroAnim(dayTab.modelData.code, 1) : ""
-                            // per-condition fine-tune (sunny trimmed); daily is always day variant
-                            readonly property real iScale: weatherRoot ? weatherRoot.iconScale(dayTab.modelData.code, 1) : 1
-
-                            Kirigami.Icon {
-                                anchors.centerIn: parent
-                                width: Math.round(parent.width * (weatherRoot ? weatherRoot.staticIconZoom(dayTab.modelData.code, 1) : 1))
-                                height: width
-                                roundToIconSize: false   // honor the exact zoom; don't snap to 32/48
-                                visible: dayIcon.animSrc.length === 0
-                                source: weatherRoot ? weatherRoot.conditionIcon(dayTab.modelData.code, 1)
-                                                    : "weather-none-available"
-                            }
-                            AnimatedImage {
-                                anchors.centerIn: parent
-                                width: Math.round(parent.width * dayIcon.iScale)
-                                height: width
-                                visible: dayIcon.animSrc.length > 0
-                                source: dayIcon.animSrc
-                                // animate only when daily-icon animation is on; else hold frame 0
-                                playing: visible && full.onScreen && weatherRoot && weatherRoot.animatedDailyIcons
-                                cache: false
-                                smooth: true
-                                mipmap: true
-                                fillMode: Image.PreserveAspectFit
-                            }
+                            weatherRoot: full.weatherRoot
+                            // daily tabs always show the day variant
+                            code: dayTab.modelData ? dayTab.modelData.code : -1
+                            day: 1
+                            animate: weatherRoot ? weatherRoot.animatedDailyIcons : false
+                            canBuild: full.iconsLive
+                            playing: full.onScreen
                         }
                         Label {
                             Layout.alignment: Qt.AlignHCenter
@@ -807,6 +787,20 @@ Item {
                             && x < (hourlyFlick.contentX + hourlyFlick.width)
                         onInViewChanged: if (inView && full.scrolling)
                                              slideIn(hourlyFlick.scrollDir < 0 ? -130 : 130)
+                        // Qt Quick draws every card in the strip on every frame, not only the
+                        // ones its clip lets through, and each card carries its own Canvas
+                        // texture that nothing can batch: a week of cards cost the popup a
+                        // few milliseconds of every frame whenever anything on it moved. So
+                        // cards off the strip are hidden from the renderer, with a card's
+                        // margin either side so none pops in at an edge. The card is hidden,
+                        // not this Loader, so the Row keeps every card's place.
+                        readonly property bool onStrip:
+                            (x + width) > hourlyFlick.contentX - width
+                            && x < (hourlyFlick.contentX + hourlyFlick.width + width)
+                        Binding {
+                            target: cardLoader.item; property: "visible"; value: cardLoader.onStrip
+                            when: cardLoader.item !== null
+                        }
                         ParallelAnimation {
                             id: slideInAnim
                             NumberAnimation {
@@ -947,47 +941,22 @@ Item {
                                         font.bold: true
                                         text: weatherRoot ? weatherRoot.formatSlot(modelData) : ""
                                     }
-                                    Item {
-                                        id: hrIcon
+                                    ConditionIcon {
                                         Layout.alignment: Qt.AlignHCenter
                                         Layout.preferredWidth:  weatherRoot ? weatherRoot.hourlyIconSize : 32
                                         Layout.preferredHeight: weatherRoot ? weatherRoot.hourlyIconSize : 32
-
+                                        weatherRoot: full.weatherRoot
                                         // probability-aware code: a likely-rain hour shows rain even if the code reads cloudy
-                                        readonly property int iconCode: weatherRoot ? weatherRoot.precipAwareCode(modelData.code, modelData.precip, modelData.precipAmt, modelData.snow, modelData.temp) : modelData.code
-                                        // Always resolve the WebP so the static (anim-off) icon is the
-                                        // SAME artwork as the animated one — just frozen (playing gated
-                                        // below on animatedHourlyIcons). Falls back to the static SVG only
-                                        // for conditions heroAnim has no WebP for (returns "").
-                                        readonly property string animSrc: (weatherRoot && modelData)
-                                            ? weatherRoot.heroAnim(hrIcon.iconCode, modelData.day, modelData.cloud) : ""
-                                        // per-condition fine-tune (sunny trimmed)
-                                        readonly property real iScale: weatherRoot ? weatherRoot.iconScale(hrIcon.iconCode, modelData.day) : 1
-
-                                        Kirigami.Icon {
-                                            anchors.centerIn: parent
-                                            width: Math.round(parent.width * (weatherRoot ? weatherRoot.staticIconZoom(hrIcon.iconCode, modelData.day) : 1))
-                                            height: width
-                                            roundToIconSize: false   // honor the exact zoom; don't snap to 32/48
-                                            visible: hrIcon.animSrc.length === 0
-                                            source: weatherRoot ? weatherRoot.conditionIcon(hrIcon.iconCode, modelData.day, modelData.cloud)
-                                                                : "weather-none-available"
-                                        }
-                                        AnimatedImage {
-                                            anchors.centerIn: parent
-                                            width: Math.round(parent.width * hrIcon.iScale)
-                                            height: width
-                                            visible: hrIcon.animSrc.length > 0
-                                            source: hrIcon.animSrc
-                                            // animate only when the option is on; otherwise hold frame 0
-                                            // (a static poster matching the animated art). Decode only
-                                            // on-screen cards, and freeze while scrolling.
-                                            playing: weatherRoot && weatherRoot.animatedHourlyIcons && visible && full.onScreen && card.inView && !full.scrolling
-                                            cache: false
-                                            smooth: true
-                                            mipmap: true
-                                            fillMode: Image.PreserveAspectFit
-                                        }
+                                        code: weatherRoot ? weatherRoot.precipAwareCode(modelData.code, modelData.precip, modelData.precipAmt, modelData.snow, modelData.temp) : modelData.code
+                                        day: modelData.day
+                                        cloud: modelData.cloud
+                                        animate: weatherRoot ? weatherRoot.animatedHourlyIcons : false
+                                        // cards share one animation per condition, so a card scrolled
+                                        // in shows a condition already on screen at once; one not yet
+                                        // built waits for the strip to rest
+                                        canBuild: full.iconsLive && !full.scrolling
+                                        // moves only while on screen, and holds still while scrolling
+                                        playing: full.onScreen && card.inView && !full.scrolling
                                     }
                                     Label {
                                         Layout.alignment: Qt.AlignHCenter

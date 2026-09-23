@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+<g id="fog-night">
+<g id="Mask group">
+<mask id="mask0_2045_39544" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="75">
+<rect id="Mask" width="128" height="75" fill="white" />
+</mask>
+<g mask="url(#mask0_2045_39544)">
+<g id="Moon">
+<path id="Moon_2" d="M61.9117 40C50.715 41.2083 42 50.5617 42 61.93C42 74.1183 52.015 84 64.3683 84C74.7817 84 83.5067 76.97 86 67.465C71.137 69.0586 58.0386 54.7567 61.9117 40Z" fill="#72B9D5" />
+<animateTransform attributeName="transform" type="rotate" values="-6 64 62;-5.6266 64 62;-4.4501 64 62;-2.4868 64 62;0 64 62;2.4868 64 62;4.4501 64 62;5.6266 64 62;6 64 62;5.6266 64 62;4.4501 64 62;2.4868 64 62;0 64 62;-2.4868 64 62;-4.4501 64 62;-5.6266 64 62;-6 64 62" dur="3s" repeatCount="indefinite" calcMode="linear" /></g>
+</g>
+</g>
+<g id="Precipitation">
+<path id="Line 2" d="M40 81H88" stroke="#E2E8F0" stroke-width="3" stroke-miterlimit="10" stroke-linecap="round"><animateTransform attributeName="transform" type="translate" values="0 0;0.0933 0;0.3875 0;0.8783 0;1.5 0;2.1217 0;2.6125 0;2.9067 0;3 0;2.9067 0;2.6125 0;2.1217 0;1.5 0;0.8783 0;0.3875 0;0.0933 0;0 0" dur="3s" repeatCount="indefinite" calcMode="linear" /></path>
+<path id="Line 1" d="M40 89H88" stroke="#E2E8F0" stroke-width="3" stroke-miterlimit="10" stroke-linecap="round"><animateTransform attributeName="transform" type="translate" values="0.1065 0;0.0004 0;0.0811 0;0.3615 0;0.8404 0;1.4569 0;2.0831 0;2.5856 0;2.8935 0;2.9996 0;2.9189 0;2.6385 0;2.1596 0;1.5431 0;0.9169 0;0.4144 0;0.1065 0" dur="3s" repeatCount="indefinite" calcMode="linear" /></path>
+</g>
+</g>
+</svg>

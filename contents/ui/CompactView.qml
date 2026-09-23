@@ -19,17 +19,23 @@ Item {
     readonly property int _line2Px: Math.round(compact.height
         * (weatherRoot ? weatherRoot.panelSecondLinePercent : 37) / 100)
 
-    // The bundled Basmilius sun glyph fills its box more than the other condition
-    // icons (same "over-full artwork" issue main.qml's heroScale/iconScale correct
-    // for elsewhere), so it reads oversized in the panel at the same box size next
-    // to e.g. clouds. Scale it down a touch; every other condition, and every other
-    // icon pack, is untouched.
+    // The Meteocons sun glyph fills its box more than the other condition icons
+    // (same "over-full artwork" issue main.qml's heroScale/iconZoom correct for
+    // elsewhere), so it reads oversized in the panel at the same box size next
+    // to e.g. clouds. Scale it down a touch; every other condition, and the theme
+    // and custom packs, are untouched.
     function panelIconScale() {
-        if (!weatherRoot || weatherRoot.iconPackId !== "basmilius") return 1.0;
+        if (!weatherRoot || !weatherRoot.iconPackIsMeteocons) return 1.0;
         var code = weatherRoot.heroCode, day = weatherRoot.heroDay;
         if ((code === 0 || code === 1) && day !== 0) return 0.85;   // clear sky / sunny (day)
         return 1.0;
     }
+
+    // The monochrome pack's own icon, asked for with "Use colored icon": it is
+    // one-colour artwork, so it is tinted with the panel's text colour.
+    readonly property bool tintedIcon: !!weatherRoot && weatherRoot.panelColorIcon
+                                       && weatherRoot.iconPackIsMask && weatherRoot.hasLocation
+                                       && weatherRoot.heroCode >= 0
 
     // White icon by default; colored variant when the panelColorIcon setting is on.
     function panelIconSource() {
@@ -71,11 +77,12 @@ Item {
         // recolouring); theme packs need Kirigami.Icon to resolve "weather-*"
         // names, so the two swap by visibility (Row skips the hidden one). With no
         // forecast yet every pack falls back to the theme's "weather-none-available"
-        // name, which only the Kirigami.Icon can load.
+        // name, which only the Kirigami.Icon can load. The coloured monochrome icon
+        // goes through Kirigami.Icon as well, which draws it in the panel's text colour.
         Image {
             id: icon
             visible: weatherRoot && weatherRoot.hasLocation && !weatherRoot.iconPackIsTheme
-                     && weatherRoot.heroCode >= 0
+                     && weatherRoot.heroCode >= 0 && !compact.tintedIcon
             anchors.verticalCenter: parent.verticalCenter
             height: Math.round(compact.height * compact.iconPercent / 100 * compact.panelIconScale())
             width: height
@@ -89,10 +96,14 @@ Item {
             id: themeIcon
             // theme renderer also carries the "mark-location" pin when unset
             visible: weatherRoot && (!weatherRoot.hasLocation || weatherRoot.iconPackIsTheme
-                                     || weatherRoot.heroCode < 0)
+                                     || weatherRoot.heroCode < 0 || compact.tintedIcon)
             anchors.verticalCenter: parent.verticalCenter
-            height: Math.round(compact.height * compact.iconPercent / 100)
+            height: Math.round(compact.height * compact.iconPercent / 100
+                               * (compact.tintedIcon ? compact.panelIconScale() : 1))
             width: height
+            roundToIconSize: !compact.tintedIcon
+            isMask: compact.tintedIcon
+            color: Kirigami.Theme.textColor
             source: visible && weatherRoot ? compact.panelIconSource() : ""
         }
         Text {

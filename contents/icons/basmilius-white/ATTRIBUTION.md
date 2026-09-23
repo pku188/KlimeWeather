@@ -7,10 +7,8 @@ The icons in this folder are derived from **Meteocons / Weather Icons by Bas Mil
 - Source package: `@bybas/weather-icons` v1.5.0 (`production/fill/all`)
 - The static `wi-*.svg` files here are the basmilius artwork with their SMIL
   animations stripped, renamed to this widget's icon-stem convention.
-- The animated hero GIFs in `../animated/` are baked frame-by-frame from the
-  original animated basmilius SVGs (rotation / drift / falling-drops / flicker),
-  reproducing their intended motion for Qt's `AnimatedImage` (which cannot render
-  SVG SMIL/CSS animation directly).
+- This folder is the panel's white icon set, used whichever icon pack the
+  popup shows (`panelWhiteDir` in `contents/ui/main.qml`).
 
 Icon stem → basmilius source mapping:
 
