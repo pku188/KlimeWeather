@@ -23,6 +23,22 @@ Kirigami.FormLayout {
     property int    cfg_clockFormat
     property bool   cfg_use24Hour             // the older checkbox, read only while clockFormat was never chosen
 
+    // What "Follow system" resolves to, shown in its brackets. The same rules as
+    // main.qml's units, windUnitApi, pressureUnitApi and use24Hour — keep them in step.
+    readonly property int  localeMeasurement: Qt.locale().measurementSystem
+    readonly property bool localeUses12Hour:
+        /[aA]/.test(Qt.locale().timeFormat(Locale.ShortFormat).replace(/'[^']*'/g, ""))
+    // "Follow system (°C)": the short form is taken from the brackets of the option
+    // the system resolves to, so it reads the same as that option in any language.
+    function followSystem(options, value) {
+        for (var i = 0; i < options.length; ++i) {
+            if (options[i].value !== value) continue;
+            var m = /\(([^()]*)\)\s*$/.exec(options[i].text);
+            return i18n("Follow system (%1)", m ? m[1] : options[i].text);
+        }
+        return i18n("Follow system (%1)", value);
+    }
+
     // breathing room so the settings don't sit flush against the top
     Item { implicitHeight: Kirigami.Units.gridUnit }
 
@@ -71,11 +87,15 @@ Kirigami.FormLayout {
         id: unitCombo
         Kirigami.FormData.label: i18n("Temperature unit:")
         textRole: "text"
-        model: [
-            { text: i18n("Follow system locale"), value: "system"     },
-            { text: i18n("Celsius (°C)"),         value: "celsius"    },
-            { text: i18n("Fahrenheit (°F)"),      value: "fahrenheit" }
-        ]
+        model: {
+            var opts = [
+                { text: i18n("Celsius (°C)"),    value: "celsius"    },
+                { text: i18n("Fahrenheit (°F)"), value: "fahrenheit" }
+            ];
+            // °F only where the locale is US imperial
+            var sys = page.localeMeasurement === Locale.ImperialUSSystem ? "fahrenheit" : "celsius";
+            return [{ text: page.followSystem(opts, sys), value: "system" }].concat(opts);
+        }
         Component.onCompleted: {
             for (var i = 0; i < model.length; ++i)
                 if (model[i].value === page.cfg_temperatureUnit) { currentIndex = i; break; }
@@ -86,13 +106,17 @@ Kirigami.FormLayout {
         id: windUnitCombo
         Kirigami.FormData.label: i18n("Wind speed unit:")
         textRole: "text"
-        model: [
-            { text: i18n("Follow system locale"),       value: "auto" },
-            { text: i18n("Kilometers per hour (kmh)"), value: "kmh" },
-            { text: i18n("Miles per hour (mph)"),       value: "mph" },
-            { text: i18n("Meters per second (m/s)"),    value: "ms"  },
-            { text: i18n("Knots (kn)"),                 value: "kn"  }
-        ]
+        model: {
+            var opts = [
+                { text: i18n("Kilometers per hour (kmh)"), value: "kmh" },
+                { text: i18n("Miles per hour (mph)"),       value: "mph" },
+                { text: i18n("Meters per second (m/s)"),    value: "ms"  },
+                { text: i18n("Knots (kn)"),                 value: "kn"  }
+            ];
+            // mph wherever the locale is imperial (the UK's too)
+            var sys = page.localeMeasurement === Locale.MetricSystem ? "kmh" : "mph";
+            return [{ text: page.followSystem(opts, sys), value: "auto" }].concat(opts);
+        }
         Component.onCompleted: {
             for (var i = 0; i < model.length; ++i)
                 if (model[i].value === page.cfg_windUnit) { currentIndex = i; break; }
@@ -103,12 +127,16 @@ Kirigami.FormLayout {
         id: pressureUnitCombo
         Kirigami.FormData.label: i18n("Air pressure unit:")
         textRole: "text"
-        model: [
-            { text: i18n("Follow system locale"),        value: "auto" },
-            { text: i18n("Hectopascals (hPa)"),          value: "hPa"  },
-            { text: i18n("Inches of mercury (inHg)"),    value: "inHg" },
-            { text: i18n("Millimeters of mercury (mmHg)"), value: "mmHg" }
-        ]
+        model: {
+            var opts = [
+                { text: i18n("Hectopascals (hPa)"),            value: "hPa"  },
+                { text: i18n("Inches of mercury (inHg)"),      value: "inHg" },
+                { text: i18n("Millimeters of mercury (mmHg)"), value: "mmHg" }
+            ];
+            // inHg where the locale is US imperial
+            var sys = page.localeMeasurement === Locale.ImperialUSSystem ? "inHg" : "hPa";
+            return [{ text: page.followSystem(opts, sys), value: "auto" }].concat(opts);
+        }
         Component.onCompleted: {
             for (var i = 0; i < model.length; ++i)
                 if (model[i].value === page.cfg_pressureUnit) { currentIndex = i; break; }
@@ -121,7 +149,9 @@ Kirigami.FormLayout {
         textRole: "text"
         // value is the stored mode (main.qml clockFormat), not the index
         model: [
-            { text: i18n("Follow system default"), value: 0 },
+            { text: i18n("Follow system (%1)", page.localeUses12Hour ? i18nc("short for 12-hour time", "12h")
+                                                                     : i18nc("short for 24-hour time", "24h")),
+              value: 0 },
             { text: i18n("12-hour time"),          value: 1 },
             { text: i18n("24-hour time"),          value: 2 }
         ]

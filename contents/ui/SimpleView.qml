@@ -1274,7 +1274,8 @@ Item {
 
     implicitWidth:  Math.max(Kirigami.Units.gridUnit * 34, content.implicitWidth + pad * 2)
     implicitHeight: content.implicitHeight + pad + Math.round(pad * 1.0)
-    Layout.minimumWidth: Kirigami.Units.gridUnit * 30 + pad * 2
+    // the card layout's minimum (FullView), so both layouts squeeze to the same width
+    Layout.minimumWidth: Kirigami.Units.gridUnit * 32 + pad * 2
 
     // animations drive the window position (hourPos)
     NumberAnimation {

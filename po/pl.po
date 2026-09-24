@@ -22,7 +22,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: io.github.pku188.klimeweather\n"
 "Report-Msgid-Bugs-To: https://github.com/pku188/KlimeWeather/issues\n"
-"POT-Creation-Date: 2026-09-23 23:57+0200\n"
+"POT-Creation-Date: 2026-09-24 23:45+0200\n"
 "PO-Revision-Date: 2026-09-18 18:40+0200\n"
 "Last-Translator: Anonymous contributor\n"
 "Language-Team: Polish\n"
@@ -526,19 +526,24 @@ msgstr "Wiatr (prędkość / porywy)"
 msgid "Second metric font:"
 msgstr "Czcionka drugiej wartości:"
 
-#: contents/ui/configGeneral.qml:31
+#: contents/ui/configGeneral.qml:37 contents/ui/configGeneral.qml:39
+#: contents/ui/configGeneral.qml:152
+msgid "Follow system (%1)"
+msgstr "Jak w systemie (%1)"
+
+#: contents/ui/configGeneral.qml:47
 msgid "Refresh interval (minutes):"
 msgstr "Interwał odświeżania (minuty):"
 
-#: contents/ui/configGeneral.qml:37
+#: contents/ui/configGeneral.qml:53
 msgid "Weather alerts:"
 msgstr "Alerty pogodowe:"
 
-#: contents/ui/configGeneral.qml:40
+#: contents/ui/configGeneral.qml:56
 msgid "Show weather alerts"
 msgstr "Pokazuj alerty pogodowe"
 
-#: contents/ui/configGeneral.qml:49
+#: contents/ui/configGeneral.qml:65
 msgid ""
 "Weather alerts come from KDE Public Alert Server. It collects official "
 "weather warnings from agencies around the world so you get worldwide alerts "
@@ -549,92 +554,93 @@ msgstr ""
 "alerty z całego świata bez konieczności kontaktowania się z każdą agencją z "
 "osobna ani ujawniania jej swoich danych."
 
-#: contents/ui/configGeneral.qml:54
+#: contents/ui/configGeneral.qml:70
 msgid "Show alerts at or above:"
 msgstr "Pokazuj alerty od poziomu:"
 
-#: contents/ui/configGeneral.qml:59
+#: contents/ui/configGeneral.qml:75
 msgid "Minor"
 msgstr "Niewielkie"
 
-#: contents/ui/configGeneral.qml:60 contents/ui/main.qml:1623
+#: contents/ui/configGeneral.qml:76 contents/ui/main.qml:1623
 msgid "Moderate"
 msgstr "Umiarkowane"
 
-#: contents/ui/configGeneral.qml:61
+#: contents/ui/configGeneral.qml:77
 msgid "Severe"
 msgstr "Poważne"
 
-#: contents/ui/configGeneral.qml:62 contents/ui/main.qml:1626
+#: contents/ui/configGeneral.qml:78 contents/ui/main.qml:1626
 msgid "Extreme"
 msgstr "Ekstremalne"
 
-#: contents/ui/configGeneral.qml:72
+#: contents/ui/configGeneral.qml:88
 msgid "Temperature unit:"
 msgstr "Jednostka temperatury:"
 
-#: contents/ui/configGeneral.qml:75 contents/ui/configGeneral.qml:90
-#: contents/ui/configGeneral.qml:107
-msgid "Follow system locale"
-msgstr "Zgodna z ustawieniami regionalnymi systemu"
-
-#: contents/ui/configGeneral.qml:76
+#: contents/ui/configGeneral.qml:92
 msgid "Celsius (°C)"
 msgstr "Celsjusz (°C)"
 
-#: contents/ui/configGeneral.qml:77
+#: contents/ui/configGeneral.qml:93
 msgid "Fahrenheit (°F)"
 msgstr "Fahrenheit (°F)"
 
-#: contents/ui/configGeneral.qml:87
+#: contents/ui/configGeneral.qml:107
 msgid "Wind speed unit:"
 msgstr "Jednostka prędkości wiatru:"
 
-#: contents/ui/configGeneral.qml:91
+#: contents/ui/configGeneral.qml:111
 msgid "Kilometers per hour (kmh)"
 msgstr "Kilometry na godzinę (km/h)"
 
-#: contents/ui/configGeneral.qml:92
+#: contents/ui/configGeneral.qml:112
 msgid "Miles per hour (mph)"
 msgstr "Mile na godzinę (mph)"
 
-#: contents/ui/configGeneral.qml:93
+#: contents/ui/configGeneral.qml:113
 msgid "Meters per second (m/s)"
 msgstr "Metry na sekundę (m/s)"
 
-#: contents/ui/configGeneral.qml:94
+#: contents/ui/configGeneral.qml:114
 msgid "Knots (kn)"
 msgstr "Węzły (kn)"
 
-#: contents/ui/configGeneral.qml:104
+#: contents/ui/configGeneral.qml:128
 msgid "Air pressure unit:"
 msgstr "Jednostka ciśnienia:"
 
-#: contents/ui/configGeneral.qml:108
+#: contents/ui/configGeneral.qml:132
 msgid "Hectopascals (hPa)"
 msgstr "Hektopaskale (hPa)"
 
-#: contents/ui/configGeneral.qml:109
+#: contents/ui/configGeneral.qml:133
 msgid "Inches of mercury (inHg)"
 msgstr "Cale słupa rtęci (inHg)"
 
-#: contents/ui/configGeneral.qml:110
+#: contents/ui/configGeneral.qml:134
 msgid "Millimeters of mercury (mmHg)"
 msgstr "Milimetry słupa rtęci (mmHg)"
 
-#: contents/ui/configGeneral.qml:120
+#: contents/ui/configGeneral.qml:148
 msgid "Clock format:"
 msgstr "Format zegara:"
 
-#: contents/ui/configGeneral.qml:124
-msgid "Follow system default"
-msgstr "Zgodny z ustawieniem domyślnym systemu"
+#: contents/ui/configGeneral.qml:152
+msgctxt "short for 12-hour time"
+msgid "12h"
+msgstr "12h"
 
-#: contents/ui/configGeneral.qml:125
+#: contents/ui/configGeneral.qml:153
+msgctxt "short for 24-hour time"
+msgid "24h"
+msgstr "24h"
+
+#: contents/ui/configGeneral.qml:155
 msgid "12-hour time"
 msgstr "Format 12-godzinny"
 
-#: contents/ui/configGeneral.qml:126
+#: contents/ui/configGeneral.qml:156
 msgid "24-hour time"
 msgstr "Format 24-godzinny"
 
@@ -982,7 +988,7 @@ msgstr "Dane pogodowe od MET Norway (met.no)"
 msgid "Weather data by Open-Meteo.com"
 msgstr "Dane pogodowe od Open-Meteo.com"
 
-#: contents/ui/SimpleView.qml:1434
+#: contents/ui/SimpleView.qml:1435
 msgid "Switch to card layout"
 msgstr "Przełącz na układ kart"
 
