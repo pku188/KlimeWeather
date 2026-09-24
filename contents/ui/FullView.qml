@@ -450,6 +450,9 @@ Item {
                 // live block
                 sample: full.hoveredHourSample
                         || (full.weatherRoot ? full.weatherRoot.currentHourSample : null)
+                // what the header can be handed: any hourly card, any day tab
+                readingHours: full.timeline
+                readingDays: dayTabsRep.count
                 animate: full.weatherRoot ? full.weatherRoot.fullHeaderAnim : false
                 animCanBuild: full.iconsLive
                 animPlaying: full.onScreen

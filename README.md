@@ -5,9 +5,9 @@ Weather widget for KDE Plasma, without the noise.
 
 Two weather sources, two layouts, and readouts you choose. Plasma 6.
 
-This is a fork of the [Bare Weather](https://github.com/bvlthvzvr/BareWeather) widget with various QoL improvements.
+This is a fork of the [Bare Weather](https://github.com/bvlthvzvr/BareWeather), following its strict privacy principles and adding various QoL improvements.
 
-<img width="956" height="442" alt="klime-weather-1" src="https://pkucaj.com/github/img/klime-weather-1.png" />
+<img alt="klime-weather-1" src="https://pkucaj.com/github/img/klime-weather-1.png" />
 
 ## Widget features
 
@@ -23,11 +23,10 @@ This is a fork of the [Bare Weather](https://github.com/bvlthvzvr/BareWeather) w
 
 ### Readouts you pick
 
-- Point anywhere along the graph to read that hour's conditions.
 - Up to four **Weather Elements** in the header: air pressure, feels like, humidity, UV,
 precipitation rate or daily sum, wind (with a direction arrow), cloud cover, sunrise/sunset.
-- Units: °C/°F (or your system locale's), km/h, mph, m/s or knots, hPa, inHg or mmHg,
-  12- or 24-hour clock (or your system's). Dates follow your system's date format.
+- Customizable unit types and time formats which follow your system's locale settings by default.
+- Point anywhere along the graph to read that hour's conditions.
 
 
 ### Other characteristics
