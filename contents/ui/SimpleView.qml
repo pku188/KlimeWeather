@@ -1473,6 +1473,9 @@ Item {
                 selectedDay: simple.selectedDay
                 // the hour under the pointer, else the one the graph is focused on
                 sample: simple.hoveredSample || simple.focusedSample
+                // what the header can be handed: any hour of the graph, any day button
+                readingHours: simple.samples
+                readingDays: simple.dayCount
                 animate: simple.weatherRoot ? simple.weatherRoot.simpleHeaderAnim : false
                 animCanBuild: simple.iconsLive
                 animPlaying: simple.onScreen
