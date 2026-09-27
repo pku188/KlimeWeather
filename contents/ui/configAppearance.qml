@@ -25,6 +25,7 @@ Item {
     property alias cfg_dailyDays:          dailyDaysSpin.value
     property alias cfg_heroIconSize:       heroSpin.value
     property alias cfg_tempFontSize:       tempSpin.value
+    property alias cfg_dailyNameFontSize:  dailyNameSpin.value
     property alias cfg_dailyIconSize:      dailySpin.value
     property alias cfg_dailyTempFontSize:  dailyTempSpin.value
     property alias cfg_windArrowSize:      windArrowSpin.value
@@ -54,6 +55,7 @@ Item {
     property alias cfg_simpleHourFontSize:     simpleHourSpin.value
     property alias cfg_simpleGraphTempFontSize: simpleGraphTempSpin.value
     property alias cfg_simpleDayMarkerFontSize: simpleDayMarkerSpin.value
+    property alias cfg_dayPillFontSize:         dayPillSpin.value
     property alias cfg_simpleDailyDays:         graphDaysSpin.value
     property alias cfg_graphScrollHoursDay:     graphScrollDaySpin.value
     property alias cfg_graphScrollHoursDetail:  graphScrollDetailSpin.value
@@ -84,7 +86,8 @@ Item {
     property alias cfg_panelIconPercent:   panelIconSpin.value
     property alias cfg_panelFontPercent:   panelFontSpin.value
     property alias cfg_panelColorIcon:     panelColorCheck.checked
-    property alias cfg_panelDetailed:      panelDetailedCheck.checked
+    property int   cfg_panelDisplay
+    property bool  cfg_panelDetailed      // the older checkbox, read only while panelDisplay was never chosen
     property alias cfg_panelSecondLine:    panelSecondLineCombo.currentIndex
     property alias cfg_panelConditionPercent:  panelConditionSpin.value
     property alias cfg_panelSecondLinePercent: panelSecondLineSpin.value
@@ -306,6 +309,15 @@ Item {
                             Kirigami.FormData.label: i18n("Cards per scroll:")
                             from: 1
                             to: 12
+                        }
+                        ConfigSpinBox {
+                            id: dailyNameSpin
+                            Kirigami.FormData.label: i18n("Daily tab name font:")
+                            from: 8
+                            to: 32
+                            stepSize: 1
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("The day name. The date under it follows at a slightly smaller size.")
                         }
                         ConfigSpinBox {
                             id: dailySpin
@@ -650,6 +662,13 @@ Item {
                         to: 32
                         stepSize: 1
                     }
+                    ConfigSpinBox {
+                        id: dayPillSpin
+                        Kirigami.FormData.label: i18n("Day buttons font:")
+                        from: 8
+                        to: 32
+                        stepSize: 1
+                    }
                     ConfigComboBox {
                         id: simpleAnimCombo
                         Kirigami.FormData.label: i18n("Animation:")
@@ -784,9 +803,34 @@ Item {
             ScrollView {
                 contentWidth: availableWidth
                 Kirigami.FormLayout {
+                    ConfigComboBox {
+                        id: panelDisplayCombo
+                        Kirigami.FormData.label: i18n("Panel display:")
+                        textRole: "text"
+                        // value is the stored mode (main.qml panelDisplay)
+                        model: [
+                            { text: i18n("Weather icon and temperature"), value: 0 },
+                            { text: i18n("Weather icon"),                 value: 1 },
+                            { text: i18n("Temperature"),                  value: 2 },
+                            { text: i18n("Detailed view"),                value: 3 }
+                        ]
+                        // the settings below apply only where the display shows their part
+                        readonly property int mode: currentIndex >= 0 ? model[currentIndex].value : 0
+                        // never chosen: what main.qml derives from the older checkbox
+                        Component.onCompleted: currentIndex = page.cfg_panelDisplay >= 0
+                            ? Math.min(3, page.cfg_panelDisplay) : (page.cfg_panelDetailed ? 3 : 0)
+                        onActivated: page.cfg_panelDisplay = model[currentIndex].value
+                    }
+                    CheckBox {
+                        id: panelColorCheck
+                        Kirigami.FormData.label: i18n("Icon color:")
+                        text: i18n("Use colored icon")
+                        enabled: panelDisplayCombo.mode !== 2   // any display with the icon
+                    }
                     ConfigSpinBox {
                         id: panelIconSpin
                         Kirigami.FormData.label: i18n("Panel icon size:")
+                        enabled: panelDisplayCombo.mode !== 2
                         from: 50
                         to: 200
                         stepSize: 5
@@ -794,23 +838,15 @@ Item {
                     ConfigSpinBox {
                         id: panelFontSpin
                         Kirigami.FormData.label: i18n("Panel temperature font:")
+                        enabled: panelDisplayCombo.mode !== 1   // any display with the temperature
                         from: 20
                         to: 90
                         stepSize: 2
                     }
-                    CheckBox {
-                        id: panelColorCheck
-                        Kirigami.FormData.label: i18n("Icon color:")
-                        text: i18n("Use colored icon")
-                    }
-                    CheckBox {
-                        id: panelDetailedCheck
-                        Kirigami.FormData.label: i18n("Panel:")
-                        text: i18n("Detailed View")
-                    }
                     ConfigComboBox {
                         id: panelSecondLineCombo
-                        enabled: panelDetailedCheck.checked
+                        Kirigami.FormData.label: i18n("Detailed view:")
+                        enabled: panelDisplayCombo.mode === 3
                         // index maps directly to panelSecondLine (0 = H/L, 1 = precip, 2 = wind)
                         model: [
                             i18n("High / low temperature"),
@@ -820,7 +856,7 @@ Item {
                     }
                     ConfigSpinBox {
                         id: panelConditionSpin
-                        enabled: panelDetailedCheck.checked
+                        enabled: panelDisplayCombo.mode === 3
                         Kirigami.FormData.label: i18n("Condition font:")
                         from: 15
                         to: 70
@@ -828,7 +864,7 @@ Item {
                     }
                     ConfigSpinBox {
                         id: panelSecondLineSpin
-                        enabled: panelDetailedCheck.checked
+                        enabled: panelDisplayCombo.mode === 3
                         Kirigami.FormData.label: i18n("Second metric font:")
                         from: 15
                         to: 70

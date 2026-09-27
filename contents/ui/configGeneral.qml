@@ -8,6 +8,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import org.kde.plasma.plasmoid
 
 Kirigami.FormLayout {
     id: page
@@ -37,6 +38,39 @@ Kirigami.FormLayout {
             return i18n("Follow system (%1)", m ? m[1] : options[i].text);
         }
         return i18n("Follow system (%1)", value);
+    }
+
+    // ── Reset all settings ──
+    // Every setting goes back to its default from main.xml (the configuration holds
+    // each one's default as "<key>Default"), except what isn't a preference: where
+    // the widget is — its location and the saved ones — and one-time markers whose
+    // reset would run an old migration again.
+    readonly property var keptOnReset: ["latitude", "longitude", "locationName", "locationTimezone",
+                                        "locationConfigured", "savedLocations",
+                                        "locationFontsSplit", "simpleHourly", "unitConfigured"]
+    function resetAllSettings() {
+        var c = Plasmoid.configuration, keys = c.keys(), has = {}, i, k;
+        for (i = 0; i < keys.length; ++i) has[keys[i]] = true;
+        for (i = 0; i < keys.length; ++i) {
+            k = keys[i];
+            // (the "…Default" entries have no default of their own, so they skip too)
+            if (!has[k + "Default"] || keptOnReset.indexOf(k) >= 0) continue;
+            c[k] = c[k + "Default"];
+        }
+        c.writeConfig();
+        // Plasma saves only the open page, from its cfg_ values: take the new values
+        // here too, or OK / Apply would write this page's old ones back.
+        for (i = 0; i < keys.length; ++i)
+            if (("cfg_" + keys[i]) in page) page["cfg_" + keys[i]] = c[keys[i]];
+        syncControls();
+    }
+    // the lists pick their entry from cfg_ values only when asked
+    function syncControls() {
+        alertLevelCombo.sync();
+        unitCombo.sync();
+        windUnitCombo.sync();
+        pressureUnitCombo.sync();
+        clockFormatCombo.sync();
     }
 
     // breathing room so the settings don't sit flush against the top
@@ -77,10 +111,11 @@ Kirigami.FormLayout {
             { text: i18n("Severe"),   value: 3 },
             { text: i18n("Extreme"),  value: 4 }
         ]
-        Component.onCompleted: {
+        function sync() {
             for (var i = 0; i < model.length; ++i)
                 if (model[i].value === page.cfg_minAlertSeverity) { currentIndex = i; break; }
         }
+        Component.onCompleted: sync()
         onActivated: page.cfg_minAlertSeverity = model[currentIndex].value
     }
     ConfigComboBox {
@@ -96,10 +131,11 @@ Kirigami.FormLayout {
             var sys = page.localeMeasurement === Locale.ImperialUSSystem ? "fahrenheit" : "celsius";
             return [{ text: page.followSystem(opts, sys), value: "system" }].concat(opts);
         }
-        Component.onCompleted: {
+        function sync() {
             for (var i = 0; i < model.length; ++i)
                 if (model[i].value === page.cfg_temperatureUnit) { currentIndex = i; break; }
         }
+        Component.onCompleted: sync()
         onActivated: { page.cfg_temperatureUnit = model[currentIndex].value; page.cfg_unitConfigured = true; }
     }
     ConfigComboBox {
@@ -117,10 +153,11 @@ Kirigami.FormLayout {
             var sys = page.localeMeasurement === Locale.MetricSystem ? "kmh" : "mph";
             return [{ text: page.followSystem(opts, sys), value: "auto" }].concat(opts);
         }
-        Component.onCompleted: {
+        function sync() {
             for (var i = 0; i < model.length; ++i)
                 if (model[i].value === page.cfg_windUnit) { currentIndex = i; break; }
         }
+        Component.onCompleted: sync()
         onActivated: page.cfg_windUnit = model[currentIndex].value
     }
     ConfigComboBox {
@@ -137,10 +174,11 @@ Kirigami.FormLayout {
             var sys = page.localeMeasurement === Locale.ImperialUSSystem ? "inHg" : "hPa";
             return [{ text: page.followSystem(opts, sys), value: "auto" }].concat(opts);
         }
-        Component.onCompleted: {
+        function sync() {
             for (var i = 0; i < model.length; ++i)
                 if (model[i].value === page.cfg_pressureUnit) { currentIndex = i; break; }
         }
+        Component.onCompleted: sync()
         onActivated: page.cfg_pressureUnit = model[currentIndex].value
     }
     ConfigComboBox {
@@ -156,11 +194,37 @@ Kirigami.FormLayout {
             { text: i18n("24-hour time"),          value: 2 }
         ]
         // never chosen: what main.qml derives from the older checkbox
-        Component.onCompleted: {
+        function sync() {
             var m = page.cfg_clockFormat >= 0 ? page.cfg_clockFormat : (page.cfg_use24Hour ? 0 : 1);
             for (var i = 0; i < model.length; ++i)
                 if (model[i].value === m) { currentIndex = i; break; }
         }
+        Component.onCompleted: sync()
         onActivated: page.cfg_clockFormat = model[currentIndex].value
+    }
+
+    Item { Kirigami.FormData.isSection: true }
+    Button {
+        text: i18n("Reset All Settings…")
+        icon.name: "edit-reset"
+        onClicked: resetPrompt.open()
+    }
+    Kirigami.PromptDialog {
+        id: resetPrompt
+        title: i18n("Reset all settings?")
+        subtitle: i18n("Every setting of this widget goes back to its default. Your location and saved locations are kept.")
+        standardButtons: Kirigami.Dialog.NoButton
+        customFooterActions: [
+            Kirigami.Action {
+                text: i18n("Reset")
+                icon.name: "edit-reset"
+                onTriggered: { page.resetAllSettings(); resetPrompt.close(); }
+            },
+            Kirigami.Action {
+                text: i18n("Cancel")
+                icon.name: "dialog-cancel"
+                onTriggered: resetPrompt.close()
+            }
+        ]
     }
 }

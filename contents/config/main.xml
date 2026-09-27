@@ -146,6 +146,11 @@
     <entry name="showDayDate" type="Bool">
       <default>true</default>
     </entry>
+    <!-- card-layout day tabs: pixel size of the day name; the date under it follows
+         at 5/6 of it (16 → 13, the theme's 12 pt / 10 pt pair these replaced) -->
+    <entry name="dailyNameFontSize" type="Int">
+      <default>16</default>
+    </entry>
     <!-- card-layout day tabs: pixel size of the "low | high" temperatures -->
     <entry name="dailyTempFontSize" type="Int">
       <default>16</default>
@@ -282,6 +287,10 @@
     <entry name="simpleGraphTempFontSize" type="Int">
       <default>16</default>
     </entry>
+    <!-- Simple-layout day buttons (the "Thu Fri Sat" pills in the header): pixel size -->
+    <entry name="dayPillFontSize" type="Int">
+      <default>16</default>
+    </entry>
     <!-- Simple-layout graph new-day marker label font (the "Fri, 18/09" at midnight) -->
     <entry name="simpleDayMarkerFontSize" type="Int">
       <default>14</default>
@@ -332,7 +341,14 @@
     <entry name="panelColorIcon" type="Bool">
       <default>true</default>
     </entry>
-    <!-- show condition text + H/L below the temperature instead of just the temperature -->
+    <!-- What the panel shows: 0 the weather icon and temperature, 1 the icon alone,
+         2 the temperature alone, 3 the detailed view (icon, temperature, condition and
+         a second reading). -1 = never chosen: derived from panelDetailed below, the
+         older checkbox, so an upgrade keeps what was set. -->
+    <entry name="panelDisplay" type="Int">
+      <default>-1</default>
+    </entry>
+    <!-- older "Detailed View" checkbox, now only read to derive panelDisplay -->
     <entry name="panelDetailed" type="Bool">
       <default>false</default>
     </entry>

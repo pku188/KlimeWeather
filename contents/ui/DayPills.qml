@@ -70,7 +70,8 @@ Row {
                 anchors.centerIn: parent
                 text: pills.weatherRoot ? pills.weatherRoot.dayName(pill.index, true) : ""
                 font.bold: pill.selected
-                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize + 2
+                font.pixelSize: pills.weatherRoot ? pills.weatherRoot.dayPillFontSize
+                                                  : Kirigami.Theme.defaultFont.pixelSize + 2
             }
         }
     }

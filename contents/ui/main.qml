@@ -94,6 +94,8 @@ PlasmoidItem {
     readonly property int    tempFontSize:   Plasmoid.configuration.tempFontSize   || 88
     readonly property int    dailyIconSize:  Plasmoid.configuration.dailyIconSize  || 36
     readonly property int    dailyTempFontSize: Plasmoid.configuration.dailyTempFontSize || 15
+    // card-layout day tab name; its date follows at 5/6 (see FullView)
+    readonly property int    dailyNameFontSize: Plasmoid.configuration.dailyNameFontSize || 16
     // Pixel size of the wind-direction arrow, wherever it is drawn (hourly cards and
     // both headers' Wind element). Its own setting because the glyph reads much smaller
     // than text at the same size — the arrow sits inside a circle that eats most of it.
@@ -153,7 +155,17 @@ PlasmoidItem {
     readonly property int    panelIconPercent:   Plasmoid.configuration.panelIconPercent   || 130
     readonly property int    panelFontPercent:   Plasmoid.configuration.panelFontPercent   || 48
     readonly property bool   panelColorIcon:     Plasmoid.configuration.panelColorIcon === true
-    readonly property bool   panelDetailed:      Plasmoid.configuration.panelDetailed === true
+    // What the panel shows (Appearance → Panel → Panel display): 0 the weather icon
+    // and temperature, 1 the icon alone, 2 the temperature alone, 3 the detailed view.
+    // Never chosen (-1): the older "Detailed View" checkbox decides.
+    readonly property int    panelDisplay: {
+        var m = Plasmoid.configuration.panelDisplay ?? -1;
+        if (m >= 0) return Math.min(3, m);
+        return Plasmoid.configuration.panelDetailed === true ? 3 : 0;
+    }
+    readonly property bool   panelDetailed:      panelDisplay === 3
+    readonly property bool   panelShowIcon:      panelDisplay !== 2
+    readonly property bool   panelShowTemp:      panelDisplay !== 1
     readonly property int    panelSecondLine:    Plasmoid.configuration.panelSecondLine ?? 0
     // Detailed-panel font sizes, % of panel height: the bold condition word and
     // the second line chosen by panelSecondLine.
@@ -329,6 +341,8 @@ PlasmoidItem {
     // decoupled from the Detailed cards' hourlyTempFontSize.
     readonly property int simpleGraphTempFontSize: Plasmoid.configuration.simpleGraphTempFontSize || 16
     readonly property int simpleDayMarkerFontSize: Plasmoid.configuration.simpleDayMarkerFontSize || 12
+    // graph layout's day buttons (DayPills)
+    readonly property int dayPillFontSize: Plasmoid.configuration.dayPillFontSize || 16
     readonly property var headerMetrics: [
         Plasmoid.configuration.headerMetric1 || "feelsLike",
         Plasmoid.configuration.headerMetric2 || "humidity",

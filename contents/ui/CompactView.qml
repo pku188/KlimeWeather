@@ -79,10 +79,11 @@ Item {
         // forecast yet every pack falls back to the theme's "weather-none-available"
         // name, which only the Kirigami.Icon can load. The coloured monochrome icon
         // goes through Kirigami.Icon as well, which draws it in the panel's text colour.
+        // "Panel display" set to the temperature alone hides both.
         Image {
             id: icon
             visible: weatherRoot && weatherRoot.hasLocation && !weatherRoot.iconPackIsTheme
-                     && weatherRoot.heroCode >= 0 && !compact.tintedIcon
+                     && weatherRoot.heroCode >= 0 && !compact.tintedIcon && weatherRoot.panelShowIcon
             anchors.verticalCenter: parent.verticalCenter
             height: Math.round(compact.height * compact.iconPercent / 100 * compact.panelIconScale())
             width: height
@@ -94,9 +95,12 @@ Item {
         }
         Kirigami.Icon {
             id: themeIcon
-            // theme renderer also carries the "mark-location" pin when unset
-            visible: weatherRoot && (!weatherRoot.hasLocation || weatherRoot.iconPackIsTheme
-                                     || weatherRoot.heroCode < 0 || compact.tintedIcon)
+            // theme renderer also carries the "mark-location" pin when unset — shown in
+            // every panel display, or a widget with no location would have nothing to click
+            visible: weatherRoot && (!weatherRoot.hasLocation
+                                     || (weatherRoot.panelShowIcon
+                                         && (weatherRoot.iconPackIsTheme || weatherRoot.heroCode < 0
+                                             || compact.tintedIcon)))
             anchors.verticalCenter: parent.verticalCenter
             height: Math.round(compact.height * compact.iconPercent / 100
                                * (compact.tintedIcon ? compact.panelIconScale() : 1))
@@ -109,7 +113,8 @@ Item {
         Text {
             id: temp
             anchors.verticalCenter: parent.verticalCenter
-            visible: weatherRoot && !weatherRoot.panelDetailed && text.length > 0 && weatherRoot.hasLocation
+            visible: weatherRoot && !weatherRoot.panelDetailed && weatherRoot.panelShowTemp
+                     && text.length > 0 && weatherRoot.hasLocation
             text: weatherRoot ? weatherRoot.temperatureText : "—"
             color: Kirigami.Theme.textColor
             font.pixelSize: Math.round(compact.height * compact.fontPercent / 100)
@@ -126,7 +131,8 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: weatherRoot ? weatherRoot.temperatureText : "—"
                 color: Kirigami.Theme.textColor
-                font.pixelSize: Math.round(compact.height * 0.68)
+                // 68 % of the panel at the default temperature font (48 %), scaled by it
+                font.pixelSize: Math.round(compact.height * 0.68 * compact.fontPercent / 48)
             }
             // Right stack: bold condition word always on top; the second line
             // switches between "low / high" and precip via the panelSecondLine setting.

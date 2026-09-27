@@ -564,7 +564,7 @@ Item {
                         Label {
                             Layout.alignment: Qt.AlignHCenter
                             text: weatherRoot ? weatherRoot.dayName(dayTab.index, true) : ""
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
+                            font.pixelSize: weatherRoot ? weatherRoot.dailyNameFontSize : 16
                             font.bold: dayTab.selected
                         }
                         // the date under the name, in the system's date format (no year)
@@ -573,7 +573,8 @@ Item {
                             Layout.topMargin: -Math.round(Kirigami.Units.smallSpacing / 2)
                             visible: weatherRoot ? weatherRoot.showDayDate : true
                             text: weatherRoot ? weatherRoot.dailyDate(dayTab.index) : ""
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize - 1
+                            // follows the day name, a step smaller
+                            font.pixelSize: Math.round((weatherRoot ? weatherRoot.dailyNameFontSize : 16) * 5 / 6)
                             font.bold: dayTab.index === 0   // today's date stands out; stays dimmed
                             opacity: 0.55
                         }
