@@ -378,6 +378,7 @@ Item {
         var target = Math.min(dayCardX(dayIdx),
                               Math.max(0, hourlyFlick.contentWidth - hourlyFlick.width));
         scrollAnim.stop();
+        scrollAnim.duration = scrollAnim.quickMs;
         scrollAnim.from = hourlyFlick.contentX;
         scrollAnim.to = target;
         scrollAnim.start();
@@ -409,14 +410,24 @@ Item {
         return Math.max(0, Math.min(maxX, best));
     }
 
-    ColumnLayout {
+    // One column. A grid layout rather than a column, so the day tabs and the hourly
+    // strip can trade places (Layout.row): weatherRoot.hourlyCardsFirst puts the
+    // strip on top, right under the header.
+    GridLayout {
         id: content
+        columns: 1
+        rowSpacing: Kirigami.Units.smallSpacing
+        columnSpacing: 0
         anchors.fill: parent
         anchors.leftMargin: full.pad
         anchors.rightMargin: full.pad
         anchors.bottomMargin: full.pad
         anchors.topMargin: Math.round(full.pad * 0.4)
-        spacing: Kirigami.Units.smallSpacing
+        readonly property bool cardsFirst: full.weatherRoot ? full.weatherRoot.hourlyCardsFirst : false
+        // the air under the header, and the wider gap between the tabs and the strip,
+        // whichever comes first
+        readonly property int underHeader: Kirigami.Units.smallSpacing
+        readonly property int betweenRows: Math.round(Kirigami.Units.largeSpacing * 1.6)
 
         // ── Header ────────────────────────────────────────────────────────
         // Placed from the shared header geometry in WeatherToolbar (view coordinates,
@@ -424,6 +435,7 @@ Item {
         // graph layout.
         RowLayout {
             id: headerRow
+            Layout.row: 0
             Layout.fillWidth: true
             // Pinned to the top of its cell. A popup taller than the content gets the
             // spare height spread between the rows (which gives the rows below their
@@ -474,6 +486,8 @@ Item {
                 // The location line is above the Weather Elements, so it may run over
                 // them; it only has to stay clear of the temperature.
                 leftBound: content.x + headerRow.x + heroRow.x + heroRow.heroTempWidth + Kirigami.Units.largeSpacing * 2
+                // the source row sits beside the Weather Elements: it stays clear of them
+                sourceLeftBound: content.x + headerRow.x + heroRow.x + heroRow.width + Kirigami.Units.largeSpacing
                 locationFontSize: weatherRoot ? weatherRoot.locationFontSize : 26
                 providerFontSize: weatherRoot ? weatherRoot.providerFontSize : 16
                 pillCount: weatherRoot ? weatherRoot.graphDays : 0
@@ -487,8 +501,9 @@ Item {
         // RowLayout — a RowLayout manages every child item, so a highlight
         // inside it would be grabbed as a layout cell and lose its x/width
         Item {
+            Layout.row: content.cardsFirst ? 2 : 1
             Layout.fillWidth: true
-            Layout.topMargin: Kirigami.Units.smallSpacing
+            Layout.topMargin: content.cardsFirst ? content.betweenRows : content.underHeader
             implicitHeight: dayTabsRow.implicitHeight
 
             // single selection highlight that SLIDES between tabs (drawn under
@@ -607,9 +622,10 @@ Item {
         // ── Continuous hourly timeline (scroll + drag) ────────────────────
         Flickable {
             id: hourlyFlick
+            Layout.row: content.cardsFirst ? 1 : 2
             Layout.fillWidth: true
             Layout.preferredHeight: full.hourCardH + Kirigami.Units.smallSpacing * 2
-            Layout.topMargin: Math.round(Kirigami.Units.largeSpacing * 1.6)   // gap between tabs and hourly
+            Layout.topMargin: content.cardsFirst ? content.underHeader : content.betweenRows
             Layout.leftMargin: Kirigami.Units.largeSpacing                     // inset from the day tabs
             Layout.rightMargin: Kirigami.Units.largeSpacing
             contentWidth: hourlyRow.width
@@ -642,6 +658,7 @@ Item {
                 var t = full.nearestCardX(contentX);
                 if (Math.abs(t - contentX) > 1) {
                     scrollAnim.stop();
+                    scrollAnim.duration = scrollAnim.quickMs;
                     scrollAnim.from = contentX;
                     scrollAnim.to = t;
                     scrollAnim.start();
@@ -667,10 +684,12 @@ Item {
                     var maxX = Math.max(0, hourlyFlick.contentWidth - hourlyFlick.width);
                     var ad = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x;
                     var pd = wheel.pixelDelta.y !== 0 ? wheel.pixelDelta.y : wheel.pixelDelta.x;
-                    // touchpad pixel deltas stay continuous (clamped) to keep scroll smooth
-                    if (pd !== 0) {
+                    // touchpad pixel deltas stay continuous (clamped) to keep scroll smooth;
+                    // a wheel notch steps whole cards even if it carries a pixel delta
+                    if (pd !== 0 && Wheel.isGesture(wheel)) {
                         full.chosenDay = -1;
                         scrollAnim.stop();
+                        scrollAnim.duration = scrollAnim.quickMs;
                         scrollAnim.from = hourlyFlick.contentX;
                         scrollAnim.to = Math.max(0, Math.min(maxX, hourlyFlick.contentX - pd));
                         scrollAnim.start();
@@ -686,17 +705,24 @@ Item {
                     if (Math.abs(targetX - base) < 0.5) return;
                     full.chosenDay = -1;
                     scrollAnim.stop();
+                    // the notch's glide is the user's (Appearance → Cards → Scroll animation)
+                    scrollAnim.duration = weatherRoot ? weatherRoot.cardSlideMs : scrollAnim.quickMs;
                     scrollAnim.from = hourlyFlick.contentX;
                     scrollAnim.to = targetX;
                     scrollAnim.start();
                 }
             }
 
+            // Every move of the strip runs through this one animation; each start sets
+            // its length. A wheel notch takes the user's cardSlideMs. Tab clicks, touchpad
+            // scrolling and the snap after a drag keep quickMs: a touchpad has to track the
+            // fingers, and a long glide there only lags behind them.
             NumberAnimation {
                 id: scrollAnim
+                readonly property int quickMs: 140
                 target: hourlyFlick
                 property: "contentX"
-                duration: 140
+                duration: quickMs
                 easing.type: Easing.OutCubic
                 onFinished: full.pendingDay = -1   // chain closed; resume from selectedDay
             }

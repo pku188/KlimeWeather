@@ -81,13 +81,14 @@ PlasmoidItem {
         ? (localeMeasurement === Locale.ImperialUSSystem ? "fahrenheit" : "celsius")
         : temperatureUnitSetting
     readonly property int    dailyDays:      Plasmoid.configuration.dailyDays      || 5
-    // Days the graph spans, today included: 3 by default, up to 5 (Appearance →
-    // Graph). Three is what BOTH providers can draw at hourly resolution — met.no's
-    // hourly data runs out around hour 54 and only 6-hour blocks follow, so its later
-    // days are stretched blocks (which read acceptably once identical readouts merge,
-    // see SimpleView's readoutPlan). Open-Meteo stays hourly the whole way. The CARD
-    // layout keeps its own day count (dailyDays); it renders blocks as blocks.
-    readonly property int    graphDays: Math.max(3, Math.min(5, Plasmoid.configuration.simpleDailyDays || 3))
+    // Days the graph spans, today included: 3 to 7 (Appearance → Graph). Three is
+    // what BOTH providers can draw at hourly resolution — met.no's hourly data runs out
+    // around hour 54 and only 6-hour blocks follow, so its later days are stretched
+    // blocks (a smooth curve through them, see grid.js, and readable once identical
+    // readouts merge, see SimpleView's readoutPlan). Open-Meteo stays hourly the whole
+    // way. The CARD layout keeps its own day count (dailyDays); it renders blocks as
+    // blocks.
+    readonly property int    graphDays: Math.max(3, Math.min(7, Plasmoid.configuration.simpleDailyDays || 3))
     readonly property int    graphZoom:       Math.max(0, Math.min(2, Plasmoid.configuration.graphZoom ?? 1))
     readonly property int    refreshMinutes: Plasmoid.configuration.refreshInterval || 15
     readonly property int    heroIconSize:   Plasmoid.configuration.heroIconSize   || 88
@@ -101,6 +102,8 @@ PlasmoidItem {
     // than text at the same size — the arrow sits inside a circle that eats most of it.
     readonly property int    windArrowSize:     Plasmoid.configuration.windArrowSize || 21
     readonly property bool   showDayDate:       Plasmoid.configuration.showDayDate ?? true
+    // card layout: the hourly cards above the day tabs (Appearance → Cards)
+    readonly property bool   hourlyCardsFirst:  Plasmoid.configuration.hourlyCardsFirst === true
     readonly property int    hourlyIconSize:     Plasmoid.configuration.hourlyIconSize     || 38
     readonly property int    hourlyInfoFontSize: Plasmoid.configuration.hourlyInfoFontSize || 11
     // Detailed hourly-card element font (time + per-hour readouts/glyphs); SimpleView
@@ -112,6 +115,8 @@ PlasmoidItem {
     readonly property int    detailDayStartHour:  Plasmoid.configuration.detailDayStartHour
     readonly property int    cardDealDurationPercent: Plasmoid.configuration.cardDealDurationPercent ?? 60
     readonly property int    cardsPerScroll:      Math.max(1, Plasmoid.configuration.cardsPerScroll || 1)
+    // how long one wheel notch takes to slide the card strip (Appearance → Cards)
+    readonly property int    cardSlideMs:         Math.max(0, Plasmoid.configuration.cardSlideMs ?? 150)
     readonly property int    graphScrollHoursDay:    Math.max(1, Plasmoid.configuration.graphScrollHoursDay    || 6)
     readonly property int    graphScrollHoursDetail: Math.max(1, Plasmoid.configuration.graphScrollHoursDetail || 3)
     readonly property int    graphScrollHoursWide:   Math.max(1, Plasmoid.configuration.graphScrollHoursWide   || 12)
@@ -1035,7 +1040,9 @@ PlasmoidItem {
         var ctx = {
             lat: coarseCoord(lat),
             lon: coarseCoord(lon),
-            forecastDays: 7,
+            // a week, and the day after it: the graph's last day closes on that day's
+            // first hour (see grid.js), or its final window comes up an hour short
+            forecastDays: 8,
             // Providers that report their own offset ignore this; the ones that
             // can't (met.no) render everything in the location's clock with it.
             utcOffsetSeconds: resolvedOffsetSeconds
@@ -1450,11 +1457,16 @@ PlasmoidItem {
     // stands in, linearly: 2.5 mm or more is full intensity, 1.25 mm is half.
     // Amount and chance are different quantities — this is purely so a location
     // without a chance still shows its rain, not a claim that one implies the other.
+    // An hour the graph stretched out of a 6-hour block carries a smooth shape for the
+    // curve (precipCurve / precipAmtCurve, see grid.js); the wash follows that, while
+    // the printed readouts keep the block's own figures.
     function precipWashPct(s) {
         if (!s) return 0;
-        if (!isNaN(s.precip)) return s.precip;
-        if (!isNaN(s.precipAmt))
-            return Math.min(100, Math.max(0, s.precipAmt) / precipWashFullMm * 100);
+        if (!isNaN(s.precip))
+            return (s.precipCurve !== undefined && !isNaN(s.precipCurve)) ? s.precipCurve : s.precip;
+        var amt = (s.precipAmtCurve !== undefined && !isNaN(s.precipAmtCurve)) ? s.precipAmtCurve : s.precipAmt;
+        if (!isNaN(amt))
+            return Math.min(100, Math.max(0, amt) / precipWashFullMm * 100);
         return 0;
     }
     // Real precipitation — at least rainAmountThreshold (0.1 mm), the same line the

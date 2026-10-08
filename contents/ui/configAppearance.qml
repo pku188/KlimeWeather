@@ -30,6 +30,7 @@ Item {
     property alias cfg_dailyTempFontSize:  dailyTempSpin.value
     property alias cfg_windArrowSize:      windArrowSpin.value
     property alias cfg_showDayDate:        dayDateCheck.checked
+    property alias cfg_hourlyCardsFirst:   hourlyFirstCheck.checked
     property alias cfg_hourlyIconSize:     hourlySpin.value
     property alias cfg_hourlyTempFontSize: hourlyTempSpin.value
     property alias cfg_hourlyCardFontSize: hourlyCardSpin.value
@@ -47,6 +48,7 @@ Item {
     property alias  cfg_headerInfoFontSize: elementsFontSpin.value
     property int    cfg_headerInfoFontWeight
     property alias  cfg_cardsPerScroll:     cardScrollSpin.value
+    property alias  cfg_cardSlideMs:        cardSlideSpin.value
     property alias  cfg_cardDealDurationPercent: cardDealSpin.value
     // Simple layout (forecast days moved here from General). The graph zoom has no
     // entry here: it is toggled from the graph's own toolbar, and declaring it would let
@@ -311,6 +313,18 @@ Item {
                             to: 12
                         }
                         ConfigSpinBox {
+                            id: cardSlideSpin
+                            Kirigami.FormData.label: i18n("Scroll animation:")
+                            from: 0
+                            to: 2000
+                            stepSize: 50
+                            // the unit lives on the value, as with the graph's scroll animation
+                            textFromValue: (value, locale) => i18n("%1 ms", value)
+                            valueFromText: (text, locale) => parseInt(text.replace(/[^0-9]/g, "") || "0", 10)
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("How long the cards take to glide to their new place after one scroll notch. More cards per scroll covers more ground, so it wants a longer glide to feel the same. 0 jumps straight there.")
+                        }
+                        ConfigSpinBox {
                             id: dailyNameSpin
                             Kirigami.FormData.label: i18n("Daily tab name font:")
                             from: 8
@@ -404,6 +418,11 @@ Item {
                             id: dayDateCheck
                             Kirigami.FormData.label: i18n("Day tabs:")
                             text: i18n("Show the date under each day")
+                        }
+                        CheckBox {
+                            id: hourlyFirstCheck
+                            Kirigami.FormData.label: i18n("Hourly cards:")
+                            text: i18n("Show above the day tabs")
                         }
 
                     }
@@ -567,10 +586,10 @@ Item {
                     ConfigSpinBox {
                         id: graphDaysSpin
                         Kirigami.FormData.label: i18n("Forecast days:")
-                        // the day pills and the graph grow to the left; the location
-                        // above them follows the first pill (see HeaderRightBlock)
+                        // the day pills grow to the left, on their own row under the
+                        // source button (see HeaderRightBlock)
                         from: 3
-                        to: 5
+                        to: 7
                     }
                     ConfigSpinBox {
                         id: graphScrollDetailSpin

@@ -79,8 +79,8 @@
       <default>5</default>
     </entry>
     <!-- Days the graph layout spans, today included (independent of dailyDays).
-         3 to 5: three is what both providers can draw as a real hourly curve; past
-         that, MET Norway's days are built from stretched 6-hour blocks. -->
+         3 to 7: three is what both providers can draw as a real hourly curve; past
+         56 hours, MET Norway's days are built from stretched 6-hour blocks. -->
     <entry name="simpleDailyDays" type="Int">
       <default>4</default>
     </entry>
@@ -141,6 +141,10 @@
     </entry>
     <entry name="dailyIconSize" type="Int">
       <default>46</default>
+    </entry>
+    <!-- card layout: the strip of hourly cards above the day tabs instead of below -->
+    <entry name="hourlyCardsFirst" type="Bool">
+      <default>false</default>
     </entry>
     <!-- card-layout day tabs: show the date (day and month) under each day name -->
     <entry name="showDayDate" type="Bool">
@@ -204,6 +208,13 @@
     <!-- How many hour cards one mouse-wheel notch moves the card strip. -->
     <entry name="cardsPerScroll" type="Int">
       <default>3</default>
+    </entry>
+    <!-- How long one mouse-wheel notch takes to slide the card strip, in
+         milliseconds — the card layout's twin of graphSlideMs* below. Only notches:
+         day-tab clicks, touchpad scrolling and the snap after a drag keep their own
+         quick glide. 0 = jump straight there. -->
+    <entry name="cardSlideMs" type="Int">
+      <default>350</default>
     </entry>
     <!-- How many hours one mouse-wheel notch moves the graph, per zoom level.
          Defaults are a quarter of each zoom's visible window. -->
