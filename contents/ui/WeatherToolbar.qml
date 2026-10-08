@@ -40,8 +40,12 @@ Item {
     readonly property int conditionPull: -Math.round(Kirigami.Units.gridUnit * 0.5) + 4
     // Vertical centre of the corner buttons' glyphs; the location sits on this line.
     readonly property real buttonCenterY: row.y + row.height / 2
-    // Left edge of the corner buttons; the location keeps clear of it.
+    // Left edge of the corner buttons.
     readonly property real buttonsLeft: row.x
+    // Left edge the row has with all four buttons — the graph layout's zoom-in button —
+    // whether or not the zoom buttons are shown. The location lines up with it in both
+    // layouts, so it keeps its spot when the layout switches.
+    readonly property real fullButtonsLeft: row.x + row.width - 4 * refreshButton.width - 3 * row.spacing
     // Space between the location line / corner buttons and the source button and day
     // pills below them.
     readonly property int sourceRowGap: Math.round(Kirigami.Units.gridUnit * 0.15) + 6
@@ -104,6 +108,7 @@ Item {
             ToolTip.text: bar.switchTooltip
         }
         ToolbarButton {
+            id: refreshButton
             iconName: "refresh"
             enabled: bar.root && !bar.root.loading
             onClicked: if (bar.root) bar.root.fetchWeather()

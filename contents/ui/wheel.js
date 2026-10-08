@@ -24,6 +24,21 @@
  * property. Pass it by id: inside an arrow-function signal handler `this` binds
  * lexically and is NOT the handler.
  */
+/*
+ * A touchpad gesture, as opposed to a wheel notch? A touchpad's scroll comes in
+ * phases (begin / update / end); a mouse wheel's has none. The pixel delta alone does
+ * not tell them apart: a wheel notch can carry one as well, and taking such a notch
+ * for a touchpad moved the strip by a few pixels, whatever "cards per scroll" said.
+ * (Touchpads that report no phase — X11 — come with no pixel delta either, and add up
+ * their angle deltas into notches as before.)
+ */
+function isGesture(event) {
+    // a Qt that reports no phase at all: keep the old rule (a pixel delta, checked
+    // by the caller, means a touchpad)
+    if (event.phase === undefined) return true;
+    return event.phase !== Qt.NoScrollPhase;
+}
+
 function step(handler, angleDelta) {
     if (angleDelta === 0) return 0;
     handler.acc += angleDelta;

@@ -23,6 +23,8 @@ AbstractButton {
     readonly property int logoHeight: Math.round(fontSize * 1.5)
     implicitHeight: Math.max(Math.round(Kirigami.Units.gridUnit * 1.7), logoHeight + 4)
     implicitWidth: row.implicitWidth + sidePad * 2
+    // the narrowest it goes: the logo alone, its name elided away
+    readonly property real logoOnlyWidth: Math.round(logoHeight * (source ? source.logoAspect : 1)) + sidePad * 2
     hoverEnabled: true
 
     background: Rectangle {

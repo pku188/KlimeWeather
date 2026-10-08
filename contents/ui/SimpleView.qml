@@ -785,7 +785,12 @@ Item {
     // plotH grows with topReserve so the temp curve keeps the same pixel
     // amplitude (range = 0.68·plotH − topReserve) — the extra room is purely
     // headroom for the new-day marker above a peak, the curve is not flattened.
+    // When the day pills need a row of their own under the header (pillsUnderHeader),
+    // the plot gives that row's height back, so the popup keeps its size and its last
+    // row — the hours — isn't pushed out of view.
     readonly property real plotH:      Kirigami.Units.gridUnit * 14.0
+                                       - (pillsUnderHeader ? underHeaderPills.implicitHeight
+                                                             + underHeaderPills.Layout.topMargin : 0)
     readonly property real topReserve: Kirigami.Units.gridUnit * 4.1   // room for temp labels + the new-day marker above the peak
     readonly property real precipBandH: plotH * 0.13                   // bottom margin the temp curve keeps clear (smaller → taller, more dramatic temp curve)
     readonly property real precipMaxFrac: 0.70                         // precip fill rises to this fraction of plotH at 100% chance — high chances overlap the temp curve, low ones stay a sliver near the floor
@@ -1262,6 +1267,13 @@ Item {
     // behind a hidden popup, so an animated icon gated on `visible` alone keeps
     // decoding frames for a window nobody can see.
     readonly property bool onScreen: Window.visibility !== Window.Hidden
+    // The room beside the Weather Elements (the header row past the hero, which holds
+    // a steady width) is too narrow for the day pills: they move under the header.
+    // Measured against the hero, not the right-hand block, so where the pills are
+    // shown never changes the answer.
+    readonly property bool pillsUnderHeader:
+        rightBlock.pillsWidth > headerRow.width - (heroRow.x + heroRow.width)
+                                - headerRow.spacing * 2 - rightBlock.Layout.rightMargin
     // kept warm across layout switches now, so replay the curve reveal when the
     // view is shown again rather than relying on recreation
     onVisibleChanged: if (visible) entranceReveal()
@@ -1487,17 +1499,21 @@ Item {
             // Location, day pills and weather source — shared with the card layout, so
             // they hold the same spots in both (see HeaderRightBlock).
             HeaderRightBlock {
+                id: rightBlock
                 Layout.alignment: Qt.AlignTop
                 Layout.fillWidth: true
                 Layout.maximumWidth: implicitWidth
                 Layout.topMargin: toolbar.buttonCenterY - simple.headerY - capCenter
                 Layout.rightMargin: toolbar.rightInset - simple.pad
+                pillsInBlock: !simple.pillsUnderHeader
                 weatherRoot: simple.weatherRoot
                 toolbar: toolbar
                 originX: content.x + headerRow.x
                 // The location line is above the Weather Elements, so it may run over
                 // them; it only has to stay clear of the temperature.
                 leftBound: content.x + headerRow.x + heroRow.x + heroRow.heroTempWidth + Kirigami.Units.largeSpacing * 2
+                // the source row sits beside the Weather Elements: it stays clear of them
+                sourceLeftBound: content.x + headerRow.x + heroRow.x + heroRow.width + Kirigami.Units.largeSpacing
                 locationFontSize: weatherRoot ? weatherRoot.locationFontSize : 26
                 providerFontSize: weatherRoot ? weatherRoot.providerFontSize : 16
                 pillCount: weatherRoot ? weatherRoot.graphDays : 0
@@ -1505,6 +1521,22 @@ Item {
                 onDayClicked: (index) => simple.goToDay(index)
                 onDayStepped: (delta) => simple.stepDay(delta)
             }
+        }
+
+        // The day pills, when the header has no room for them under the source button:
+        // seven days in a narrow popup are longer than the space beside the Weather
+        // Elements. A row of their own then, still right-aligned under the source.
+        DayPills {
+            id: underHeaderPills
+            visible: simple.pillsUnderHeader
+            Layout.alignment: Qt.AlignRight
+            Layout.topMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: rightBlock.Layout.rightMargin - rightBlock.pillsOverhang
+            weatherRoot: simple.weatherRoot
+            count: weatherRoot ? weatherRoot.graphDays : 0
+            selectedDay: simple.selectedDay
+            onDayClicked: (index) => simple.goToDay(index)
+            onDayStepped: (delta) => simple.stepDay(delta)
         }
 
         // ── Graph: morphing curve + sliding icon/time filmstrip ────────────
@@ -1533,7 +1565,9 @@ Item {
                     wheel.accepted = true;
                     var pd = wheel.pixelDelta.x !== 0 ? wheel.pixelDelta.x
                            : wheel.pixelDelta.y !== 0 ? wheel.pixelDelta.y : 0;
-                    if (pd !== 0) {
+                    // a touchpad gesture slides 1:1; a wheel notch steps, even if it
+                    // carries a pixel delta (see Wheel.isGesture)
+                    if (pd !== 0 && Wheel.isGesture(wheel)) {
                         // touchpad: 1:1 pixels, position follows the gesture (slides);
                         // continuous, so it can't morph (same as a slow finger-drag)
                         simple.cancelDayMorph();
