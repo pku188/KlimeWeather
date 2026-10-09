@@ -13,9 +13,10 @@ ToolButton {
     id: pin
     property var root: null   // weatherRoot reference
     readonly property bool active: root ? root.keepOpen : false
+    // the glyph's size, the toolbar buttons' (their glyphs are drawn on a 24 px grid)
+    property int size: 24
 
-    // the glyphs are drawn on a 24 px grid; showing them at that size keeps them crisp
-    width: 24; height: 24
+    width: size; height: size
     padding: 0
     flat: true
     // No hover/pressed plate: the glyph swap is the feedback, as on the title bar.

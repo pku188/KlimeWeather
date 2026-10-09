@@ -2,7 +2,7 @@
  * The weather source, shown in the header as the provider's logo mark and name, and
  * switched by clicking it. It always shows the source in use, never the one a click
  * would switch to (that is what the tooltip says). Shaped like the graph layout's day
- * pills, which it sits beside there, so it reads as part of the same set.
+ * pills, so it reads as part of the same header.
  * Copyright 2026  pku188 — SPDX-License-Identifier: GPL-2.0-or-later
  */
 import QtQuick
@@ -25,6 +25,10 @@ AbstractButton {
     implicitWidth: row.implicitWidth + sidePad * 2
     // the narrowest it goes: the logo alone, its name elided away
     readonly property real logoOnlyWidth: Math.round(logoHeight * (source ? source.logoAspect : 1)) + sidePad * 2
+    // Middle of the name's capitals from the button's top, so the header can centre the
+    // button on the location's line (see HeaderRightBlock).
+    readonly property real capCenter: topPadding + row.y + nameLabel.y + nameLabel.baselineOffset
+                                      + capMetrics.tightBoundingRect.y + capMetrics.tightBoundingRect.height / 2
     hoverEnabled: true
 
     background: Rectangle {
@@ -49,6 +53,7 @@ AbstractButton {
                 roundToIconSize: false
             }
             Label {
+                id: nameLabel
                 // elides if a narrow popup squeezes the button (the logo stays whole)
                 Layout.fillWidth: true
                 elide: Text.ElideRight
@@ -57,6 +62,8 @@ AbstractButton {
             }
         }
     }
+
+    TextMetrics { id: capMetrics; font: nameLabel.font; text: "H" }
 
     onClicked: if (root) root.toggleProvider()
     Accessible.name: btn.source ? btn.source.displayName : ""

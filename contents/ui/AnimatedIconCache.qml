@@ -15,7 +15,12 @@ import QtQuick
 
 Item {
     id: cache
-    visible: false   // its icons are only ever drawn through their textures
+    // Visible, though nothing of it shows: each icon is drawn only through its
+    // texture (ConditionIconShared hides it with hideSource). It must not be
+    // hidden with visible: false — in a Plasma panel popup (Qt 6.12) an animation
+    // inside an invisible item no longer makes the window draw a new frame, so the
+    // icons froze a moment after the popup opened and moved only while something
+    // else (a hover) redrew the popup.
 
     property var _entries: ({})
 

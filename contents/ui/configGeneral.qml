@@ -21,11 +21,13 @@ Kirigami.FormLayout {
     property int    cfg_minAlertSeverity
     property string cfg_windUnit
     property string cfg_pressureUnit
+    property string cfg_precipUnit
     property int    cfg_clockFormat
     property bool   cfg_use24Hour             // the older checkbox, read only while clockFormat was never chosen
 
     // What "Follow system" resolves to, shown in its brackets. The same rules as
-    // main.qml's units, windUnitApi, pressureUnitApi and use24Hour — keep them in step.
+    // main.qml's units, windUnitApi, pressureUnitApi, precipImperial and use24Hour —
+    // keep them in step.
     readonly property int  localeMeasurement: Qt.locale().measurementSystem
     readonly property bool localeUses12Hour:
         /[aA]/.test(Qt.locale().timeFormat(Locale.ShortFormat).replace(/'[^']*'/g, ""))
@@ -70,6 +72,7 @@ Kirigami.FormLayout {
         unitCombo.sync();
         windUnitCombo.sync();
         pressureUnitCombo.sync();
+        precipUnitCombo.sync();
         clockFormatCombo.sync();
     }
 
@@ -144,10 +147,11 @@ Kirigami.FormLayout {
         textRole: "text"
         model: {
             var opts = [
-                { text: i18n("Kilometers per hour (kmh)"), value: "kmh" },
+                { text: i18n("Kilometers per hour (km/h)"), value: "kmh" },
                 { text: i18n("Miles per hour (mph)"),       value: "mph" },
                 { text: i18n("Meters per second (m/s)"),    value: "ms"  },
-                { text: i18n("Knots (kn)"),                 value: "kn"  }
+                { text: i18n("Knots (kn)"),                 value: "kn"  },
+                { text: i18n("Beaufort scale (bft)"),       value: "bft" }
             ];
             // mph wherever the locale is imperial (the UK's too)
             var sys = page.localeMeasurement === Locale.MetricSystem ? "kmh" : "mph";
@@ -180,6 +184,28 @@ Kirigami.FormLayout {
         }
         Component.onCompleted: sync()
         onActivated: page.cfg_pressureUnit = model[currentIndex].value
+    }
+    ConfigComboBox {
+        id: precipUnitCombo
+        Kirigami.FormData.label: i18n("Precipitation unit:")
+        textRole: "text"
+        model: {
+            var opts = [
+                { text: i18n("Millimeters (mm)"), value: "mm" },
+                { text: i18n("Inches (in)"),      value: "in" }
+            ];
+            // inches where the locale is US imperial (the UK measures rain in mm)
+            var sys = page.localeMeasurement === Locale.ImperialUSSystem ? "in" : "mm";
+            return [{ text: page.followSystem(opts, sys), value: "auto" }].concat(opts);
+        }
+        function sync() {
+            for (var i = 0; i < model.length; ++i)
+                if (model[i].value === page.cfg_precipUnit) { currentIndex = i; break; }
+        }
+        Component.onCompleted: sync()
+        onActivated: page.cfg_precipUnit = model[currentIndex].value
+        ToolTip.visible: hovered
+        ToolTip.text: i18n("Snowfall follows it: centimeters with millimeters, inches with inches.")
     }
     ConfigComboBox {
         id: clockFormatCombo

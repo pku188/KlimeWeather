@@ -16,9 +16,10 @@ AbstractButton {
     // how faint the glyph gets while disabled (e.g. refresh during a fetch)
     property real disabledOpacity: 0.4
 
-    // The glyphs are drawn on a 24 px grid and shown at exactly that size to stay crisp;
-    // the padding leaves room for the hover plate around them.
-    readonly property int glyphSize: 24
+    // The glyphs are drawn on a 24 px grid, which is the default size (Appearance →
+    // Common → Toolbar icon size); the padding leaves room for the hover plate around
+    // them.
+    property int glyphSize: 24
     padding: 2
     width: glyphSize + padding * 2
     height: width

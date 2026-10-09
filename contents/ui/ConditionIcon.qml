@@ -117,12 +117,17 @@ Item {
     Component.onCompleted: _sync()
     Component.onDestruction: _release()
 
-    ShaderEffect {
+    // Built only while there is a shared icon to draw: a ShaderEffect left with no
+    // texture logs "Texture t1 is not assigned a valid texture provider" on every
+    // frame, and a static icon has no use for one.
+    Loader {
         anchors.centerIn: parent
         width: icon._px
         height: width
-        visible: icon._vectorShown
-        // no shaders given: the default ones draw `source`
-        property var source: icon._shared ? icon._shared.texture : null
+        active: icon._vectorShown
+        sourceComponent: ShaderEffect {
+            // no shaders given: the default ones draw `source`
+            property var source: icon._shared ? icon._shared.texture : null
+        }
     }
 }

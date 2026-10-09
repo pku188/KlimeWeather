@@ -205,6 +205,8 @@ Item {
         switchTooltip: i18n("Switch to graph layout")
         switchIcon: "view-graph"
         root: weatherRoot
+        // the location line is centred on the top buttons; see WeatherToolbar.topDrop
+        lineCap: rightBlock.capCenter
     }
 
     implicitWidth:  content.implicitWidth  + pad * 2
@@ -475,6 +477,7 @@ Item {
             // Location, day pills and weather source — shared with the graph layout, so
             // they hold the same spots in both (see HeaderRightBlock).
             HeaderRightBlock {
+                id: rightBlock
                 Layout.alignment: Qt.AlignTop
                 Layout.fillWidth: true
                 Layout.maximumWidth: implicitWidth
@@ -486,8 +489,6 @@ Item {
                 // The location line is above the Weather Elements, so it may run over
                 // them; it only has to stay clear of the temperature.
                 leftBound: content.x + headerRow.x + heroRow.x + heroRow.heroTempWidth + Kirigami.Units.largeSpacing * 2
-                // the source row sits beside the Weather Elements: it stays clear of them
-                sourceLeftBound: content.x + headerRow.x + heroRow.x + heroRow.width + Kirigami.Units.largeSpacing
                 locationFontSize: weatherRoot ? weatherRoot.locationFontSize : 26
                 providerFontSize: weatherRoot ? weatherRoot.providerFontSize : 16
                 pillCount: weatherRoot ? weatherRoot.graphDays : 0

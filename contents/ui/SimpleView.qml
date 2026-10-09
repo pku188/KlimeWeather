@@ -786,11 +786,14 @@ Item {
     // amplitude (range = 0.68·plotH − topReserve) — the extra room is purely
     // headroom for the new-day marker above a peak, the curve is not flattened.
     // When the day pills need a row of their own under the header (pillsUnderHeader),
-    // the plot gives that row's height back, so the popup keeps its size and its last
-    // row — the hours — isn't pushed out of view.
+    // or reach far enough below the hero to make the header taller (pillsBelowHero), or
+    // larger toolbar icons push the hero down (heroDrop), the plot gives that height
+    // back, so the popup keeps its size and its last row — the hours — isn't pushed
+    // out of view.
     readonly property real plotH:      Kirigami.Units.gridUnit * 14.0
                                        - (pillsUnderHeader ? underHeaderPills.implicitHeight
                                                              + underHeaderPills.Layout.topMargin : 0)
+                                       - pillsBelowHero - Math.max(0, toolbar.heroDrop)
     readonly property real topReserve: Kirigami.Units.gridUnit * 4.1   // room for temp labels + the new-day marker above the peak
     readonly property real precipBandH: plotH * 0.13                   // bottom margin the temp curve keeps clear (smaller → taller, more dramatic temp curve)
     readonly property real precipMaxFrac: 0.70                         // precip fill rises to this fraction of plotH at 100% chance — high chances overlap the temp curve, low ones stay a sliver near the floor
@@ -1268,12 +1271,15 @@ Item {
     // decoding frames for a window nobody can see.
     readonly property bool onScreen: Window.visibility !== Window.Hidden
     // The room beside the Weather Elements (the header row past the hero, which holds
-    // a steady width) is too narrow for the day pills: they move under the header.
-    // Measured against the hero, not the right-hand block, so where the pills are
-    // shown never changes the answer.
-    readonly property bool pillsUnderHeader:
-        rightBlock.pillsWidth > headerRow.width - (heroRow.x + heroRow.width)
-                                - headerRow.spacing * 2 - rightBlock.Layout.rightMargin
+    // a steady width) is too narrow for the day pills even on two rows: they move under
+    // the header. Counted at that room whether or not the pills are shown there, so
+    // where they are shown never changes the answer.
+    readonly property bool pillsUnderHeader: rightBlock.pillRows > 2
+    // How far wrapped day pills reach below the hero, which the header row then grows
+    // by. The plot gives it back, as it does for the row under the header.
+    readonly property real pillsBelowHero:
+        Math.max(0, rightBlock.Layout.topMargin + rightBlock.implicitHeight
+                    - heroRow.Layout.topMargin - heroRow.implicitHeight)
     // kept warm across layout switches now, so replay the curve reveal when the
     // view is shown again rather than relying on recreation
     onVisibleChanged: if (visible) entranceReveal()
@@ -1448,6 +1454,8 @@ Item {
         switchIcon: "view-cards"
         showZoom: true
         root: weatherRoot
+        // the location line is centred on the top buttons; see WeatherToolbar.topDrop
+        lineCap: rightBlock.capCenter
     }
 
     ColumnLayout {
@@ -1512,8 +1520,10 @@ Item {
                 // The location line is above the Weather Elements, so it may run over
                 // them; it only has to stay clear of the temperature.
                 leftBound: content.x + headerRow.x + heroRow.x + heroRow.heroTempWidth + Kirigami.Units.largeSpacing * 2
-                // the source row sits beside the Weather Elements: it stays clear of them
-                sourceLeftBound: content.x + headerRow.x + heroRow.x + heroRow.width + Kirigami.Units.largeSpacing
+                // the pills sit beside the Weather Elements: they stay clear of them, by
+                // the row's spacing and the spacer item's
+                pillsLeftBound: content.x + headerRow.x + heroRow.x + heroRow.width
+                                + headerRow.spacing * 2
                 locationFontSize: weatherRoot ? weatherRoot.locationFontSize : 26
                 providerFontSize: weatherRoot ? weatherRoot.providerFontSize : 16
                 pillCount: weatherRoot ? weatherRoot.graphDays : 0
@@ -1523,15 +1533,16 @@ Item {
             }
         }
 
-        // The day pills, when the header has no room for them under the source button:
-        // seven days in a narrow popup are longer than the space beside the Weather
-        // Elements. A row of their own then, still right-aligned under the source.
+        // The day pills, when the room beside the Weather Elements would take more than
+        // two rows of them (large day-button text in a narrow popup). A row of their
+        // own then, still right-aligned, and wrapping too if even that is too narrow.
         DayPills {
             id: underHeaderPills
             visible: simple.pillsUnderHeader
             Layout.alignment: Qt.AlignRight
             Layout.topMargin: Kirigami.Units.smallSpacing
             Layout.rightMargin: rightBlock.Layout.rightMargin - rightBlock.pillsOverhang
+            wrapWidth: content.width - Layout.rightMargin
             weatherRoot: simple.weatherRoot
             count: weatherRoot ? weatherRoot.graphDays : 0
             selectedDay: simple.selectedDay

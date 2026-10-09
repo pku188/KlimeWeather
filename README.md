@@ -67,7 +67,6 @@ renderer, which halves the CPU usage.
   the hours stays smooth instead of re-rasterising the full width every frame.
 - **Refreshes are conditional** — when the forecast has not changed, the server answers
   with a few bytes instead of the whole payload.
-- **Refresh after each hour updates cards in place**, instead of recreating the full set.
 
 
 ## Install

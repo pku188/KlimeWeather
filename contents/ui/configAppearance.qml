@@ -37,6 +37,7 @@ Item {
     property alias cfg_conditionFontSize:  condFontSpin.value
     property alias cfg_locationFontSize:   locFontSpin.value
     property alias cfg_providerFontSize:   providerFontSpin.value
+    property alias cfg_toolbarIconSize:    toolbarIconSpin.value
     property int   cfg_cardAnimation
     // the older per-part switches, read only while cardAnimation was never chosen
     property bool  cfg_animatedDailyIcons
@@ -255,6 +256,15 @@ Item {
                         stepSize: 1
                         ToolTip.visible: hovered
                         ToolTip.text: i18n("Sizes the MET Norway / Open-Meteo button; its logo scales with the text.")
+                    }
+                    ConfigSpinBox {
+                        id: toolbarIconSpin
+                        Kirigami.FormData.label: i18n("Toolbar icon size:")
+                        from: 16
+                        to: 40
+                        stepSize: 1
+                        ToolTip.visible: hovered
+                        ToolTip.text: i18n("Sizes the buttons in the popup's corners: keep open, zoom, layout switch and refresh.")
                     }
                     ConfigSpinBox {
                         id: elementsFontSpin

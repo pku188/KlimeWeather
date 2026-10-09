@@ -73,8 +73,7 @@ PlasmoidItem {
     // ImperialUKSystem. Every unit set to "Follow system locale" reads it directly,
     // each by that locale's own custom (see units, windUnitApi, pressureUnitApi).
     readonly property int localeMeasurement: Qt.locale().measurementSystem
-    // The temperature unit, and with it the imperial/metric choice for precipitation.
-    // "system": °F where the locale is US imperial. The UK's imperial system still
+    // The temperature unit. "system": °F where the locale is US imperial. The UK's imperial system still
     // gives its temperatures in °C, so it stays Celsius.
     readonly property string temperatureUnitSetting: Plasmoid.configuration.temperatureUnit || "system"
     readonly property string units: temperatureUnitSetting === "system"
@@ -128,6 +127,7 @@ PlasmoidItem {
     readonly property int    conditionFontSize:   Plasmoid.configuration.conditionFontSize   || 28
     readonly property int    locationFontSize:    Plasmoid.configuration.locationFontSize    || 28
     readonly property int    providerFontSize:    Plasmoid.configuration.providerFontSize    || 16
+    readonly property int    toolbarIconSize:     Plasmoid.configuration.toolbarIconSize     || 24
     readonly property bool   simpleLayout:         Plasmoid.configuration.simpleLayout         || false
     readonly property int    simpleHourlyIconSize: Plasmoid.configuration.simpleHourlyIconSize || 34
     // Which icons animate (Appearance → Cards / Graph → Animation). Card layout:
@@ -177,9 +177,16 @@ PlasmoidItem {
     readonly property int    panelConditionPercent:  Plasmoid.configuration.panelConditionPercent  || 40
     readonly property int    panelSecondLinePercent: Plasmoid.configuration.panelSecondLinePercent || 37
 
+    // Precipitation unit, and with it snowfall's (centimetres or inches). "auto" follows
+    // the system locale: inches where it is US imperial, millimetres elsewhere (the UK
+    // measures rain in millimetres too). "mm"/"in" pin it. (Until 2026-10 it followed
+    // the temperature unit.)
+    readonly property string precipUnit: Plasmoid.configuration.precipUnit || "auto"
+    readonly property bool   precipImperial: precipUnit === "in"
+        || (precipUnit === "auto" && localeMeasurement === Locale.ImperialUSSystem)
     // Wind speed unit. "auto" follows the system locale: mph wherever it is imperial —
     // the UK's too, which gives wind in mph though its temperatures are in °C — and
-    // kmh where it is metric. "kmh"/"mph"/"ms"/"kn" pin it instead. (Until 2026-09 "auto"
+    // kmh where it is metric. "kmh"/"mph"/"ms"/"kn"/"bft" pin it instead. (Until 2026-09 "auto"
     // followed the temperature unit, which left the UK on kmh.)
     // windUnitApi is the unit wind speeds are converted to (convertUnits);
     // windUnitLabel is what the UI prints.
@@ -188,7 +195,8 @@ PlasmoidItem {
                                         : (localeMeasurement === Locale.MetricSystem ? "kmh" : "mph")
     readonly property string windUnitLabel: (windUnitApi === "mph") ? "mph"
                                           : (windUnitApi === "ms")  ? "m/s"
-                                          : (windUnitApi === "kn")  ? "kn" : "kmh"
+                                          : (windUnitApi === "kn")  ? "kn"
+                                          : (windUnitApi === "bft") ? "bft" : "km/h"
     // Air pressure unit, the same shape as the wind one: "auto" follows the system
     // locale — inHg where it is US imperial, hPa elsewhere (the UK quotes hPa/millibars);
     // hPa, inHg or mmHg pin it.
@@ -477,7 +485,7 @@ PlasmoidItem {
         if (pressureUnitApi === "mmHg") return i18n("%1 mmHg", Math.round(hPa * 0.75006158));
         return i18n("%1 hPa", Math.round(hPa));
     }
-    // per-hour precipitation amount → "1.2 mm" / "0.05 in" (imperial follows °F).
+    // per-hour precipitation amount → "1.2 mm" / "0.05 in" (see precipUnit).
     // A real-but-sub-display amount (would round to "0.00 in" / "0.0 mm" at the normal
     // precision) is shown at EXTRA precision instead, so a trace reads as a real small
     // number (e.g. "0.004 in") rather than a meaningless zero. Only a TRUE zero
@@ -492,7 +500,7 @@ PlasmoidItem {
     function precipAmtStr(mm) {
         var q = precipAmtQ(mm);
         if (q <= 0) return "";                                   // rounds away → blank
-        if (units === "fahrenheit") {
+        if (precipImperial) {
             var inch = q / 25.4;
             return (inch >= 0.005 ? inch.toFixed(2)              // normal: 2 dp
                                   : inch.toFixed(3)) + " in";    // trace: 3 dp so it isn't "0.00 in"
@@ -507,7 +515,7 @@ PlasmoidItem {
     // 0.0005 in.
     function hasPrecipAmt(mm) {
         if (isNaN(mm) || mm <= 0) return false;
-        return (units === "fahrenheit") ? (mm / 25.4 >= 0.0005) : (mm >= 0.005);
+        return precipImperial ? (mm / 25.4 >= 0.0005) : (mm >= 0.005);
     }
     // The amount precipAmtStr will actually PRINT, rounded half-up to the step it
     // prints at — and clamped inside its own branch, so rounding can never promote a
@@ -518,7 +526,7 @@ PlasmoidItem {
     // hours.
     function precipAmtQ(mm) {
         if (isNaN(mm) || mm <= 0) return 0;
-        if (units === "fahrenheit") {
+        if (precipImperial) {
             var inch = mm / 25.4;
             return 25.4 * (inch >= 0.005 ? Math.round(inch * 100) / 100
                                          : Math.min(0.00499, Math.round(inch * 1000) / 1000));
@@ -526,13 +534,13 @@ PlasmoidItem {
         return mm >= 0.05 ? Math.round(mm * 10) / 10
                           : Math.min(0.0499, Math.round(mm * 100) / 100);
     }
-    // header precipitation amount (mm) → display string in the active unit; imperial
-    // (°F) → inches (2 dp), else mm (1 dp). `perHour` adds "/h" for a rate. Unlike
+    // header precipitation amount (mm) → display string in the active unit: inches
+    // (2 dp) or mm (1 dp), see precipUnit. `perHour` adds "/h" for a rate. Unlike
     // precipAmtStr (card readouts, which blank a 0), this keeps 0 visible so the
     // header reads "0 in" / "0 mm" rather than going empty.
     function precipUnitStr(mm, perHour) {
         if (isNaN(mm)) return "";
-        var imperial = (units === "fahrenheit");
+        var imperial = precipImperial;
         var v = imperial ? (mm / 25.4) : mm;
         var num = imperial ? v.toFixed(2) : ("" + (Math.round(v * 10) / 10));
         return num + (imperial ? " in" : " mm") + (perHour ? "/h" : "");
@@ -541,10 +549,10 @@ PlasmoidItem {
     // derived from water with a FIXED snow:liquid ratio while real ratios swing
     // 5:1–20:1 (see DEVELOPMENT), so a tenths digit is fake precision. Three
     // tiers: ~0 → "0", a real-but-tiny amount → "light", else round to the
-    // nearest half-unit. Imperial follows the °F unit (½-inch buckets: "½ in").
+    // nearest half-unit. Inches with the precipitation unit (½-inch buckets: "½ in").
     function snowfallStr(cm, blankZero) {
         if (isNaN(cm)) return "";
-        var imperial = (units === "fahrenheit");
+        var imperial = precipImperial;
         var unit = imperial ? " in" : " cm";
         // Below the "is it snowing" floor (0.1 cm — same gate SimpleView uses to
         // decide which columns get a snow label) there's effectively no snow. The
@@ -604,11 +612,11 @@ PlasmoidItem {
             // rule as the hourly cards, so header and cards never disagree (no "5G10" on a
             // card while the header hides it). Skips a redundant "5 G5" on calm hours.
             var gs = (hourSample && !isNaN(hourSample.gust)) ? hourSample.gust : windGust;
-            // Sustained wind with its unit, then the gust in brackets: "11.2 kmh (G24)".
+            // Sustained wind with its unit, then the gust in brackets: "11.2 km/h (G24)".
             // The gust is a peak, so it is rounded; keeping it outside the unit also
             // stops it reading as a second measurement of the same thing. Whether to
             // show it is still decided on rounded values, so a steady hour doesn't
-            // get a redundant "(G11)" after "11.2 kmh".
+            // get a redundant "(G11)" after "11.2 km/h".
             var windBody = (!isNaN(gs) && Math.round(gs) > Math.round(ws))
                 ? (windLabel(ws) + " (G" + Math.round(gs) + ")")
                 : windLabel(ws);
@@ -678,10 +686,10 @@ PlasmoidItem {
         return d.toLocaleTimeString(Qt.locale(), "h:mm AP").replace(/\s*AM/, "a").replace(/\s*PM/, "p");
     }
 
-    // Wind speed → "6.0 mph" / "12.3 kmh" / "3.4 m/s" / "6.6 kn" (see windUnit).
+    // Wind speed → "6.0 mph" / "12.3 km/h" / "3.4 m/s" / "6.6 kn" / "4 bft" (see windUnit).
     // One decimal, everywhere a wind speed is spelled out. Shared so the sustained
     // value can't change precision depending on whether a gust is shown next to it —
-    // the header used to print "11.2 kmh" on its own but "11 G20 kmh" the moment a
+    // the header used to print "11.2 km/h" on its own but "11 G20 km/h" the moment a
     // gust appeared, which reads as the number losing accuracy for no reason.
     // (The hourly CARDS keep their own whole-number "5G10" form on purpose: no room.)
     function windNum(v) { return Math.round(v * 10) / 10; }
@@ -948,7 +956,18 @@ PlasmoidItem {
         if (windUnitApi === "mph") return kmh / 1.609344;
         if (windUnitApi === "ms")  return kmh / 3.6;
         if (windUnitApi === "kn")  return kmh / 1.852;
+        if (windUnitApi === "bft") return _beaufort(kmh);
         return kmh;
+    }
+    // Beaufort force, 0 (calm) to 12 (hurricane), by the WMO table: the lowest speed
+    // of each force from 1 up, in m/s. A whole number, so every place that rounds a
+    // wind speed prints it unchanged ("4 bft", gusts "(G7)").
+    readonly property var _beaufortFrom: [0.3, 1.6, 3.4, 5.5, 8.0, 10.8, 13.9, 17.2, 20.8, 24.5, 28.5, 32.7]
+    function _beaufort(kmh) {
+        if (isNaN(kmh)) return NaN;
+        var ms = kmh / 3.6, b = 0;
+        while (b < 12 && ms >= _beaufortFrom[b]) ++b;
+        return b;
     }
     // Returns a converted COPY: the raw model must stay in °C / km/h to be converted
     // again later, never converted twice.
