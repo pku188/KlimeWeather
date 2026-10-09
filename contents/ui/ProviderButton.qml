@@ -25,10 +25,6 @@ AbstractButton {
     implicitWidth: row.implicitWidth + sidePad * 2
     // the narrowest it goes: the logo alone, its name elided away
     readonly property real logoOnlyWidth: Math.round(logoHeight * (source ? source.logoAspect : 1)) + sidePad * 2
-    // Middle of the name's capitals from the button's top, so the header can centre the
-    // button on the location's line (see HeaderRightBlock).
-    readonly property real capCenter: topPadding + row.y + nameLabel.y + nameLabel.baselineOffset
-                                      + capMetrics.tightBoundingRect.y + capMetrics.tightBoundingRect.height / 2
     hoverEnabled: true
 
     background: Rectangle {
@@ -62,8 +58,6 @@ AbstractButton {
             }
         }
     }
-
-    TextMetrics { id: capMetrics; font: nameLabel.font; text: "H" }
 
     onClicked: if (root) root.toggleProvider()
     Accessible.name: btn.source ? btn.source.displayName : ""

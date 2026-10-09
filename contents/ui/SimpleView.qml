@@ -1520,6 +1520,8 @@ Item {
                 // The location line is above the Weather Elements, so it may run over
                 // them; it only has to stay clear of the temperature.
                 leftBound: content.x + headerRow.x + heroRow.x + heroRow.heroTempWidth + Kirigami.Units.largeSpacing * 2
+                // the source sits beside the Weather Elements: it stays clear of them
+                sourceLeftBound: content.x + headerRow.x + heroRow.x + heroRow.width + Kirigami.Units.largeSpacing
                 // the pills sit beside the Weather Elements: they stay clear of them, by
                 // the row's spacing and the spacer item's
                 pillsLeftBound: content.x + headerRow.x + heroRow.x + heroRow.width
