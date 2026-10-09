@@ -1881,7 +1881,18 @@ PlasmoidItem {
         // fed capture → implicitHeight → resize → capture into a runaway vertical
         // grow. First run (unpinned width) tracks the view so the popup opens at its
         // natural size, then self-pins on first capture.
-        implicitWidth:  savedW > 0 ? savedW : (view ? view.implicitWidth : Kirigami.Units.gridUnit * 32)
+        // While the user drags the popup's edge, the width is pinned to where the drag
+        // is rather than to the saved width, which only catches up once the drag
+        // settles (captureSize). Plasma re-applies this implicit size whenever the
+        // content's implicit height changes: with the stale saved width, a height change
+        // mid-drag snapped the popup back to its old width — the graph's day pills
+        // moving under the header and back did it on every step, and the popup blinked.
+        property real _dragW: 0
+        function _followDrag() {
+            if (Date.now() - _lastDragMs < 1000) _dragW = Math.round(width);
+        }
+        implicitWidth:  _dragW > 0 ? _dragW
+                      : (savedW > 0 ? savedW : (view ? view.implicitWidth : Kirigami.Units.gridUnit * 32))
         implicitHeight: view ? view.implicitHeight : Kirigami.Units.gridUnit * 20
         // On the panel the popup keeps its own sizing. On the DESKTOP a widget has ONE
         // stored geometry that Plasma only ever grows (never shrinks) — per-layout or
@@ -1943,6 +1954,7 @@ PlasmoidItem {
             if (!win || fullRep.width <= 0) return;
             var chromeW = win.width  - fullRep.width;
             var chromeH = win.height - fullRep.height;
+            _dragW = 0;   // the saved size is the one to apply now
             var w = (savedW > 0 ? savedW : Math.round(implicitWidth))  + chromeW;
             var h = (savedH > 0 ? savedH : Math.round(implicitHeight)) + chromeH;
             _applying = true;
@@ -1972,6 +1984,7 @@ PlasmoidItem {
                 Plasmoid.configuration.detailPopupWidth  = Math.round(fullRep.width);
                 Plasmoid.configuration.detailPopupHeight = Math.round(fullRep.height);
             }
+            _dragW = 0;   // the saved width has caught up with the drag
         }
 
         // User drags resize this Item; debounce, then store under the active
@@ -1985,6 +1998,9 @@ PlasmoidItem {
         onWidthChanged:  {
             if (!_applying && _userCanResize()) {
                 _lastDragMs = Date.now();
+                // a moment later: Plasma resizes the popup as the implicit width
+                // changes, and taking the width from inside that resize re-entered it
+                Qt.callLater(fullRep._followDrag);
                 if (root.simpleLayout) Plasmoid.configuration.simplePopupManual = true;
             }
             captureTimer.restart();

@@ -789,10 +789,13 @@ Item {
     // or reach far enough below the hero to make the header taller (pillsBelowHero), or
     // larger toolbar icons push the hero down (heroDrop), the plot gives that height
     // back, so the popup keeps its size and its last row — the hours — isn't pushed
-    // out of view.
+    // out of view. All of it, to the pixel (the column's spacing above the pills' row
+    // too): the view's height must not change when the pills move, or Plasma resizes
+    // the popup mid-drag (see main.qml's _dragW).
     readonly property real plotH:      Kirigami.Units.gridUnit * 14.0
                                        - (pillsUnderHeader ? underHeaderPills.implicitHeight
-                                                             + underHeaderPills.Layout.topMargin : 0)
+                                                             + underHeaderPills.Layout.topMargin
+                                                             + content.spacing : 0)
                                        - pillsBelowHero - Math.max(0, toolbar.heroDrop)
     readonly property real topReserve: Kirigami.Units.gridUnit * 4.1   // room for temp labels + the new-day marker above the peak
     readonly property real precipBandH: plotH * 0.13                   // bottom margin the temp curve keeps clear (smaller → taller, more dramatic temp curve)
