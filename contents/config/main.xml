@@ -101,21 +101,21 @@
     <!-- up to 4 metrics shown in the DETAILED layout header next to the temperature -->
     <entry name="headerMetric1" type="String"><default>sun</default></entry>
     <entry name="headerMetric2" type="String"><default>precipSum</default></entry>
-    <entry name="headerMetric3" type="String"><default>pressure</default></entry>
+    <entry name="headerMetric3" type="String"><default>none</default></entry>
     <entry name="headerMetric4" type="String"><default>none</default></entry>
     <!-- independent header metrics for the SIMPLE layout -->
     <entry name="simpleHeaderMetric1" type="String"><default>uv</default></entry>
     <entry name="simpleHeaderMetric2" type="String"><default>precipSum</default></entry>
-    <entry name="simpleHeaderMetric3" type="String"><default>pressure</default></entry>
+    <entry name="simpleHeaderMetric3" type="String"><default>none</default></entry>
     <entry name="simpleHeaderMetric4" type="String"><default>wind</default></entry>
     <entry name="hourlyMetric1" type="String"><default>wind</default></entry>
-    <entry name="hourlyMetric2" type="String"><default>precip</default></entry>
+    <entry name="hourlyMetric2" type="String"><default>precipAmt</default></entry>
     <!-- per-slot fallbacks, tried in order when the primary readout has no value
          for an hour (e.g. snow on a dry hour falls back to precip chance, then
          to wind) -->
     <entry name="hourlyMetric1Fallback" type="String"><default>none</default></entry>
     <entry name="hourlyMetric1Fallback2" type="String"><default>none</default></entry>
-    <entry name="hourlyMetric2Fallback" type="String"><default>precipAmt</default></entry>
+    <entry name="hourlyMetric2Fallback" type="String"><default>precip</default></entry>
     <entry name="hourlyMetric2Fallback2" type="String"><default>uv</default></entry>
     <!-- hour a non-today day opens at in the Detailed hourly timeline:
          6 = 6 AM (skip the overnight cards), 0 = midnight. Today always opens
@@ -134,6 +134,10 @@
          3 Severe, 4 Extreme. Default 2 = Moderate+ (Minor/Unknown filtered) -->
     <entry name="minAlertSeverity" type="Int">
       <default>2</default>
+    </entry>
+    <!-- send each new alert the widget shows to Plasma's notifications, once -->
+    <entry name="alertNotifications" type="Bool">
+      <default>true</default>
     </entry>
     <entry name="keepOpen" type="Bool">
       <default>false</default>
@@ -192,6 +196,29 @@
     </entry>
     <entry name="providerFontSize" type="Int">
       <default>15</default>
+    </entry>
+    <!-- Weather Elements style: 0 = text labels ("Humidity: 78%"), 1 = icons (the
+         hourly cards' icon before each value) -->
+    <entry name="headerElementsStyle" type="Int">
+      <default>0</default>
+    </entry>
+    <!-- the Weather Elements' icons in Meteocons' flat colours, rather than monochrome
+         in the text colour. The panel has its own, panelColorIcon, and the graph's
+         markers dayMarkerIconColored; the hourly cards' stay monochrome. -->
+    <entry name="readingIconsColored" type="Bool">
+      <default>false</default>
+    </entry>
+    <!-- weather-specific text colours: the Weather Elements' values (blue precipitation,
+         the UV scale's green to red, …) and the card layout's daily low / high. Off,
+         they are in the theme's text colour. -->
+    <entry name="weatherSpecificColors" type="Bool">
+      <default>true</default>
+    </entry>
+    <!-- the graph's markers in colour: the new-day icons in the icon pack's colours
+         (else the panel's solid white set) and sunrise / sunset in Meteocons' flat
+         colours with gold times (else monochrome), all in the text colour when off -->
+    <entry name="dayMarkerIconColored" type="Bool">
+      <default>true</default>
     </entry>
     <!-- Size of the popup's corner buttons (pin, zoom, layout switch, refresh) in
          pixels; their glyphs are drawn on a 24 px grid. -->
@@ -358,31 +385,65 @@
     <entry name="panelFontPercent" type="Int">
       <default>72</default>
     </entry>
-    <!-- use the colored icon variant in the panel instead of the white one -->
+    <!-- use the colored icon variant in the panel instead of the one-colour icon drawn
+         in the panel's text colour -->
     <entry name="panelColorIcon" type="Bool">
-      <default>true</default>
+      <default>false</default>
     </entry>
-    <!-- What the panel shows: 0 the weather icon and temperature, 1 the icon alone,
-         2 the temperature alone, 3 the detailed view (icon, temperature, condition and
-         a second reading). -1 = never chosen: derived from panelDetailed below, the
-         older checkbox, so an upgrade keeps what was set. -->
+    <!-- What the panel shows, in order (Appearance → Panel → Panel Elements): a JSON list
+         of {"id", "shown"}. The ids: "icon", "temp", "location", "condition", and the
+         readings "hiLo", "precipRate", "wind", "feelsLike", "humidity", "precipSum",
+         "uv", "pressure", "sun", "dewPoint", "snowSum", "cloud" (see
+         contents/ui/panelelements.js). Empty = never edited: derived from the older
+         panelDisplay and panelSecondLine below, so an upgrade keeps what was set. -->
+    <entry name="panelElements" type="String">
+      <default></default>
+    </entry>
+    <!-- older "Panel display", now only read to derive panelElements: 0 the weather
+         icon and temperature, 1 the icon alone, 2 the temperature alone, 3 the
+         detailed view (icon, temperature and the panelSecondLine reading), 4 the icon,
+         temperature and condition; -1 = never chosen, derived from panelDetailed -->
     <entry name="panelDisplay" type="Int">
       <default>-1</default>
     </entry>
-    <!-- older "Detailed View" checkbox, now only read to derive panelDisplay -->
+    <!-- older "Detailed View" checkbox, now only read to derive panelElements -->
     <entry name="panelDetailed" type="Bool">
       <default>false</default>
     </entry>
-    <!-- detailed panel second line: 0 = H/L temperature, 1 = precip chance / amount, 2 = wind speed / gust -->
+    <!-- older detailed-view reading, now only read to derive panelElements: 0 high /
+         low temperature, 1 this hour's precipitation, 2 wind, 3 feels like, 4 humidity,
+         5 precipitation sum, 6 UV index, 7 air pressure, 8 sunrise / sunset, 9 dew
+         point, 10 snowfall, 11 cloud cover -->
     <entry name="panelSecondLine" type="Int">
       <default>0</default>
     </entry>
-    <!-- detailed-panel font sizes, as a % of panel height (condition word / second line) -->
-    <entry name="panelConditionPercent" type="Int">
-      <default>40</default>
+    <!-- panel temperature font weight: 400 regular, 600 semibold, 700 bold -->
+    <entry name="panelTempFontWeight" type="Int">
+      <default>400</default>
+    </entry>
+    <!-- The panel's secondary font — everything on it but the weather icon and the
+         temperature: the location, the condition and the readings. Its weight (the same
+         values), and its size as a % of the panel's thickness. -->
+    <entry name="panelSecondLineFontWeight" type="Int">
+      <default>600</default>
     </entry>
     <entry name="panelSecondLinePercent" type="Int">
-      <default>37</default>
+      <default>52</default>
+    </entry>
+    <!-- pixels added to the space the panel leaves between its elements (none beside
+         the weather icon, else a quarter of the panel's thickness), on both sides of a
+         separator, and between a vertical panel's lines; negative brings them closer -->
+    <entry name="panelElementSpacing" type="Int">
+      <default>0</default>
+    </entry>
+    <!-- drawn between the panel's elements, in the secondary font, but never between
+         the weather icon and the temperature: 0 none, 1 a bullet "•", 2 custom, the
+         character in panelElementSeparatorText -->
+    <entry name="panelElementSeparator" type="Int">
+      <default>0</default>
+    </entry>
+    <entry name="panelElementSeparatorText" type="String">
+      <default></default>
     </entry>
     <!-- condition-icon pack: a bundled Meteocons style ("meteocons-fill", "-flat", "-line",
          "-monochrome"), "system" (theme weather-* icons), or "custom" -->

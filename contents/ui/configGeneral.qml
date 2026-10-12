@@ -19,6 +19,7 @@ Kirigami.FormLayout {
     property alias  cfg_refreshInterval: refreshSpin.value
     property alias  cfg_showAlerts: alertsCheck.checked
     property int    cfg_minAlertSeverity
+    property alias  cfg_alertNotifications: alertNotifyCheck.checked
     property string cfg_windUnit
     property string cfg_pressureUnit
     property string cfg_precipUnit
@@ -76,9 +77,11 @@ Kirigami.FormLayout {
         clockFormatCombo.sync();
     }
 
-    // breathing room so the settings don't sit flush against the top
-    Item { implicitHeight: Kirigami.Units.gridUnit }
-
+    // two sections, titled as on the Location page
+    Kirigami.Separator {
+        Kirigami.FormData.label: i18n("Weather data")
+        Kirigami.FormData.isSection: true
+    }
     ConfigSpinBox {
         id: refreshSpin
         Kirigami.FormData.label: i18n("Refresh interval (minutes):")
@@ -120,6 +123,18 @@ Kirigami.FormLayout {
         }
         Component.onCompleted: sync()
         onActivated: page.cfg_minAlertSeverity = model[currentIndex].value
+    }
+    CheckBox {
+        id: alertNotifyCheck
+        Kirigami.FormData.label: i18n("Alert notifications:")
+        text: i18n("Notify about new alerts")
+        enabled: alertsCheck.checked
+        ToolTip.visible: hovered
+        ToolTip.text: i18n("Sends each new alert at or above the level above to the system's notifications, once. A click on it opens the widget.")
+    }
+    Kirigami.Separator {
+        Kirigami.FormData.label: i18n("Units")
+        Kirigami.FormData.isSection: true
     }
     ConfigComboBox {
         id: unitCombo

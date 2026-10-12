@@ -1,5 +1,15 @@
 /*
- * Compact (panel/tray) representation — white icon + temperature.
+ * Compact (panel/tray) representation: the Panel Elements (Appearance → Panel) shown,
+ * in their order — by default the weather icon and the temperature.
+ *
+ * On a horizontal panel they sit on one line, as wide as they need. On a vertical one
+ * they wrap: each goes on the line before when it fits beside what is there within
+ * the panel's width, else on a new line, and every line is centred. Sizes are a % of
+ * the panel's thickness either way — its height, or a vertical panel's width.
+ *
+ * The Element separator goes between every two elements but the weather icon and the
+ * temperature, which stay together in either order: in the middle of the space
+ * between them on a line, and on a vertical panel on a row of its own between lines.
  * Copyright 2026  pku188, bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
  */
 import QtQuick
@@ -11,195 +21,194 @@ Item {
 
     property var weatherRoot
 
-    readonly property int iconPercent: weatherRoot ? weatherRoot.panelIconPercent : 130
-    readonly property int fontPercent: weatherRoot ? weatherRoot.panelFontPercent : 48
-    // Detailed layout only: condition word and second line, each its own % of height.
-    readonly property int _condPx: Math.round(compact.height
-        * (weatherRoot ? weatherRoot.panelConditionPercent : 40) / 100)
-    readonly property int _line2Px: Math.round(compact.height
-        * (weatherRoot ? weatherRoot.panelSecondLinePercent : 37) / 100)
-
-    // The Meteocons sun glyph fills its box more than the other condition icons
-    // (same "over-full artwork" issue main.qml's heroScale/iconZoom correct for
-    // elsewhere), so it reads oversized in the panel at the same box size next
-    // to e.g. clouds. Scale it down a touch; every other condition, and the theme
-    // and custom packs, are untouched.
-    function panelIconScale() {
-        if (!weatherRoot || !weatherRoot.iconPackIsMeteocons) return 1.0;
-        var code = weatherRoot.heroCode, day = weatherRoot.heroDay;
-        if ((code === 0 || code === 1) && day !== 0) return 0.85;   // clear sky / sunny (day)
-        return 1.0;
+    readonly property bool vertical: !!weatherRoot && weatherRoot.panelVertical
+    readonly property real thickness: vertical ? width : height
+    readonly property int iconPx: Math.round(thickness * (weatherRoot ? weatherRoot.panelIconPercent : 130) / 100)
+    readonly property int tempPx: Math.round(thickness * (weatherRoot ? weatherRoot.panelFontPercent : 72) / 100)
+    readonly property int secondaryPx: Math.round(thickness * (weatherRoot ? weatherRoot.panelSecondaryPercent : 37) / 100)
+    // Space between two elements on a line: none beside the weather icon, whose
+    // artwork leaves the edges of its box empty, else a quarter of the panel's
+    // thickness — and the Element spacing's pixels added (Appearance → Panel). A
+    // separator gets half of that space on each side, the added pixels on both. A
+    // vertical panel's lines are a tenth of its thickness apart, plus those pixels.
+    // Nothing closer than touching.
+    readonly property int gap: Math.round(thickness / 4)
+    readonly property int spacing: weatherRoot ? weatherRoot.panelElementSpacing : 0
+    readonly property string separator: weatherRoot ? weatherRoot.panelSeparator : ""
+    readonly property int lineGap: Math.max(0, Math.round(thickness / 10) + spacing)
+    function gapBetween(a, b) {
+        return Math.max(0, (a.elementId === "icon" || b.elementId === "icon" ? 0 : gap) + spacing);
+    }
+    function gapBeside(el) {
+        return Math.max(0, (el.elementId === "icon" ? 0 : Math.round(gap / 2)) + spacing);
     }
 
-    // The monochrome pack's own icon, asked for with "Use colored icon": it is
-    // one-colour artwork, so it is tinted with the panel's text colour.
-    readonly property bool tintedIcon: !!weatherRoot && weatherRoot.panelColorIcon
-                                       && weatherRoot.iconPackIsMask && weatherRoot.hasLocation
-                                       && weatherRoot.heroCode >= 0
-
-    // White icon by default; colored variant when the panelColorIcon setting is on.
-    function panelIconSource() {
-        if (!weatherRoot) return "";
-        if (!weatherRoot.hasLocation) return "mark-location";   // no location set → pin, not fake weather
-        var code = weatherRoot.heroCode, day = weatherRoot.heroDay;
-        // panel-only: show the moon-behind-cloud icon for overcast night (the
-        // popup keeps its own overcast-night artwork).
-        var override = (code === 3 && day === 0) ? "wi-night-alt-partly-cloudy" : undefined;
-        return weatherRoot.panelColorIcon
-            ? weatherRoot.conditionIcon(code, day, weatherRoot.heroCloud, override)
-            : weatherRoot.conditionIconWhite(code, day, weatherRoot.heroCloud, override);
+    // The elements shown, in order. With no location just the pin, which opens the
+    // settings; with every element hidden the weather icon, so there is always
+    // something to click.
+    readonly property var shownIds: {
+        if (!weatherRoot) return [];
+        if (!weatherRoot.hasLocation) return ["icon"];
+        var ids = weatherRoot.panelElements.filter(function (el) { return el.shown; })
+                                           .map(function (el) { return el.id; });
+        return ids.length > 0 ? ids : ["icon"];
     }
 
-    // Force the panel to allocate exactly the content width + side padding, so
-    // the temperature is never clipped and the widget never overlaps neighbours.
-    // Asymmetric: the white-moon SVG already carries internal left padding, so
-    // keep the outer-left gap small and put the breathing room on the right.
-    readonly property int _leftPad:  0
-    readonly property int _rightPad: 0
-    readonly property int _w: row.implicitWidth + _leftPad + _rightPad
-    Layout.minimumWidth:   _w
-    Layout.preferredWidth: _w
-    Layout.maximumWidth:   _w
+    // The panel gives the widget exactly what the elements take along the panel, so
+    // nothing is clipped and nothing overlaps the neighbours; across it, the panel's
+    // thickness.
+    property real contentWidth: 0
+    property real contentHeight: 0
+    Layout.minimumWidth:    vertical ? 0 : contentWidth
+    Layout.preferredWidth:  vertical ? -1 : contentWidth
+    Layout.maximumWidth:    vertical ? Infinity : contentWidth
+    Layout.minimumHeight:   vertical ? contentHeight : 0
+    Layout.preferredHeight: vertical ? contentHeight : -1
+    Layout.maximumHeight:   vertical ? contentHeight : Infinity
 
     MouseArea {
         anchors.fill: parent
         onClicked: if (weatherRoot) weatherRoot.expanded = !weatherRoot.expanded
     }
 
-    Row {
-        id: row
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.left: parent.left
-        anchors.leftMargin: compact._leftPad
-        spacing: 0
-
-        // Bundled white SVG packs render flat via a plain Image (no icon-engine
-        // recolouring); theme packs need Kirigami.Icon to resolve "weather-*"
-        // names, so the two swap by visibility (Row skips the hidden one). With no
-        // forecast yet every pack falls back to the theme's "weather-none-available"
-        // name, which only the Kirigami.Icon can load. The coloured monochrome icon
-        // goes through Kirigami.Icon as well, which draws it in the panel's text colour.
-        // "Panel display" set to the temperature alone hides both.
-        Image {
-            id: icon
-            visible: weatherRoot && weatherRoot.hasLocation && !weatherRoot.iconPackIsTheme
-                     && weatherRoot.heroCode >= 0 && !compact.tintedIcon && weatherRoot.panelShowIcon
-            anchors.verticalCenter: parent.verticalCenter
-            height: Math.round(compact.height * compact.iconPercent / 100 * compact.panelIconScale())
-            width: height
-            sourceSize.width: width
-            sourceSize.height: height
-            fillMode: Image.PreserveAspectFit
-            smooth: true
-            source: visible && weatherRoot ? compact.panelIconSource() : ""
+    Repeater {
+        id: elements
+        model: compact.shownIds
+        delegate: PanelElement {
+            required property string modelData
+            weatherRoot: compact.weatherRoot
+            elementId: modelData
+            iconPx: compact.iconPx
+            tempPx: compact.tempPx
+            secondaryPx: compact.secondaryPx
+            maxWidth: compact.vertical ? compact.width : Infinity
+            onImplicitWidthChanged: compact.scheduleLayout()
+            onImplicitHeightChanged: compact.scheduleLayout()
+            onPresentChanged: compact.scheduleLayout()
         }
-        Kirigami.Icon {
-            id: themeIcon
-            // theme renderer also carries the "mark-location" pin when unset — shown in
-            // every panel display, or a widget with no location would have nothing to click
-            visible: weatherRoot && (!weatherRoot.hasLocation
-                                     || (weatherRoot.panelShowIcon
-                                         && (weatherRoot.iconPackIsTheme || weatherRoot.heroCode < 0
-                                             || compact.tintedIcon)))
-            anchors.verticalCenter: parent.verticalCenter
-            height: Math.round(compact.height * compact.iconPercent / 100
-                               * (compact.tintedIcon ? compact.panelIconScale() : 1))
-            width: height
-            roundToIconSize: !compact.tintedIcon
-            isMask: compact.tintedIcon
+        onItemAdded: compact.scheduleLayout()
+        onItemRemoved: compact.scheduleLayout()
+    }
+    // The separators, one for every gap there can be: the layout shows those it needs.
+    // In the secondary font, so they scale with it.
+    Repeater {
+        id: separators
+        model: compact.separator.length > 0 ? Math.max(0, compact.shownIds.length - 1) : 0
+        delegate: Text {
+            visible: false
+            text: compact.separator
             color: Kirigami.Theme.textColor
-            source: visible && weatherRoot ? compact.panelIconSource() : ""
+            font.pixelSize: compact.secondaryPx
+            font.weight: compact.weatherRoot ? compact.weatherRoot.panelSecondaryFontWeight : Font.Normal
+            onImplicitWidthChanged: compact.scheduleLayout()
         }
-        Text {
-            id: temp
-            anchors.verticalCenter: parent.verticalCenter
-            visible: weatherRoot && !weatherRoot.panelDetailed && weatherRoot.panelShowTemp
-                     && text.length > 0 && weatherRoot.hasLocation
-            text: weatherRoot ? weatherRoot.temperatureText : "—"
-            color: Kirigami.Theme.textColor
-            font.pixelSize: Math.round(compact.height * compact.fontPercent / 100)
-        }
+        onItemAdded: compact.scheduleLayout()
+        onItemRemoved: compact.scheduleLayout()
+    }
+    onWidthChanged: scheduleLayout()
+    onHeightChanged: scheduleLayout()
+    onGapChanged: scheduleLayout()
+    onSpacingChanged: scheduleLayout()
 
-        // Detailed layout: big bold "96°" on the left, with a smaller muted
-        // stack ("H 99°" over "L 74°", or the precip line) to its right.
-        Row {
-            id: detailedCol
-            anchors.verticalCenter: parent.verticalCenter
-            visible: weatherRoot && weatherRoot.panelDetailed && weatherRoot.hasLocation
-            spacing: 6
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: weatherRoot ? weatherRoot.temperatureText : "—"
-                color: Kirigami.Theme.textColor
-                // 68 % of the panel at the default temperature font (48 %), scaled by it
-                font.pixelSize: Math.round(compact.height * 0.68 * compact.fontPercent / 48)
-            }
-            // Right stack: bold condition word always on top; the second line
-            // switches between "low / high" and precip via the panelSecondLine setting.
-            Column {
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: -3
-                Text {
-                    text: weatherRoot ? weatherRoot.conditionText(weatherRoot.heroCode, weatherRoot.heroDay) : ""
-                    color: Kirigami.Theme.textColor
-                    font.bold: true
-                    font.pixelSize: compact._condPx
-                }
-                // Second line, option A: low / high temperature. With the colored
-                // panel icon on, tint L blue and H warm (matching FullView's temps).
-                Text {
-                    visible: weatherRoot && weatherRoot.panelSecondLine === 0
-                    textFormat: Text.StyledText
-                    text: {
-                        if (!weatherRoot || isNaN(weatherRoot.lowTemp) || isNaN(weatherRoot.highTemp))
-                            return "";
-                        var L = Math.round(weatherRoot.lowTemp), H = Math.round(weatherRoot.highTemp);
-                        return weatherRoot.panelColorIcon
-                            ? "<font color='" + weatherRoot.precipColor + "'>L</font>" + L + "&nbsp;&nbsp;&nbsp;"
-                              + "<font color='#ff6e40'>H</font>" + H
-                            : "L" + L + "&nbsp;&nbsp;&nbsp;H" + H;
+    function scheduleLayout() { Qt.callLater(layoutElements) }
+    // Places the elements and separators (see the top of the file) and sets the size
+    // they take.
+    function layoutElements() {
+        var items = [], seps = [], i, it;
+        for (i = 0; i < elements.count; ++i) {
+            it = elements.itemAt(i);
+            if (it && it.present) items.push(it);
+        }
+        for (i = 0; i < separators.count; ++i) {
+            it = separators.itemAt(i);
+            if (it) { it.visible = false; seps.push(it); }
+        }
+        var useSep = seps.length > 0;
+        var sepW = useSep ? seps[0].implicitWidth : 0, sepH = useSep ? seps[0].implicitHeight : 0;
+        var nextSep = 0;
+        function placeSep(x, y) {
+            var sep = seps[nextSep++];
+            if (!sep) return;
+            sep.x = x;
+            sep.y = y;
+            sep.visible = true;
+        }
+        // whether a separator goes between two neighbours: not between the weather icon
+        // and the temperature
+        function separated(a, b) {
+            return useSep && !((a.elementId === "icon" && b.elementId === "temp")
+                               || (a.elementId === "temp" && b.elementId === "icon"));
+        }
+        // the room between two neighbours on a line
+        function between(a, b) {
+            return separated(a, b) ? compact.gapBeside(a) + sepW + compact.gapBeside(b) : compact.gapBetween(a, b);
+        }
+        // Places one line's elements from `x`, centred on a line `height` tall at `y`.
+        function placeLine(line, x, y, height) {
+            for (var k = 0; k < line.length; ++k) {
+                var el = line[k];
+                if (k > 0) {
+                    if (separated(line[k - 1], el)) {
+                        x += compact.gapBeside(line[k - 1]);
+                        placeSep(x, y + Math.round((height - sepH) / 2));
+                        x += sepW + compact.gapBeside(el);
+                    } else {
+                        x += compact.gapBetween(line[k - 1], el);
                     }
-                    color: Kirigami.Theme.textColor
-                    opacity: 0.7
-                    font.bold: true
-                    font.pixelSize: compact._line2Px
                 }
-                // Second line, option B: "chance / amount" for today. With the colored
-                // panel icon on, tint both numbers blue but leave the "/" theme-colored.
-                Text {
-                    visible: weatherRoot && weatherRoot.panelSecondLine === 1
-                             && !isNaN(weatherRoot.precipChanceToday)
-                    textFormat: Text.StyledText
-                    text: {
-                        if (!weatherRoot) return "";
-                        var c = Math.round(weatherRoot.precipChanceToday) + "%";
-                        var a = weatherRoot.precipUnitStr(weatherRoot.precipSumToday, false);
-                        return weatherRoot.panelColorIcon
-                            ? "<font color='" + weatherRoot.precipColor + "'>" + c + "</font> / "
-                              + "<font color='" + weatherRoot.precipColor + "'>" + a + "</font>"
-                            : c + " / " + a;
-                    }
-                    color: Kirigami.Theme.textColor
-                    opacity: 0.7
-                    font.bold: true
-                    font.pixelSize: compact._line2Px
-                }
-                // Second line, option C: wind + gust → "34 G12 mph".
-                Text {
-                    visible: weatherRoot && weatherRoot.panelSecondLine === 2
-                             && !isNaN(weatherRoot.windSpeed)
-                    text: weatherRoot
-                        ? Math.round(weatherRoot.windSpeed)
-                          + (isNaN(weatherRoot.windGust) ? "" : " G" + Math.round(weatherRoot.windGust))
-                          + " " + weatherRoot.windUnitLabel
-                        : ""
-                    color: Kirigami.Theme.textColor
-                    opacity: 0.7
-                    font.bold: true
-                    font.pixelSize: compact._line2Px
-                }
+                el.x = x;
+                el.y = y + Math.round((height - el.implicitHeight) / 2);
+                x += el.implicitWidth;
             }
         }
+        // the lines: one on a horizontal panel
+        var lines = [], line = null;
+        for (i = 0; i < items.length; ++i) {
+            it = items[i];
+            var room = line ? between(line.items[line.items.length - 1], it) : 0;
+            if (line && (!compact.vertical || line.width + room + it.implicitWidth <= compact.width)) {
+                line.items.push(it);
+                line.width += room + it.implicitWidth;
+                line.height = Math.max(line.height, it.implicitHeight);
+            } else {
+                line = { items: [it], width: it.implicitWidth, height: it.implicitHeight };
+                lines.push(line);
+            }
+        }
+        if (!compact.vertical) {
+            // one line, centred across the panel's height (the icon may reach past it)
+            var w = lines.length > 0 ? lines[0].width : 0;
+            if (lines.length > 0)
+                placeLine(lines[0].items, Math.max(0, Math.round((compact.width - w) / 2)), 0, compact.height);
+            compact.contentWidth = w;
+            compact.contentHeight = compact.height;
+            return;
+        }
+        // A separator between two lines gets a row of its own, a little lower than its
+        // text: the mark sits in the middle of the line, the text reaches above it.
+        var sepRow = useSep ? Math.round(compact.secondaryPx * 0.7) : 0;
+        // whether a separator goes between line i - 1 and line i
+        function lineSeparated(i) {
+            var above = lines[i - 1].items;
+            return separated(above[above.length - 1], lines[i].items[0]);
+        }
+        var h = 0;
+        for (i = 0; i < lines.length; ++i)
+            h += (i > 0 ? compact.lineGap + (lineSeparated(i) ? sepRow + compact.lineGap : 0) : 0) + lines[i].height;
+        var y = Math.max(0, Math.round((compact.height - h) / 2));
+        for (i = 0; i < lines.length; ++i) {
+            if (i > 0) {
+                y += compact.lineGap;
+                if (lineSeparated(i)) {
+                    placeSep(Math.round((compact.width - sepW) / 2), y + Math.round((sepRow - sepH) / 2));
+                    y += sepRow + compact.lineGap;
+                }
+            }
+            placeLine(lines[i].items, Math.round((compact.width - lines[i].width) / 2), y, lines[i].height);
+            y += lines[i].height;
+        }
+        compact.contentWidth = compact.width;
+        compact.contentHeight = h;
     }
 
     // No stale marker in the panel: the panel is glanced at, not read, and a dot there

@@ -207,6 +207,7 @@ QtObject {
                 // too, but it is met.no's own boundary, not ours.)
                 day:       Solar.isDayAt(ctx.lat, ctx.lon, ms, off),
                 humidity:  rh,
+                dew:       _temp(_n(det.dew_point_temperature)),
                 uv:        _n(det.ultraviolet_index_clear_sky),   // clear-sky, as MET publishes it
                 precip:    _n(bd.probability_of_precipitation),
                 precipAmt: amt,
@@ -301,6 +302,7 @@ QtObject {
                 weatherCode:  codeFor(csym),
                 apparentTemp: _temp(_apparentC(cTempC, cRh, cWind)),
                 humidity:     cRh,
+                dewPoint:     _temp(_n(cd.dew_point_temperature)),
                 isDay:        Solar.isDayAt(ctx.lat, ctx.lon, Date.parse(c0.time), off),
                 uvIndex:      _n(cd.ultraviolet_index_clear_sky),
                 precipRate:   (cblk && cblk.details) ? _n(cblk.details.precipitation_amount) : NaN,

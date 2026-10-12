@@ -68,3 +68,19 @@ Daytime precipitation uses the sun-free icons (a sun under a fully overcast rain
 hour reads wrong); night keeps the moon. The `wi-day-*` precipitation stems are
 not used by the widget itself, but keep every pack complete for anyone copying one
 as a custom folder.
+
+## Reading icons (`readings/`)
+
+The icons drawn before a reading — the Weather Elements' icon style, the panel's
+readings, the hourly cards' readouts and the graph's sunrise and sunset — and the
+ones the panel settings list the Panel Elements with, from **`@meteocons/svg-static` 0.1.0**, static, in two styles: `flat/<name>.svg`
+for "Use colored icons", and the monochrome set as `monochrome.js`, SVG strings
+drawn in `currentColor` that the widget recolours to the theme's text colour.
+Built by `tools/icon-pipeline/meteocons_packs.py --readings`: masks as above, and
+in the monochrome set the artwork painted white (humidity's "%", the umbrella's lit
+panel) cut out of the icon, so it shows the background as any symbolic icon does,
+and the line icons (not the solid ones or the thermometers) drawn 3 units (of 128)
+bolder — Meteocons' 2–4 unit lines came out under a pixel wide at the widget's sizes.
+
+thermometer, humidity, uv-index, raindrop, raindrops, umbrella, snowflake, cloudy,
+barometer, wind, sunrise, sunset, thermometer-raindrop, partly-cloudy-day.

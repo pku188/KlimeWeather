@@ -8,6 +8,10 @@
  * the icon: ConditionIconShared captures this item into a texture, and a capture
  * takes an item's content without its layer effect — the icons came out black.
  *
+ * The icon is hidden by capturing it (hideSource), not with visible: false: in a
+ * Plasma panel popup (Qt 6.12) an animation inside an invisible item no longer makes
+ * the window draw a new frame, and the icons froze (see AnimatedIconCache).
+ *
  * Copyright 2026  pku188 — SPDX-License-Identifier: GPL-2.0-or-later
  */
 import QtQuick
@@ -22,11 +26,19 @@ Item {
     ConditionIconVector {
         id: art
         anchors.fill: parent
-        visible: false   // drawn through the effect below
+    }
+    // the icon as a texture for the effect below, which is all that draws it
+    ShaderEffectSource {
+        id: artTexture
+        anchors.fill: parent
+        sourceItem: art
+        hideSource: true
+        live: true
+        visible: false
     }
     MultiEffect {
         anchors.fill: parent
-        source: art
+        source: artTexture
         brightness: 1.0
         colorization: 1.0
         colorizationColor: tinted.tint

@@ -10,7 +10,27 @@ monochrome), the few icons the widget uses under its own wi-* stem names:
     contents/icons/meteocons/<style>/animated/wi-<stem>.svg
 
 usage: meteocons_packs.py <svg-package-dir> <svg-static-package-dir> <out-dir>
+       meteocons_packs.py --readings <svg-static-package-dir> <out-dir>
        (the package dirs are the extracted tarballs' "package" folders)
+
+--readings writes the icons drawn before a reading (the Weather Elements' icon
+style, the panel's readings, the hourly cards' readouts and the graph's sunrise
+and sunset) and the ones the panel settings list its elements with, static, in
+the two styles they come in — flat, for "Use colored icons", and monochrome,
+tinted to the theme's text colour:
+
+    contents/icons/meteocons/readings/flat/<name>.svg
+    contents/icons/meteocons/readings/monochrome.js
+
+The monochrome set is a JavaScript module of SVG strings drawn in currentColor:
+the widget swaps in the theme's colour and hands Image the result as a data URL,
+so every copy of an icon at one size shares one rendering (a tinting effect per
+icon would cost a render pass each, and the hourly cards hold a couple hundred).
+Its artwork painted white — humidity's "%", the umbrella's lit panel — is cut out
+of the icon instead (a luminance mask), or it would stay white over the tint. And
+its line icons are drawn bolder (MONO_WEIGHT, not the solid icons or the
+thermometers): Meteocons' 2–4 unit lines came out under a pixel wide at the
+widget's sizes.
 
 The artwork is left as drawn; what changes is how it is written, so that Qt
 draws it the way a browser does.
@@ -41,7 +61,7 @@ ignored). So:
     must move in step with the cloud it follows), re-sampled into evenly spaced
     linear values with the easing and phase built in.
 """
-import math, os, sys
+import json, math, os, sys
 import xml.etree.ElementTree as ET
 
 SVG = "http://www.w3.org/2000/svg"
@@ -77,6 +97,22 @@ STEMS = {
     "wi-day-thunderstorm":       "thunderstorms-day",
     "wi-night-alt-thunderstorm": "thunderstorms-night",
 }
+
+
+# The readings' icons, under their Meteocons names, and the weather icon's in the
+# panel settings' list of elements.
+READINGS = ("thermometer", "humidity", "uv-index", "raindrop", "raindrops", "umbrella",
+            "snowflake", "cloudy", "barometer", "wind", "sunrise", "sunset",
+            "thermometer-raindrop", "partly-cloudy-day")
+READING_STYLES = ("monochrome", "flat")
+# How much bolder the monochrome line icons are drawn, in units of the 128-unit box:
+# every line grows this much wider (a stroke of the same colour around each shape,
+# filled outlines too — the cloud is a thin filled ring). 5 clogged the details.
+# Left as drawn: the solid icons (thickened, the two raindrops merged into one) and the
+# thermometers (thickened, the glass, mercury and drop ran into one hard-to-read shape).
+MONO_WEIGHT = 3
+MONO_AS_DRAWN = {"humidity", "raindrop", "raindrops", "snowflake",
+                 "thermometer", "thermometer-raindrop"}
 
 
 def fail(path, msg):
@@ -295,7 +331,93 @@ def build(src_anim, src_static, out):
     print("wrote %d icons to %s" % (written, out))
 
 
+def knockout_white(root, path):
+    """Cut the artwork painted white out of the icon (see --readings)."""
+    defined = set()   # shapes inside <mask> and <clipPath> are not artwork
+    for tag in ("mask", "clipPath"):
+        for d in root.iter("{%s}%s" % (SVG, tag)):
+            defined.update(d.iter())
+    parent = {c: p for p in root.iter() for c in p}
+    whites = [el for el in root.iter()
+              if el.tag in SHAPES and el.get("fill") == "white" and el not in defined]
+    if not whites:
+        return
+    x, y, w, h = (root.get("viewBox") or "0 0 128 128").split()
+    mask = ET.Element("{%s}mask" % SVG, {"id": "knockout", "maskUnits": "userSpaceOnUse",
+                                         "x": x, "y": y, "width": w, "height": h})
+    ET.SubElement(mask, "{%s}rect" % SVG, {"x": x, "y": y, "width": w, "height": h, "fill": "white"})
+    for el in whites:
+        a = parent.get(el)
+        while a is not None and a is not root:
+            if a.get("transform"):
+                fail(path, "white artwork under a transform is not handled")
+            a = parent.get(a)
+        hole = ET.fromstring(ET.tostring(el))
+        hole.set("fill", "black")
+        mask.append(hole)
+        parent[el].remove(el)
+    defs = root.find("{%s}defs" % SVG)
+    if defs is None:
+        defs = ET.Element("{%s}defs" % SVG)
+        root.insert(0, defs)
+    defs.append(mask)
+    group = ET.Element("{%s}g" % SVG, {"mask": "url(#knockout)"})
+    for ch in list(root):
+        if ch is not defs:
+            root.remove(ch)
+            group.append(ch)
+    root.append(group)
+
+
+def bolden(root, delta):
+    """Draw every line of the icon `delta` units wider (see MONO_WEIGHT)."""
+    defined = set()   # mask and clip shapes are geometry, not artwork
+    for tag in ("mask", "clipPath"):
+        for d in root.iter("{%s}%s" % (SVG, tag)):
+            defined.update(d.iter())
+    for el in root.iter():
+        if el in defined or el.tag not in SHAPES:
+            continue
+        if el.get("stroke") == "currentColor":
+            el.set("stroke-width", "%g" % (float(el.get("stroke-width", "1")) + delta))
+        elif el.get("fill") == "currentColor":
+            el.set("stroke", "currentColor")
+            el.set("stroke-width", "%g" % delta)
+            el.set("stroke-linejoin", "round")
+
+
+def build_readings(src_static, out):
+    dest = os.path.join(out, "readings")
+    os.makedirs(os.path.join(dest, "flat"), exist_ok=True)
+    mono = {}
+    for style in READING_STYLES:
+        for name in READINGS:
+            path = os.path.join(src_static, style, name + ".svg")
+            tree = ET.parse(path)
+            luminance_masks(tree.getroot(), path)
+            if style == "flat":
+                tree.write(os.path.join(dest, "flat", name + ".svg"), encoding="unicode")
+            else:
+                if name not in MONO_AS_DRAWN:
+                    bolden(tree.getroot(), MONO_WEIGHT)
+                knockout_white(tree.getroot(), path)
+                mono[name] = ET.tostring(tree.getroot(), encoding="unicode")
+    with open(os.path.join(dest, "monochrome.js"), "w") as js:
+        js.write(".pragma library\n"
+                 "// Meteocons' monochrome reading icons (MIT, see ../ATTRIBUTION.md), drawn in\n"
+                 "// currentColor. Generated by tools/icon-pipeline/meteocons_packs.py --readings;\n"
+                 "// edit that, not this.\n"
+                 "var svg = {\n")
+        for name in READINGS:
+            js.write("    %s: %s,\n" % (json.dumps(name), json.dumps(mono[name])))
+        js.write("};\n")
+    print("wrote %d flat reading icons and monochrome.js to %s" % (len(READINGS), dest))
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
+    if len(sys.argv) == 4 and sys.argv[1] == "--readings":
+        build_readings(*sys.argv[2:])
+    elif len(sys.argv) == 4:
+        build(*sys.argv[1:])
+    else:
         sys.exit(__doc__)
-    build(*sys.argv[1:])

@@ -680,12 +680,12 @@ ScrollView {
                         }
                     }
 
-                    // double-click anywhere on the row switches to it (same as "Use").
-                    // The buttons above grab their own clicks, so this only fires on
-                    // the row body, and never on the already-active row.
+                    // a click anywhere on the row switches to it. The buttons above
+                    // (favorite, edit, remove) take their own clicks, so this only fires
+                    // on the row body, and never on the already-active row.
                     TapHandler {
                         enabled: !savedRow.isActive
-                        onDoubleTapped: page.useSaved(savedRow.index)
+                        onTapped: page.useSaved(savedRow.index)
                     }
                     HoverHandler { id: rowHover }
                 }

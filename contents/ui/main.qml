@@ -15,8 +15,11 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasma5support as P5Support
 import org.kde.kirigami as Kirigami
+import org.kde.notification
 import "providers"
 import "providers/grid.js" as Grid
+import "../icons/meteocons/readings/monochrome.js" as MonoReadings
+import "panelelements.js" as PanelElements
 
 PlasmoidItem {
     id: root
@@ -160,22 +163,31 @@ PlasmoidItem {
     readonly property int    panelIconPercent:   Plasmoid.configuration.panelIconPercent   || 130
     readonly property int    panelFontPercent:   Plasmoid.configuration.panelFontPercent   || 48
     readonly property bool   panelColorIcon:     Plasmoid.configuration.panelColorIcon === true
-    // What the panel shows (Appearance → Panel → Panel display): 0 the weather icon
-    // and temperature, 1 the icon alone, 2 the temperature alone, 3 the detailed view.
-    // Never chosen (-1): the older "Detailed View" checkbox decides.
-    readonly property int    panelDisplay: {
-        var m = Plasmoid.configuration.panelDisplay ?? -1;
-        if (m >= 0) return Math.min(3, m);
-        return Plasmoid.configuration.panelDetailed === true ? 3 : 0;
+    // What the panel shows, in order (Appearance → Panel → Panel Elements): each
+    // { id, shown } (see panelelements.js). Never edited: what the older "Panel
+    // display" showed.
+    readonly property var    panelElements: PanelElements.parse(Plasmoid.configuration.panelElements,
+                                                                Plasmoid.configuration.panelDisplay ?? -1,
+                                                                Plasmoid.configuration.panelDetailed === true,
+                                                                Plasmoid.configuration.panelSecondLine ?? 0)
+    // A vertical panel: the elements wrap onto lines as wide as the panel.
+    readonly property bool   panelVertical: Plasmoid.formFactor === PlasmaCore.Types.Vertical
+    readonly property int    panelTempFontWeight: Plasmoid.configuration.panelTempFontWeight || 400
+    // The panel's secondary font — everything on it but the weather icon and the
+    // temperature: the location, the condition and the readings (Appearance → Panel →
+    // Secondary font, Secondary font style). Its size is a % of the panel's thickness.
+    readonly property int    panelSecondaryFontWeight: Plasmoid.configuration.panelSecondLineFontWeight || 400
+    readonly property int    panelSecondaryPercent:    Plasmoid.configuration.panelSecondLinePercent || 37
+    // Pixels added to the space between the panel's elements (Appearance → Panel →
+    // Element spacing), and what is drawn between them (Element separator): a bullet,
+    // the user's own character, or "" none.
+    readonly property int    panelElementSpacing:  Plasmoid.configuration.panelElementSpacing ?? 0
+    readonly property string panelSeparator: {
+        var mode = Plasmoid.configuration.panelElementSeparator ?? 0;
+        if (mode === 1) return "•";
+        if (mode === 2) return (Plasmoid.configuration.panelElementSeparatorText || "").trim();
+        return "";
     }
-    readonly property bool   panelDetailed:      panelDisplay === 3
-    readonly property bool   panelShowIcon:      panelDisplay !== 2
-    readonly property bool   panelShowTemp:      panelDisplay !== 1
-    readonly property int    panelSecondLine:    Plasmoid.configuration.panelSecondLine ?? 0
-    // Detailed-panel font sizes, % of panel height: the bold condition word and
-    // the second line chosen by panelSecondLine.
-    readonly property int    panelConditionPercent:  Plasmoid.configuration.panelConditionPercent  || 40
-    readonly property int    panelSecondLinePercent: Plasmoid.configuration.panelSecondLinePercent || 37
 
     // Precipitation unit, and with it snowfall's (centimetres or inches). "auto" follows
     // the system locale: inches where it is US imperial, millimetres elsewhere (the UK
@@ -206,6 +218,7 @@ PlasmoidItem {
 
     property real apparentTemp: NaN
     property real humidity:     NaN
+    property real dewPoint:     NaN   // current dew point (user's temperature unit)
     property real uvIndex:      NaN
     property real precipRate:   NaN   // current precipitation, mm/h
     property real windSpeed:    NaN   // current wind speed (unit = windUnitApi)
@@ -261,7 +274,8 @@ PlasmoidItem {
     // alerts at or above the user's minimum severity — the filtered view that
     // drives the banner + tooltip. weatherAlerts holds the FULL fetched set, so
     // changing minAlertRank re-filters live without waiting for the next fetch.
-    readonly property var displayAlerts: weatherAlerts.filter(function (a) {
+    readonly property var displayAlerts: weatherAlerts.filter(function (a) { return root._alertShown(a); })
+    function _alertShown(a) {
         if (alertRank(a.severity) < minAlertRank) return false;
         // Drop alerts already past their CAP <expires> so a stale record from the
         // beta server (or one that lapses between the 15-min fetches) doesn't linger.
@@ -272,7 +286,7 @@ PlasmoidItem {
             if (!isNaN(exp) && exp < Date.now()) return false;
         }
         return true;
-    })
+    }
     // drives the header banner
     readonly property var topAlert: {
         if (!displayAlerts.length) return null;
@@ -399,13 +413,14 @@ PlasmoidItem {
         if (!m) return "";
         switch (id) {
         case "wind":      return isNaN(m.wind) ? "" : windLabel(m.wind);
-        // "Wind + gust" → compact "5G10" (sustained-Gust, whole numbers, no unit — cards
-        // are tight, and the trailing direction arrow marks it as wind). Falls back to the
-        // plain speed when no gust rounds higher than sustained (a steady-wind hour).
+        // "Wind + gust" → compact "5.3 (G10)" (no unit — cards are tight, and the trailing
+        // direction arrow marks it as wind): the speed to a decimal like everywhere else,
+        // the gust — a peak — whole, in brackets as in the header. Falls back to the plain
+        // speed when no gust rounds higher than sustained (a steady-wind hour).
         case "windGust":  return isNaN(m.wind) ? "" :
                               ((!isNaN(m.gust) && Math.round(m.gust) > Math.round(m.wind))
-                                  ? (Math.round(m.wind) + "G" + Math.round(m.gust))
-                                  : ("" + Math.round(m.wind)));
+                                  ? (windNum(m.wind) + " (G" + Math.round(m.gust) + ")")
+                                  : ("" + windNum(m.wind)));
         // At/under precipDisplayFloor counts as nothing-to-show on dry-coded hours
         // so a fallback can take over. But on actual precip-coded hours (WMO 51+)
         // always show the chance — suppressing it while the card shows a rain icon
@@ -434,43 +449,27 @@ PlasmoidItem {
         case "humidity":  return isNaN(m.humidity) ? "" : (Math.round(m.humidity) + "%");
         case "uv":        return isNaN(m.uv) ? "" : ("UV " + Math.round(m.uv));
         case "feelsLike": return isNaN(m.feels) ? "" : tempStr(m.feels);
+        case "dewPoint":  return isNaN(m.dew) ? "" : tempStr(m.dew);
         case "cloud":     return (isNaN(m.cloud) || m.cloud < 10) ? "" : (Math.round(m.cloud) + "%");
         case "pressure":  return isNaN(m.pressure) ? "" : pressureStr(m.pressure);
         }
         return "";   // "none" / unknown
     }
-    // Leading glyph (a char in the BUNDLED weather-icons font, wiFont) for a
-    // readout metric — so the icon is identical for every user regardless of
-    // their system icon theme (named theme icons like weather-showers-symbolic
-    // render differently per theme, or not at all). "" = no glyph: wind has its
-    // own trailing direction arrow; "none"/unknown get nothing. Codepoints are
-    // PUA, verified against the bundled .ttf cmap.
-    function hourlyMetricGlyph(id) {
+    // The icon before an hourly card's readout (see readingIcon): "" for none — wind
+    // has its own trailing direction arrow, and "none"/unknown get nothing.
+    function hourlyMetricIcon(id) {
         switch (id) {
-        case "cloud":     return "\uf041";   // wi-cloud (U+F041) — escape form, not the literal PUA char the others use
-        case "pressure":  return "\uf079";   // wi-barometer (U+F079)
-        case "precip":    return "";   // wi-umbrella (U+F084) — precip *chance* (vs wi-raindrop below = precip amount)
-        case "precipAmt": return "";   // wi-raindrop
-        case "snow":      return "";   // wi-snowflake-cold
-        case "humidity":  return "";   // wi-humidity
-        case "uv":        return "";   // wi-day-sunny
-        case "feelsLike": return "";   // wi-thermometer
+        case "cloud":     return "cloudy";
+        case "pressure":  return "barometer";
+        case "precip":    return "umbrella";    // the chance (the amount is a raindrop)
+        case "precipAmt": return "raindrop";
+        case "snow":      return "snowflake";
+        case "humidity":  return "humidity";
+        case "uv":        return "uv-index";
+        case "feelsLike": return "thermometer";
+        case "dewPoint":  return "thermometer-raindrop";
         }
         return "";
-    }
-    // Per-glyph size multiplier (× the readout font) for the leading glyph. The
-    // sun / thermometer / humidity glyphs render visually larger than the rain &
-    // snow ones at the same pixel size, so they're nudged down slightly to look
-    // balanced against the text. Rain/snow (and anything else) use the base 1.5×.
-    function hourlyMetricGlyphScale(id) {
-        switch (id) {
-        case "uv":
-        case "humidity":
-        case "feelsLike":
-        case "precip":    return 1.25;   // wi-umbrella reads a touch large at base — nudge down to match sun/humidity
-        case "pressure":  return 1.25;   // the barometer dial reads large at base, like those
-        }
-        return 1.5;
     }
     // Air pressure → "1013 hPa" / "29.92 inHg" / "760 mmHg". Both providers publish it at sea level
     // in hPa (the contract's unit), converted here like precipitation and snowfall are —
@@ -583,27 +582,43 @@ PlasmoidItem {
         if (id === "feelsLike") {
             var ft = (hourSample && !isNaN(hourSample.feels)) ? hourSample.feels : apparentTemp;
             return isNaN(ft) ? "" : i18n("Feels like: %1",
-                "<font color=\"" + feelsColor(ft) + "\">" + tempStr(ft) + "</font>");
+                _tint(tempStr(ft), feelsColor(ft), weatherSpecificColors));
         }
         if (id === "humidity") {
             var hum = (hourSample && !isNaN(hourSample.humidity)) ? hourSample.humidity : humidity;
             return isNaN(hum) ? "" : i18n("Humidity: %1",
-                "<font color=\"" + humidityColor(hum) + "\">" + Math.round(hum) + "%</font>");
+                _tint(Math.round(hum) + "%", humidityColor(hum), weatherSpecificColors));
         }
         if (id === "uv") {
             var uv = (hourSample && !isNaN(hourSample.uv)) ? hourSample.uv : uvIndex;
-            return isNaN(uv) ? "" : i18n("UV Index: %1",
-                "<font color=\"" + uvColor(uv) + "\">" + uvIndexText(uv) + "</font>");
+            return isNaN(uv) ? "" : i18n("UV Index: %1", uvIndexText(uv, weatherSpecificColors));
         }
+        if (id === "dewPoint") {
+            var dp = (hourSample && !isNaN(hourSample.dew)) ? hourSample.dew : dewPoint;
+            return isNaN(dp) ? "" : i18n("Dew point: %1",
+                _tint(tempStr(dp), dewColor(dp), weatherSpecificColors));
+        }
+        // the day's high and low, high first: "H/L: 18° | 9°"
+        if (id === "hiLo") {
+            var dh = day ? day : (dailyData.length ? dailyData[0] : null);
+            if (!dh || isNaN(dh.hi) || isNaN(dh.lo)) return "";
+            return i18n("H/L: %1", _hiLoText(dh.hi, dh.lo, weatherSpecificColors));
+        }
+        // the hour's amount, and its chance after a slash: "Precip.: 0.2 mm / 40%"
         if (id === "precipRate") {
             var pr = (hourSample && !isNaN(hourSample.precipAmt)) ? hourSample.precipAmt : precipRate;
-            return isNaN(pr) ? "" : i18n("Precipitation: %1",
-                "<font color=\"" + precipColor + "\">" + precipUnitStr(pr, true) + "</font>");
+            if (isNaN(pr)) return "";
+            var pc = _hourChance(hourSample);
+            var amt = _precipAmount(pr, weatherSpecificColors);
+            return isNaN(pc) ? i18n("Precip.: %1", amt)
+                             : i18n("Precip.: %1 / %2", amt,
+                                    _precipChance(pc, weatherSpecificColors));
         }
+        // the day's total, and the day in brackets: "Precip.: 1.7 mm (Tue)"
         if (id === "precipSum") {
             var ps = day ? day.precipSum : precipSumToday;
-            return isNaN(ps) ? "" : i18n("Precip. %1: %2", whenWord,
-                "<font color=\"" + precipColor + "\">" + precipUnitStr(ps, false) + "</font>");
+            return isNaN(ps) ? "" : i18n("Precip.: %1 (%2)",
+                _precipAmount(ps, weatherSpecificColors), whenWord);
         }
         if (id === "wind") {
             var ws = (hourSample && !isNaN(hourSample.wind)) ? hourSample.wind : windSpeed;
@@ -633,7 +648,7 @@ PlasmoidItem {
         if (id === "snowSum") {
             var ss = day ? day.snowSum : snowSumToday;
             return isNaN(ss) ? "" : i18n("Snowfall %1: %2", whenWord,
-                "<font color=\"" + precipColor + "\">" + snowfallStr(ss) + "</font>");
+                _tint(snowfallStr(ss), precipColor, weatherSpecificColors));
         }
         // Combined sunrise/sunset, offered in both layouts' Weather Elements.
         // One compact line "↑ 5:23a  ↓ 8:23p"; falls back to today
@@ -644,14 +659,200 @@ PlasmoidItem {
             if (!d0 || !d0.sunrise || !d0.sunset) return "";
             var rise = _sunClock(d0.sunrise), set = _sunClock(d0.sunset);
             if (!rise || !set) return "";
-            var up = "<font color=\"" + sunColor + "\">↑</font>";
-            var dn = "<font color=\"" + sunColor + "\">↓</font>";
+            var up = _tint("↑", sunColor, weatherSpecificColors);
+            var dn = _tint("↓", sunColor, weatherSpecificColors);
             return up + " " + rise + "&#160;&#160;" + dn + " " + set;
         }
         return "";
     }
     readonly property string precipColor: "#42a5f5"
     readonly property string sunColor:    "#ffb74d"
+
+    // ── Readings as icons ─────────────────────────────────────────────────────
+    // The Weather Elements in their icon style (Appearance → Common), the panel's
+    // readings, the hourly cards' readouts and the graph's sunrise and sunset:
+    // each value after an icon — Meteocons' static reading icons, bundled in
+    // contents/icons/meteocons/readings (tools/icon-pipeline/meteocons_packs.py).
+    readonly property bool elementsAsIcons: (Plasmoid.configuration.headerElementsStyle ?? 0) === 1
+    // "Weather Elements icon color" (Appearance → Common): the flat, coloured icons
+    // before the Weather Elements instead of the monochrome ones in the text colour. The
+    // panel and the graph's markers have their own; the hourly cards' stay monochrome.
+    readonly property bool readingIconsColored: Plasmoid.configuration.readingIconsColored === true
+    // "Use weather specific color" (Appearance → Common): the Weather Elements' values
+    // and the card layout's daily low / high in their weather colours (blue
+    // precipitation, the UV scale's green to red, …), else in the theme's text colour.
+    readonly property bool weatherSpecificColors: Plasmoid.configuration.weatherSpecificColors ?? true
+    // The graph's markers — the new-day icons and sunrise / sunset — in colour
+    // (Appearance → Graph → Day markers), else monochrome in the text colour.
+    readonly property bool dayMarkerIconColored: Plasmoid.configuration.dayMarkerIconColored ?? true
+    // The icon `name` as an Image source: the flat icon's file, or the monochrome one
+    // drawn in `tint` — its SVG with the colour swapped in, as a data URL, so every copy
+    // at a size shares one rendering (Qt's pixmap cache keys on the URL). Built once
+    // per icon and colour.
+    property var _monoUrls: ({})
+    function readingIcon(name, colored, tint) {
+        if (!name) return "";
+        if (colored) return Qt.resolvedUrl("../icons/meteocons/readings/flat/" + name + ".svg");
+        var hex = "" + tint, key = name + hex;
+        var url = _monoUrls[key];
+        if (!url) {
+            var svg = MonoReadings.svg[name];
+            if (!svg) return "";
+            url = "data:image/svg+xml;utf8," + encodeURIComponent(svg.replace(/currentColor/g, hex));
+            _monoUrls[key] = url;
+        }
+        return url;
+    }
+    // How wide each icon's artwork is across its box (the value follows the artwork,
+    // not the box's empty sides), and a size correction for those that fill their box
+    // more than the rest — measured from the artwork.
+    readonly property var _readingArt: ({
+        "thermometer": [0.22, 1],    "humidity": [0.30, 1],   "uv-index": [0.75, 0.72],
+        "raindrop":    [0.30, 1],    "raindrops": [0.46, 1],  "umbrella": [0.56, 0.95],
+        "snowflake":   [0.42, 1],    "cloudy": [0.62, 1.05],  "barometer": [0.62, 0.82],
+        "wind":        [0.66, 1],    "sunrise": [0.75, 1],    "sunset": [0.75, 1],
+        "thermometer-raindrop": [0.31, 1]
+    })
+    function readingIconSpan(name)  { var a = _readingArt[name]; return a ? a[0] : 1; }
+    function readingIconScale(name) { var a = _readingArt[name]; return a ? a[1] : 1; }
+    function _part(icon, text) {
+        return { icon: icon, text: text };
+    }
+    // a day's high and low, high first, each in its colour when `colored`: "18° | 9°"
+    function _hiLoText(hi, lo, colored) {
+        return _tint(tempStr(hi), "#ff6e40", colored) + " | " + _tint(tempStr(lo), "#42a5f5", colored);
+    }
+    // A precipitation amount ("1.7 mm") and chance ("40%") as the Weather Elements and
+    // the panel print them: in the precipitation blue when `colored`, but only when
+    // they print above zero — a "0 mm" or "0%" stays in the text colour. The icons
+    // before them keep their own colour setting.
+    function _precipAmount(mm, colored) {
+        var shown = precipImperial ? Math.round(mm / 25.4 * 100) : Math.round(mm * 10);
+        return _tint(precipUnitStr(mm, false), precipColor, colored && shown > 0);
+    }
+    function _precipChance(pct, colored) {
+        return _tint(Math.round(pct) + "%", precipColor, colored && Math.round(pct) > 0);
+    }
+    // the chance of precipitation for `hourSample`, or for the current hour
+    function _hourChance(hourSample) {
+        if (hourSample && !isNaN(hourSample.precip)) return hourSample.precip;
+        return currentHourSample ? currentHourSample.precip : NaN;
+    }
+    // a value in its colour when `colored`, plain otherwise (styled text)
+    function _tint(text, color, colored) {
+        return colored ? "<font color=\"" + color + "\">" + text + "</font>" : text;
+    }
+    // Weather Element `id` (the ids of metricText) as icon parts: [{ icon, text }] —
+    // usually one, two for sunrise / sunset, none when there is no value. Reads the same
+    // hour and day metricText does, with the values coloured when `colored`. A day's
+    // total is followed by the day it is for: "1.7 mm (Today)", "(Tue)".
+    function metricParts(id, dayIdx, hourSample, colored) {
+        var day = (dayIdx !== undefined && dayIdx >= 0 && dayIdx < dailyData.length) ? dailyData[dayIdx] : null;
+        var whenWord = (dayIdx !== undefined && dayIdx > 0) ? dayName(dayIdx) : i18n("Today");
+        switch (id) {
+        case "feelsLike": {
+            var ft = (hourSample && !isNaN(hourSample.feels)) ? hourSample.feels : apparentTemp;
+            return isNaN(ft) ? [] : [_part("thermometer", _tint(tempStr(ft), feelsColor(ft), colored))];
+        }
+        case "humidity": {
+            var hum = (hourSample && !isNaN(hourSample.humidity)) ? hourSample.humidity : humidity;
+            return isNaN(hum) ? [] : [_part("humidity", _tint(Math.round(hum) + "%", humidityColor(hum), colored))];
+        }
+        case "uv": {
+            var uv = (hourSample && !isNaN(hourSample.uv)) ? hourSample.uv : uvIndex;
+            return isNaN(uv) ? [] : [_part("uv-index", uvIndexText(uv, colored))];
+        }
+        case "dewPoint": {
+            var dp = (hourSample && !isNaN(hourSample.dew)) ? hourSample.dew : dewPoint;
+            return isNaN(dp) ? [] : [_part("thermometer-raindrop", _tint(tempStr(dp), dewColor(dp), colored))];
+        }
+        case "hiLo": {
+            var dh = day ? day : (dailyData.length ? dailyData[0] : null);
+            if (!dh || isNaN(dh.hi) || isNaN(dh.lo)) return [];
+            return [_part("thermometer", _hiLoText(dh.hi, dh.lo, colored))];
+        }
+        // the hour's amount, then its chance: "0.2 mm  40%" (no chance from MET Norway)
+        case "precipRate": {
+            var pr = (hourSample && !isNaN(hourSample.precipAmt)) ? hourSample.precipAmt : precipRate;
+            if (isNaN(pr)) return [];
+            var parts = [_part("raindrop", _precipAmount(pr, colored))];
+            var pc = _hourChance(hourSample);
+            if (!isNaN(pc)) parts.push(_part("umbrella", _precipChance(pc, colored)));
+            return parts;
+        }
+        case "precipSum": {
+            var ps = day ? day.precipSum : precipSumToday;
+            return isNaN(ps) ? [] : [_part("raindrops", _precipAmount(ps, colored)
+                                                         + " (" + whenWord + ")")];
+        }
+        case "snowSum": {
+            var ss = day ? day.snowSum : snowSumToday;
+            return isNaN(ss) ? [] : [_part("snowflake", _tint(snowfallStr(ss), precipColor, colored)
+                                                          + " (" + whenWord + ")")];
+        }
+        case "wind": {
+            var ws = (hourSample && !isNaN(hourSample.wind)) ? hourSample.wind : windSpeed;
+            if (isNaN(ws)) return [];
+            var gs = (hourSample && !isNaN(hourSample.gust)) ? hourSample.gust : windGust;
+            return [_part("wind", (!isNaN(gs) && Math.round(gs) > Math.round(ws))
+                                    ? (windLabel(ws) + " (G" + Math.round(gs) + ")") : windLabel(ws))];
+        }
+        case "cloud": {
+            var cc = (hourSample && !isNaN(hourSample.cloud)) ? hourSample.cloud : cloudCover;
+            return isNaN(cc) ? [] : [_part("cloudy", Math.round(cc) + "%")];
+        }
+        case "pressure": {
+            var pa = (hourSample && !isNaN(hourSample.pressure)) ? hourSample.pressure : pressure;
+            return isNaN(pa) ? [] : [_part("barometer", pressureStr(pa))];
+        }
+        case "sun": case "sunrise": case "sunset": {
+            var d0 = day ? day : (dailyData.length ? dailyData[0] : null);
+            if (!d0 || !d0.sunrise || !d0.sunset) return [];
+            var rise = _sunClock(d0.sunrise), set = _sunClock(d0.sunset);
+            if (!rise || !set) return [];
+            return [_part("sunrise", rise), _part("sunset", set)];
+        }
+        }
+        return [];
+    }
+    // The panel reading `id` (an element of panelElements, see panelelements.js) as
+    // icon parts, for now and today; none when it has no data. Coloured like the popup
+    // when the panel shows the coloured icon.
+    function panelMetricParts(id) {
+        var c = panelColorIcon;
+        switch (id) {
+        case "hiLo": {   // today's high and low: "18° | 9°"
+            if (isNaN(lowTemp) || isNaN(highTemp)) return [];
+            return [_part("thermometer", _hiLoText(highTemp, lowTemp, c))];
+        }
+        case "precipRate": return metricParts("precipRate", -1, null, c);   // this hour's amount and chance
+        case "wind": {   // wind, whole numbers: "34 km/h (G12)"
+            if (isNaN(windSpeed)) return [];
+            var gust = (!isNaN(windGust) && Math.round(windGust) > Math.round(windSpeed))
+                ? " (G" + Math.round(windGust) + ")" : "";
+            return [_part("wind", Math.round(windSpeed) + " " + windUnitLabel + gust)];
+        }
+        case "feelsLike": return metricParts("feelsLike", 0, null, c);
+        case "humidity":  return metricParts("humidity", 0, null, c);
+        case "precipSum": {   // today's precipitation sum: no "(Today)", the panel is always today
+            if (isNaN(precipSumToday)) return [];
+            return [_part("raindrops", _precipAmount(precipSumToday, c))];
+        }
+        case "uv": {   // the UV index without its category, the panel is short of room
+            if (isNaN(uvIndex)) return [];
+            return [_part("uv-index", uvIndexText(uvIndex, c, false))];
+        }
+        case "pressure": return metricParts("pressure", 0, null, c);
+        case "sun":      return metricParts("sun", 0, null, c);
+        case "dewPoint": return metricParts("dewPoint", 0, null, c);
+        case "snowSum": {  // today's snowfall: no "(Today)", as for the precipitation sum
+            if (isNaN(snowSumToday)) return [];
+            return [_part("snowflake", _tint(snowfallStr(snowSumToday), precipColor, c))];
+        }
+        case "cloud": return metricParts("cloud", 0, null, c);
+        }
+        return [];
+    }
     property int  isDay:        1
     property var  dailyData:    []   // [{ date, code, hi, lo }] — up to 7 days
     property var  allHourly:    []   // [{ time, date, temp, code, day, precip }] — all hours
@@ -697,18 +898,6 @@ PlasmoidItem {
         if (isNaN(speed)) return "";
         return windNum(speed) + " " + windUnitLabel;
     }
-
-    // Wind-direction arrow as a Weather Icons font glyph (the glyph already
-    // points the right way for each of the 16 compass sectors — no rotation).
-    // The bundled Weather Icons font, loaded once for every view that draws a glyph
-    // from it (the wind-direction arrows) — a named theme icon would render differently
-    // per user, or not at all.
-    FontLoader {
-        id: wiFontLoader
-        source: Qt.resolvedUrl("../fonts/weathericons-regular-webfont.ttf")
-    }
-    readonly property string wiFontFamily: wiFontLoader.status === FontLoader.Ready
-                                           ? wiFontLoader.font.family : ""
 
     // How far to turn contents/icons/wind-direction.svg (which points UP) for a wind
     // direction. Providers report where the wind comes FROM, and the arrow shows where it
@@ -978,6 +1167,7 @@ PlasmoidItem {
             x = Object.assign({}, raw.current);
             x.temperature  = _userTemp(x.temperature);
             x.apparentTemp = _userTemp(x.apparentTemp);
+            x.dewPoint     = _userTemp(x.dewPoint);
             x.windSpeed    = _userWind(x.windSpeed);
             x.windGust     = _userWind(x.windGust);
             out.current = x;
@@ -992,6 +1182,7 @@ PlasmoidItem {
             x = Object.assign({}, raw.hourly[i]);
             x.temp  = _userTemp(x.temp);
             x.feels = _userTemp(x.feels);
+            x.dew   = _userTemp(x.dew);
             x.wind  = _userWind(x.wind);
             x.gust  = _userWind(x.gust);
             out.hourly.push(x);
@@ -1017,6 +1208,7 @@ PlasmoidItem {
             root.weatherCode  = c.weatherCode;
             root.apparentTemp = c.apparentTemp;
             root.humidity     = c.humidity;
+            root.dewPoint     = c.dewPoint;
             root.isDay        = c.isDay;
             root.uvIndex      = c.uvIndex;
             root.precipRate   = c.precipRate;
@@ -1218,7 +1410,7 @@ PlasmoidItem {
             if (now >= start && now < start + span * 3600000) {
                 raw.current = {
                     temperature: s.temp, weatherCode: s.code, apparentTemp: s.feels,
-                    humidity: s.humidity, isDay: s.day, uvIndex: s.uv,
+                    humidity: s.humidity, dewPoint: s.dew, isDay: s.day, uvIndex: s.uv,
                     precipRate: isNaN(s.precipAmt) ? NaN : s.precipAmt / span,
                     windSpeed: s.wind, windGust: s.gust, cloudCover: s.cloud,
                     pressure: s.pressure
@@ -1308,7 +1500,7 @@ PlasmoidItem {
             var x = new XMLHttpRequest();
             // a hung detail would never decrement `pending`, so results never
             // publish — time it out and count it as a skipped (failed) detail.
-            var settle = (function (xhr) {
+            var settle = (function (xhr, id) {
                 var fin = false;
                 return function (use) {
                     if (fin || gen !== root._alertGen) return;   // superseded/done → drop
@@ -1317,11 +1509,14 @@ PlasmoidItem {
                         var a = root._parseCapAlert(xhr.responseText);
                         // store the FULL set; the minimum-severity filter is applied at
                         // display time (displayAlerts) so the level can change live
-                        if (a) results.push(a);
+                        if (a) { a.id = id; results.push(a); }
                     }
-                    if (--pending === 0 && gen === root._alertGen) root.weatherAlerts = results;
+                    if (--pending === 0 && gen === root._alertGen) {
+                        root.weatherAlerts = results;
+                        root._notifyNewAlerts(results);
+                    }
                 };
-            })(x);
+            })(x, ids[k]);
             x.timeout = 8000;
             x.ontimeout = (function (fn) { return function () { fn(false); }; })(settle);
             x.onreadystatechange = (function (xhr, fn) { return function () {
@@ -1334,6 +1529,84 @@ PlasmoidItem {
             x.send();
         }
     }
+    // ── Alert notifications ───────────────────────────────────────────────
+    // "Notify about new alerts" (General): every alert the widget shows goes to
+    // Plasma's notifications once, as it first comes in. The ones already announced
+    // are remembered in LocalStorage — across restarts, and shared by every
+    // KlimeWeather on the desktop, so two widgets for one place don't both announce
+    // it — for as long as they keep being fetched, and alertMemoryMs after, so a
+    // failed fetch doesn't make an alert new again. An update from the agency is a
+    // new alert (CAP gives it a new identifier), and is announced as one.
+    readonly property bool alertNotifications: Plasmoid.configuration.alertNotifications ?? true
+    readonly property double alertMemoryMs: 3 * 24 * 3600 * 1000
+    function _notifyNewAlerts(alerts) {
+        if (!alertNotifications || !showAlerts) return;
+        var shown = alerts.filter(function (a) { return !!a.id && root._alertShown(a); });
+        var db = _cacheDb(), fresh = [], now = Date.now();
+        if (!db) return;   // nothing remembered → nothing announced, rather than every fetch
+        try {
+            db.transaction(function (tx) {
+                tx.executeSql("CREATE TABLE IF NOT EXISTS notifiedAlerts(id TEXT PRIMARY KEY, seen REAL)");
+                for (var i = 0; i < shown.length; ++i) {
+                    if (tx.executeSql("SELECT id FROM notifiedAlerts WHERE id = ?", [shown[i].id]).rows.length === 0)
+                        fresh.push(shown[i]);
+                    tx.executeSql("INSERT OR REPLACE INTO notifiedAlerts VALUES (?, ?)", [shown[i].id, now]);
+                }
+                tx.executeSql("DELETE FROM notifiedAlerts WHERE seen < ?", [now - root.alertMemoryMs]);
+            });
+        } catch (e) {
+            console.log("Weather: alert notifications unavailable", e);
+            return;
+        }
+        // the most severe last, so it lands on top of the others
+        fresh.sort(function (a, b) { return root.alertRank(a.severity) - root.alertRank(b.severity); });
+        fresh.forEach(function (a) { root._sendAlertNotification(a); });
+    }
+    // Plain text for the notification's body, which takes a little HTML.
+    function _notifyEscape(s) {
+        return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+    function _sendAlertNotification(a) {
+        // the headline, where it says more than the event's name; where and until when;
+        // and the start of the description, the rest a click away in the popup
+        var lines = [];
+        if (a.headline && a.headline !== a.event) lines.push(a.headline);
+        var until = "";
+        if (a.ends) {
+            var d = new Date(a.ends);
+            if (!isNaN(d.getTime())) until = d.toLocaleString(Qt.locale(), use24Hour ? "ddd H:mm" : "ddd h:mm AP");
+        }
+        lines.push(until ? i18n("%1, until %2", locationShortName, until) : locationShortName);
+        var desc = a.description ? _flowAlert(a.description) : "";
+        if (desc.length > 300) desc = desc.substring(0, 300).replace(/\s+\S*$/, "") + "…";
+        if (desc) lines.push(desc);
+        var n = alertNotificationComponent.createObject(root, {
+            title: a.event || i18n("Weather alert"),
+            text: lines.map(root._notifyEscape).join("\n"),
+            // an extreme alert stays until dismissed, and shows through Do Not Disturb
+            urgency: a.severity === "Extreme" ? Notification.CriticalUrgency
+                   : a.severity === "Severe" ? Notification.HighUrgency : Notification.NormalUrgency
+        });
+        if (!n) return;
+        // shown as from KlimeWeather, not from Plasma's own notifications
+        n.setHint("x-kde-display-appname", "KlimeWeather");
+        n.sendEvent();
+    }
+    Component {
+        id: alertNotificationComponent
+        Notification {
+            componentName: "plasma_workspace"
+            eventId: "notification"
+            iconName: "dialog-warning"
+            autoDelete: true
+            // a click opens the popup, where the alert's whole text is
+            defaultAction: NotificationAction {
+                label: i18n("Show")
+                onActivated: root.expanded = true
+            }
+        }
+    }
+
     // CAP 1.2 XML → our alert object. CAP carries one <info> per language; pick
     // the UI language, else English, else the first. (Lightweight regex parse —
     // CAP's structure is regular and QML's XML DOM is awkward with namespaces.)
@@ -1613,7 +1886,8 @@ PlasmoidItem {
         if (code < 0 || !_pack.animated) return "";
         return Qt.resolvedUrl(_pack.dir) + "animated/" + conditionStem(code, day, cloudCover) + ".svg";
     }
-    // White (monochrome) variant — used for the panel/tray icon.
+    // White (monochrome) variant — the panel's icon without its colours, and the
+    // graph's day markers without theirs; both tint it to the text colour.
     function conditionIconWhite(code, day, cloudCover, stemOverride) {
         if (code < 0) return "weather-none-available";
         if (_pack.theme) return conditionStemFreedesktop(code, day);
@@ -1621,15 +1895,6 @@ PlasmoidItem {
         if (_pack.custom && Plasmoid.configuration.customIconDir)
             return Plasmoid.configuration.customIconDir + "/" + stem + _pack.ext;
         return Qt.resolvedUrl(panelWhiteDir) + stem + ".svg";
-    }
-
-    // Sunrise/sunset glyphs for the SimpleView temperature curve are DECORATION,
-    // not condition icons, so they come from their own bundled pair regardless of
-    // the active icon pack: the System theme has no sunrise/sunset glyph
-    // (conditionIcon would yield a plain sun) and a Custom folder may not include
-    // wi-sunrise/wi-sunset at all.
-    function sunEventIcon(rise) {
-        return Qt.resolvedUrl("../icons/sun-events/") + (rise ? "wi-sunrise" : "wi-sunset") + ".svg";
     }
 
     // The clear-night moon artwork (wi-night-clear) packs more visual mass into its
@@ -1661,14 +1926,19 @@ PlasmoidItem {
     }
 
     // ── UV index → text with WHO category ─────────────────────────────────
-    function uvIndexText(uv) {
+    // UV index → "2.5 (Moderate)": the value to a decimal and its WHO category, the
+    // value alone in the category's colour when `colored` (styled text). Without
+    // `withLevel` (the panel's reading) just the value.
+    function uvIndexText(uv, colored, withLevel) {
         if (isNaN(uv)) return "—";
         var v = Math.round(uv * 10) / 10;
-        if (v <= 2)  return v + " (" + i18n("Low") + ")";
-        if (v <= 5)  return v + " (" + i18n("Moderate") + ")";
-        if (v <= 7)  return v + " (" + i18n("High") + ")";
-        if (v <= 10) return v + " (" + i18n("Very High") + ")";
-        return v + " (" + i18n("Extreme") + ")";
+        var num = _tint("" + v, uvColor(uv), colored === true);
+        if (withLevel === false) return num;
+        var level = v <= 2  ? i18n("Low")
+                  : v <= 5  ? i18n("Moderate")
+                  : v <= 7  ? i18n("High")
+                  : v <= 10 ? i18n("Very High") : i18n("Extreme");
+        return num + " (" + level + ")";
     }
 
     // ── Value colors ──────────────────────────────────────────────────────
@@ -1688,6 +1958,16 @@ PlasmoidItem {
         if (h < 30)  return "#d4a85f";
         if (h <= 60) return "#4db6ac";
         return "#1e88e5";
+    }
+    // Dew point: how muggy the air is — comfortable teal, muggy orange, oppressive red
+    // (from 16 °C and from 21 °C, the usual comfort bands).
+    function dewColor(val) {
+        var d = (val === undefined) ? dewPoint : val;
+        if (isNaN(d)) return Kirigami.Theme.textColor;
+        var c = (units === "fahrenheit") ? (d - 32) * 5 / 9 : d;
+        if (c < 16) return "#4db6ac";
+        if (c < 21) return "#fb8c00";
+        return "#e53935";
     }
     // UV: official WHO exposure-category colors.
     function uvColor(val) {

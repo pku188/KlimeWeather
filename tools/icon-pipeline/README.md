@@ -33,10 +33,22 @@ offsets). See `contents/icons/meteocons/ATTRIBUTION.md`.
       --exit-with-session "env QT_QPA_PLATFORM=wayland WAYLAND_DISPLAY=wl-test qml6 probe.qml"
   ```
 
-## Panel white set and sun-event glyphs (older pipeline, still shipped)
+## Reading icons (`contents/icons/meteocons/readings/`)
 
-`contents/icons/basmilius-white/` (the panel's white icons) and
-`contents/icons/sun-events/` (the graph's sunrise/sunset markers) were made from
+The icons before a reading (Weather Elements, panel, hourly cards, the graph's
+sunrise and sunset) and in the panel settings' list of Panel Elements, from the static package, flat as files and monochrome as
+`monochrome.js` (recoloured at run time):
+
+```fish
+python3 meteocons_packs.py --readings static/package ../../contents/icons/meteocons
+```
+
+They replaced the Weather Icons font and the graph's own sunrise/sunset glyphs
+(`contents/icons/sun-events/`, made by `bake_sun_static.py`, kept for reference).
+
+## Panel white set (older pipeline, still shipped)
+
+`contents/icons/basmilius-white/` (the panel's white icons) was made from
 Meteocons v3.0.0-next.10 with the steps below, when QtSvg could not draw masks at
 all. The WebP heroes these steps also produced (`bake_v3.sh`, `render_frames.py`,
 `pad_lottie.py`, `animate_fog.py`) are retired: the Meteocons packs animate their

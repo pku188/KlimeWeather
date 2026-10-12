@@ -41,19 +41,19 @@ RowLayout {
     readonly property real elementsSteadyWidth: {
         if (!weatherRoot || !visible || !metrics || !metrics.length) return 0;
         var hours = readingHours || [], days = Math.min(readingDays, weatherRoot.dailyData.length);
-        var gap = Kirigami.Units.smallSpacing, widest = 0;
+        var gap = Kirigami.Units.smallSpacing, widest = 0, icons = weatherRoot.elementsAsIcons;
         for (var m = 0; m < metrics.length; ++m) {
             var id = metrics[m], seen = {}, w = 0, i;
             // now, each day (the day totals and sun times), and each hour (the rest)
-            var texts = [weatherRoot.metricText(id, -1, null)];
-            for (i = 0; i < days; ++i) texts.push(weatherRoot.metricText(id, i, null));
+            var texts = [_reading(id, -1, null)];
+            for (i = 0; i < days; ++i) texts.push(_reading(id, i, null));
             for (i = 0; i < hours.length; ++i)
-                if (hours[i] && !hours[i].dayBreak) texts.push(weatherRoot.metricText(id, -1, hours[i]));
+                if (hours[i] && !hours[i].dayBreak) texts.push(_reading(id, -1, hours[i]));
             for (i = 0; i < texts.length; ++i) {
                 var t = texts[i];
                 if (!t || seen[t]) continue;
                 seen[t] = true;
-                w = Math.max(w, elementsFont.advanceWidth(_plainText(t)));
+                w = Math.max(w, icons ? _partsWidth(t) : elementsFont.advanceWidth(_plainText(t)));
             }
             if (w <= 0) continue;
             if (id === "wind") w += gap * 2 + weatherRoot.windArrowSize;         // the arrow after the speed
@@ -63,6 +63,25 @@ RowLayout {
         }
         return widest;
     }
+    // An element as the column prints it, for measuring: its text, or in the icon style
+    // its parts (JSON, so identical readings are measured once).
+    function _reading(id, day, sample) {
+        if (!weatherRoot.elementsAsIcons) return weatherRoot.metricText(id, day, sample);
+        var p = weatherRoot.metricParts(id, day, sample, true);
+        return p.length ? JSON.stringify(p) : "";
+    }
+    // the width of an icon-style element (ElementReading): an icon slot and its value
+    // per part, with the spacings between them
+    function _partsWidth(json) {
+        var p = JSON.parse(json), w = 0, fontPx = elementsFont.font.pixelSize;
+        for (var i = 0; i < p.length; ++i)
+            w += iconSlot + Math.round(fontPx * 0.3) + elementsFont.advanceWidth(_plainText(p[i].text))
+                 + (i > 0 ? Math.round(fontPx * 0.6) : 0);
+        return w;
+    }
+    // Every element's icon sits centred in a slot this wide, so the values start level
+    // (the widest artwork — sunrise, sunset — fits it).
+    readonly property int iconSlot: Math.round((weatherRoot ? weatherRoot.headerInfoFontSize : 14) * 1.6)
     // what a styled Weather Element prints, without its markup (colours only)
     function _plainText(t) {
         return t.replace(/<[^>]*>/g, "").replace(/&#160;|&nbsp;/g, "\u00a0")
@@ -160,23 +179,40 @@ RowLayout {
                 readonly property var sample: heroRow.sample
                 // day-based elements (sun, precipitation and snow totals) follow the
                 // view's selected day; the rest read the hour it hands in
-                readonly property string metric: weatherRoot ? weatherRoot.metricText(modelData, heroRow.selectedDay, heroRow.sample) : ""
+                readonly property bool icons: weatherRoot ? weatherRoot.elementsAsIcons : false
+                readonly property string metric: (weatherRoot && !icons)
+                    ? weatherRoot.metricText(modelData, heroRow.selectedDay, heroRow.sample) : ""
+                // the icon style: each value after the hourly cards' icon for it
+                readonly property var parts: (weatherRoot && icons)
+                    ? weatherRoot.metricParts(modelData, heroRow.selectedDay, heroRow.sample,
+                                              weatherRoot.weatherSpecificColors) : []
+                readonly property bool hasReading: icons ? parts.length > 0 : metric.length > 0
                 // keep the FIRST row visible for the alert "!" even when its
                 // metric text is empty (e.g. metric set to "none", or a precip
                 // metric that's blank on a dry day) — an invisible parent would
                 // hide the AlertIndicator child along with the row.
-                visible: metric.length > 0
+                visible: hasReading
                          || (index === 0 && weatherRoot && weatherRoot.showAlerts
                              && weatherRoot.topAlert !== null)
                 spacing: Kirigami.Units.smallSpacing
                 Label {
+                    visible: !metricRow.icons
                     textFormat: Text.StyledText
                     font.weight: weatherRoot ? weatherRoot.headerInfoFontWeight : Font.DemiBold
                     font.pixelSize: weatherRoot ? weatherRoot.headerInfoFontSize : 14
                     text: metricRow.metric
                 }
+                ElementReading {
+                    visible: metricRow.icons && metricRow.parts.length > 0
+                    weatherRoot: heroRow.weatherRoot
+                    parts: metricRow.parts
+                    fontPx: weatherRoot ? weatherRoot.headerInfoFontSize : 14
+                    fontWeight: weatherRoot ? weatherRoot.headerInfoFontWeight : Font.DemiBold
+                    coloredIcons: weatherRoot ? weatherRoot.readingIconsColored : false
+                    iconSlot: heroRow.iconSlot
+                }
                 Kirigami.Icon {   // wind direction, after the speed (and its gust)
-                    visible: metricRow.modelData === "wind" && metricRow.metric.length > 0
+                    visible: metricRow.modelData === "wind" && metricRow.hasReading
                              && metricRow.sample && !isNaN(metricRow.sample.windDir)
                     source: Qt.resolvedUrl("../icons/wind-direction.svg")
                     isMask: true

@@ -612,9 +612,12 @@ Item {
                             Layout.alignment: Qt.AlignHCenter
                             textFormat: Text.StyledText
                             font.pixelSize: weatherRoot ? weatherRoot.dailyTempFontSize : 15
+                            // low in blue, high in orange — or both in the theme's text
+                            // colour without weather-specific colours (Appearance → Common)
                             text: weatherRoot
-                                ? "<b><font color=\"#42a5f5\">" + weatherRoot.tempStr(dayTab.modelData.lo) + "</font> | "
-                                  + "<font color=\"#ff6e40\">" + weatherRoot.tempStr(dayTab.modelData.hi) + "</font></b>" : ""
+                                ? "<b>" + weatherRoot._tint(weatherRoot.tempStr(dayTab.modelData.lo), "#42a5f5", weatherRoot.weatherSpecificColors)
+                                  + " | " + weatherRoot._tint(weatherRoot.tempStr(dayTab.modelData.hi), "#ff6e40", weatherRoot.weatherSpecificColors)
+                                  + "</b>" : ""
                         }
                     }
                 }
@@ -1025,18 +1028,15 @@ Item {
                                             // doesn't shift; the contents simply hide when val is empty.
                                             Layout.preferredHeight: full.hourMetricRowH
                                             spacing: 2
-                                            Text {   // leading metric glyph from the BUNDLED weather-
-                                                     // icons font (wiFont) — identical for every user,
-                                                     // unlike a system-theme icon. Wind has none here
-                                                     // (its direction arrow trails the label instead).
-                                                readonly property string glyph: weatherRoot ? weatherRoot.hourlyMetricGlyph(hMetricRow.effId) : ""
-                                                visible: hMetricRow.val.length > 0 && glyph.length > 0
-                                                text: glyph
-                                                color: Kirigami.Theme.textColor
+                                            ReadingIcon {   // the readout's icon (main.qml hourlyMetricIcon);
+                                                            // wind has none here — its direction
+                                                            // arrow trails the label instead
+                                                visible: hMetricRow.val.length > 0 && name.length > 0
+                                                weatherRoot: full.weatherRoot
+                                                name: weatherRoot ? weatherRoot.hourlyMetricIcon(hMetricRow.effId) : ""
+                                                colored: false   // monochrome, whatever the Weather Elements' icons
                                                 opacity: 0.75
-                                                font.family: weatherRoot ? weatherRoot.wiFontFamily : ""
-                                                font.pixelSize: Math.round((weatherRoot ? weatherRoot.hourlyCardFontSize : 11)
-                                                    * (weatherRoot ? weatherRoot.hourlyMetricGlyphScale(hMetricRow.effId) : 1.5))
+                                                fontPx: weatherRoot ? weatherRoot.hourlyCardFontSize : 11
                                             }
                                             Label {
                                                 font.pixelSize: weatherRoot ? weatherRoot.hourlyCardFontSize : 11

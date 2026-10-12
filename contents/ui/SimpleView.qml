@@ -122,6 +122,13 @@ Item {
         "set":  { core: [255, 205, 120], mid: [255, 145,  62], streak: [255, 154,  68] }
     })
     readonly property real sunGlowCoreA:   0.62   // brightest (on the line) — softened from the design's .97
+    // With the day markers' colours off (Appearance → Graph), the bloom goes neutral to
+    // match them: the theme's text colour, much fainter, so it reads as a soft light
+    // on the line rather than a coloured patch on the theme. On a light theme the text
+    // colour is dark, a shadow rather than a light, so it is fainter still there.
+    readonly property bool  sunGlowColored: weatherRoot ? weatherRoot.dayMarkerIconColored : true
+    readonly property color sunGlowNeutral: Kirigami.Theme.textColor
+    readonly property real  sunGlowNeutralA: sunGlowNeutral.hslLightness > 0.5 ? 0.22 : 0.08
     readonly property real sunGlowFeather: 3.5    // radial falloff exponent: alpha = coreA·exp(−feather·r²). Higher = softer, more feathered rim; lower = a fuller, more defined glow
     readonly property real sunGlowStreakA: 0.45   // peak alpha of the line streak
     // Horizontal radius of the radial bloom, in curve columns (feathering keeps a
@@ -1073,7 +1080,11 @@ Item {
             var colF = Math.max(0, Math.min(denom, off * denom));
             var i0 = Math.min(n - 2, Math.floor(colF)), fr = colF - i0;
             var cy = ty[i0] + (ty[i0 + 1] - ty[i0]) * fr;
-            var pal = peaks[p].rise ? sunGlow.rise : sunGlow.set;
+            var neutral = [Math.round(sunGlowNeutral.r * 255), Math.round(sunGlowNeutral.g * 255),
+                           Math.round(sunGlowNeutral.b * 255)];
+            var pal = !sunGlowColored ? { core: neutral, mid: neutral }
+                                      : (peaks[p].rise ? sunGlow.rise : sunGlow.set);
+            var coreA = sunGlowColored ? sunGlowCoreA : sunGlowNeutralA;
             // local slope of the curve at the event: the chord between the bracketing
             // columns. The bloom is rotated by this so its wide axis lies ALONG the
             // line and the rise is perpendicular to it — on a steep section it follows
@@ -1096,7 +1107,7 @@ Item {
                 var gcol = [Math.round(pal.core[0] + (pal.mid[0] - pal.core[0]) * cmix),
                             Math.round(pal.core[1] + (pal.mid[1] - pal.core[1]) * cmix),
                             Math.round(pal.core[2] + (pal.mid[2] - pal.core[2]) * cmix)];
-                var ga = gs === GSTOPS ? 0 : sunGlowCoreA * Math.exp(-sunGlowFeather * gt * gt);
+                var ga = gs === GSTOPS ? 0 : coreA * Math.exp(-sunGlowFeather * gt * gt);
                 g.addColorStop(gt, rgbaArr(gcol, ga));
             }
             ctx.fillStyle = g;
@@ -1676,6 +1687,8 @@ Item {
                             function onCurSnowChanged()   { chart.requestPaint(); }
                             function onColorModeChanged()  { chart.requestPaint(); }
                             function onRevealChanged()     { chart.requestPaint(); }
+                            function onSunGlowColoredChanged() { chart.requestPaint(); }
+                            function onSunGlowNeutralChanged() { chart.requestPaint(); }
                         }
 
                         onPaint: {
@@ -2152,11 +2165,16 @@ Item {
                                     height: width
                                     roundToIconSize: false   // render at the exact size; don't snap to 22/32
                                     anchors.verticalCenter: parent.verticalCenter
-                                    // the monochrome pack is drawn in the theme's text colour
-                                    isMask: weatherRoot ? weatherRoot.iconPackIsMask : false
+                                    // in the pack's colours, or without them the panel's solid
+                                    // white set in the theme's text colour (Appearance → Graph →
+                                    // Day markers); the monochrome pack is drawn in the text
+                                    // colour either way
+                                    readonly property bool colored: weatherRoot ? weatherRoot.dayMarkerIconColored : true
+                                    isMask: weatherRoot ? (weatherRoot.iconPackIsMask || !colored) : false
                                     color: Kirigami.Theme.textColor
                                     source: (weatherRoot && dayMarker.dayEntry)
-                                            ? weatherRoot.conditionIcon(dayMarker.dayEntry.code, 1)
+                                            ? (colored ? weatherRoot.conditionIcon(dayMarker.dayEntry.code, 1)
+                                                       : weatherRoot.conditionIconWhite(dayMarker.dayEntry.code, 1))
                                             : "weather-clear-night"
                                 }
                                 Label {
@@ -2231,24 +2249,27 @@ Item {
                             property real belowF: wantBelow ? 1 : 0
                             Behavior on belowF { NumberAnimation { duration: 300; easing.type: Easing.InOutQuad } }
                             y: aboveY + (belowY - aboveY) * belowF
-                            Kirigami.Icon {
+                            // Meteocons' sunrise / sunset, flat with the graph's "Use colored day
+                            // markers" (Appearance → Graph), else monochrome in the text colour
+                            // (main.qml readingIcon)
+                            Image {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 width: parent.sz; height: parent.sz
-                                roundToIconSize: false   // exact size; don't snap to 22/32
-                                // sunset glyph recoloured to match its time label (sunGold);
-                                // the full-colour SVG needs isMask to accept a flat tint.
-                                // sunrise keeps its natural artwork (isMask false → colour ignored).
-                                isMask: !parent.modelData.rise
-                                color: simple.sunGold
+                                sourceSize: Qt.size(width, height)
                                 source: weatherRoot
-                                        ? weatherRoot.sunEventIcon(parent.modelData.rise)
+                                        ? weatherRoot.readingIcon(parent.modelData.rise ? "sunrise" : "sunset",
+                                                                  weatherRoot.dayMarkerIconColored,
+                                                                  Kirigami.Theme.textColor)
                                         : ""
                             }
                             Label {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: weatherRoot ? simple.sunTimeLabel(parent.modelData.ms) : ""
-                                // each time matches its own glyph: sunrise the icon's gold, sunset sunGold
-                                color: parent.modelData.rise ? simple.sunRiseColor : simple.sunGold
+                                // each time matches its own glyph: sunrise the icon's gold, sunset
+                                // sunGold — or, with the day markers' colours off, the theme's
+                                // text colour like the monochrome icon above it
+                                color: !(weatherRoot && weatherRoot.dayMarkerIconColored) ? Kirigami.Theme.textColor
+                                       : (parent.modelData.rise ? simple.sunRiseColor : simple.sunGold)
                                 font.bold: true
                                 font.pixelSize: weatherRoot ? weatherRoot.hourlyInfoFontSize : 11
                             }

@@ -24,11 +24,11 @@ This is a fork of the [Bare Weather](https://github.com/bvlthvzvr/BareWeather), 
 
 ### Readouts you pick
 
-- Up to four **Weather Elements** in the header: air pressure, feels like, humidity, UV,
-precipitation rate or daily sum, wind (with a direction arrow), cloud cover, sunrise/sunset.
-- Customizable unit types and time formats which follow your system's locale settings by default.
-- Up to 7 days of forecast.
-- Point anywhere along the graph to read that hour's conditions.
+- Up to **7 days** of forecast with variety of **Weather Elements** available: air pressure, cloud cover, dew point,
+feels like, high/low temperature, humidity, hourly or daily precipitation, snowfall,
+sunrise/sunset, UV, wind (with a direction arrow) — labelled with text or with icons, colored or monochrome.
+- Show any of the Weather Elements on the **panel**, in the order you drag them into. On a vertical panel, they automatically wrap onto multiple lines.
+- Customizable unit types and time format which follow your system's locale settings by default.
 
 
 ### Other characteristics
@@ -43,10 +43,11 @@ Your system icon theme or a folder of your own icons work too.
 with both layouts having additional customization options.
 - **Redrawn wind direction icon** — a clear arrow at a size you choose, turning to
 the exact reported angle instead of snapping to the fixed set of compass points.
-- **Severe-weather alerts** from the KDE FOSS Public Alert Server, from a severity you set.
+- **Severe-weather alerts** from the KDE FOSS Public Alert Server, from a severity you set,
+each new one also sent to your desktop's notifications.
 - **Saved locations with favourites** — search by name, or detect one automatically.
 - **Scroll through the forecast** — the mouse wheel moves through hours and days.
-  How far and fast one notch travels is configurable per layout or graph view (12/24/48 hours).
+  How far and fast one notch travels is configurable per view. You can point anywhere along the graph to read that hour's conditions.
 
 
 ### Faster and smoother

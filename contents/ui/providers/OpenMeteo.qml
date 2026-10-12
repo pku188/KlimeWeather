@@ -29,10 +29,10 @@
  * The normalized model — the ONLY shape the views know about:
  *   {
  *     utcOffsetSeconds: Number|NaN,   // of the LOCATION, not the viewer
- *     current: { temperature, weatherCode, apparentTemp, humidity, isDay,
+ *     current: { temperature, weatherCode, apparentTemp, humidity, dewPoint, isDay,
  *                uvIndex, precipRate, windSpeed, windGust, cloudCover, pressure },
  *     daily:  [ { date, code, hi, lo, snowSum, precipSum, sunrise, sunset } ],
- *     hourly: [ { time, date, spanHours, temp, feels, code, day, humidity, uv,
+ *     hourly: [ { time, date, spanHours, temp, feels, code, day, humidity, dew, uv,
  *                 precip, precipAmt, snow, cloud, wind, gust, windDir, pressure } ]
  *   }
  * `code` is a WMO weather code in BOTH arrays — the icon packs, conditionText,
@@ -73,9 +73,9 @@ QtObject {
         return "https://api.open-meteo.com/v1/forecast"
              + "?latitude=" + ctx.lat
              + "&longitude=" + ctx.lon
-             + "&current=temperature_2m,weather_code,apparent_temperature,relative_humidity_2m,is_day,uv_index,precipitation,wind_speed_10m,wind_gusts_10m,cloud_cover,pressure_msl"
+             + "&current=temperature_2m,weather_code,apparent_temperature,relative_humidity_2m,dew_point_2m,is_day,uv_index,precipitation,wind_speed_10m,wind_gusts_10m,cloud_cover,pressure_msl"
              + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,snowfall_sum,sunrise,sunset"
-             + "&hourly=temperature_2m,apparent_temperature,weather_code,is_day,relative_humidity_2m,uv_index,precipitation_probability,precipitation,snowfall,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,pressure_msl"
+             + "&hourly=temperature_2m,apparent_temperature,weather_code,is_day,relative_humidity_2m,dew_point_2m,uv_index,precipitation_probability,precipitation,snowfall,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,pressure_msl"
              + "&forecast_days=" + ctx.forecastDays
              + "&timezone=auto"
              // the contract's fixed units; main.qml converts to the user's
@@ -102,6 +102,7 @@ QtObject {
                 weatherCode:  c.weather_code,
                 apparentTemp: c.apparent_temperature,
                 humidity:     c.relative_humidity_2m,
+                dewPoint:     (c.dew_point_2m    !== undefined) ? c.dew_point_2m    : NaN,
                 isDay:        c.is_day,
                 uvIndex:      c.uv_index,
                 precipRate:   (c.precipitation   !== undefined) ? c.precipitation   : NaN,
@@ -145,6 +146,7 @@ QtObject {
                     code:    hh.weather_code[hi],
                     day:     hh.is_day[hi],
                     humidity: hh.relative_humidity_2m ? hh.relative_humidity_2m[hi] : NaN,
+                    dew:      hh.dew_point_2m ? hh.dew_point_2m[hi] : NaN,
                     uv:       hh.uv_index ? hh.uv_index[hi] : NaN,
                     precip:  hh.precipitation_probability ? hh.precipitation_probability[hi] : NaN,
                     precipAmt: hh.precipitation ? hh.precipitation[hi] : NaN,   // mm this hour

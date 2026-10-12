@@ -128,6 +128,7 @@ function build(allHourly, dailyData, days, nowMs) {
     var cutoff = n > 0 ? dailyData[n - 1].date : "";
     var out = [];
     var tempSlope = pchipSlopes(allHourly, "temp"), feelsSlope = pchipSlopes(allHourly, "feels");
+    var dewSlope = pchipSlopes(allHourly, "dew");
     // The rain curve's shape (see the top of this file). The running total is known at
     // the start of every sample and after the last one; the chance at each sample's
     // middle.
@@ -171,6 +172,8 @@ function build(allHourly, dailyData, days, nowMs) {
                     pt.temp = hermite(s.temp, nxt.temp, tempSlope[i], tempSlope[i + 1], gap, k / gap);
                 if (!isNaN(s.feels) && !isNaN(nxt.feels))
                     pt.feels = hermite(s.feels, nxt.feels, feelsSlope[i], feelsSlope[i + 1], gap, k / gap);
+                if (!isNaN(s.dew) && !isNaN(nxt.dew))
+                    pt.dew = hermite(s.dew, nxt.dew, dewSlope[i], dewSlope[i + 1], gap, k / gap);
             }
             if (span > 1) {
                 // block totals → per-hour share, so the hours sum back to the block
