@@ -202,16 +202,24 @@ Item {
     WeatherToolbar {
         id: toolbar
         pad: full.pad
-        switchTooltip: i18n("Switch to graph layout")
-        switchIcon: "view-graph"
         root: weatherRoot
         // the location line is centred on the top buttons; see WeatherToolbar.topDrop
         lineCap: rightBlock.capCenter
+        // beside refresh, a wheel notch along the hourly cards either way
+        stepButtons: true
+        canStepBack: full.canScrollBack
+        canStepForward: full.canScrollForward
+        stepBackText: i18n("Earlier hours")
+        stepForwardText: i18n("Later hours")
+        onStepped: (delta) => full.scrollNotch(delta)
     }
 
     implicitWidth:  content.implicitWidth  + pad * 2
     implicitHeight: content.implicitHeight + pad + Math.round(pad * 0.4)
     Layout.minimumWidth: Kirigami.Units.gridUnit * 32 + pad * 2
+    // all of its height, as nothing in it scrolls up or down: a saved popup height
+    // under it (a header that has grown since) cut the hourly cards off at the bottom
+    Layout.minimumHeight: implicitHeight
 
     // Continuous hourly model — rebuilds after each fetch and when the day count
     // changes (those properties are read here to register the dependency).
@@ -362,6 +370,28 @@ Item {
         return Math.max(0, Math.min(maxX, cardXs[i]));
     }
 
+    // One mouse wheel notch along the hourly cards, dir +1 later and -1 earlier:
+    // cardsPerScroll cards, gliding for the user's Scroll animation (Appearance → Daily
+    // forecast). The wheel over the strip and the arrows beside refresh both take it.
+    function scrollNotch(dir) {
+        // chain off the in-flight target so rapid notches stack
+        var base = scrollAnim.running ? scrollAnim.to : hourlyFlick.contentX;
+        var targetX = stepCardsX(base, dir * (weatherRoot ? weatherRoot.cardsPerScroll : 1));
+        // a notch against the end stop moves nothing, so it leaves a picked day
+        // selected rather than flipping the highlight back
+        if (Math.abs(targetX - base) < 0.5) return;
+        chosenDay = -1;
+        scrollAnim.stop();
+        scrollAnim.duration = weatherRoot ? weatherRoot.cardSlideMs : scrollAnim.quickMs;
+        scrollAnim.from = hourlyFlick.contentX;
+        scrollAnim.to = targetX;
+        scrollAnim.start();
+    }
+    // whether a notch would move the strip, either way: the arrows' enabled state
+    readonly property real _stripTarget: scrollAnim.running ? scrollAnim.to : hourlyFlick.contentX
+    readonly property bool canScrollBack: _stripTarget > 0.5
+    readonly property bool canScrollForward: _stripTarget < hourlyFlick.contentWidth - hourlyFlick.width - 0.5
+
     // Day stepping for the tab wheel. selectedDay only catches up once the scroll
     // animation has moved contentX, so a fast second notch would otherwise step
     // from the day we are still leaving. pendingDay remembers the destination.
@@ -428,7 +458,7 @@ Item {
         readonly property bool cardsFirst: full.weatherRoot ? full.weatherRoot.hourlyCardsFirst : false
         // the air under the header, and the wider gap between the tabs and the strip,
         // whichever comes first
-        readonly property int underHeader: Kirigami.Units.smallSpacing
+        readonly property int underHeader: Kirigami.Units.smallSpacing + toolbar.contentGap
         readonly property int betweenRows: Math.round(Kirigami.Units.largeSpacing * 1.6)
 
         // ── Header ────────────────────────────────────────────────────────
@@ -439,6 +469,10 @@ Item {
             id: headerRow
             Layout.row: 0
             Layout.fillWidth: true
+            // Out to the view's right edge, past the content's padding: the day pills and
+            // the layout buttons reach a pill's padding past the refresh glyph's edge, and
+            // a row ending at the padding doesn't hand the input on that strip to them.
+            Layout.rightMargin: -full.pad
             // Pinned to the top of its cell. A popup taller than the content gets the
             // spare height spread between the rows (which gives the rows below their
             // breathing room), and a centred header would drift down with it, away
@@ -482,19 +516,20 @@ Item {
                 Layout.fillWidth: true
                 Layout.maximumWidth: implicitWidth
                 Layout.topMargin: toolbar.buttonCenterY - full.headerY - capCenter
-                Layout.rightMargin: toolbar.rightInset - full.pad
+                Layout.rightMargin: toolbar.rightInset
                 weatherRoot: full.weatherRoot
                 toolbar: toolbar
                 originX: content.x + headerRow.x
                 // The location line is above the Weather Elements, so it may run over
                 // them; it only has to stay clear of the temperature.
                 leftBound: content.x + headerRow.x + heroRow.x + heroRow.heroTempWidth + Kirigami.Units.largeSpacing * 2
-                // the source sits beside the Weather Elements: it stays clear of them
-                sourceLeftBound: content.x + headerRow.x + heroRow.x + heroRow.width + Kirigami.Units.largeSpacing
+                // the layout buttons sit beside the Weather Elements: they stay clear of
+                // them, by the row's spacing and the spacer item's
+                pillsLeftBound: content.x + headerRow.x + heroRow.x + heroRow.width
+                                + headerRow.spacing * 2
                 locationFontSize: weatherRoot ? weatherRoot.locationFontSize : 26
                 providerFontSize: weatherRoot ? weatherRoot.providerFontSize : 16
-                pillCount: weatherRoot ? weatherRoot.graphDays : 0
-                // the card layout has no day pills: an invisible placeholder keeps their room
+                // the card layout has no day pills: their row stays empty
                 pillsShown: false
             }
         }
@@ -612,11 +647,11 @@ Item {
                             Layout.alignment: Qt.AlignHCenter
                             textFormat: Text.StyledText
                             font.pixelSize: weatherRoot ? weatherRoot.dailyTempFontSize : 15
-                            // low in blue, high in orange — or both in the theme's text
-                            // colour without weather-specific colours (Appearance → Common)
+                            // "↑ high  ↓ low", high in orange and low in blue — or both in
+                            // the theme's text colour (Appearance → Daily forecast → Daily
+                            // tabs → Use colored H/L)
                             text: weatherRoot
-                                ? "<b>" + weatherRoot._tint(weatherRoot.tempStr(dayTab.modelData.lo), "#42a5f5", weatherRoot.weatherSpecificColors)
-                                  + " | " + weatherRoot._tint(weatherRoot.tempStr(dayTab.modelData.hi), "#ff6e40", weatherRoot.weatherSpecificColors)
+                                ? "<b>" + weatherRoot._hiLoText(dayTab.modelData.hi, dayTab.modelData.lo, weatherRoot.dailyHiLoColored)
                                   + "</b>" : ""
                         }
                     }
@@ -702,20 +737,7 @@ Item {
                         return;
                     }
                     var dir = Wheel.step(stripWheel, ad);
-                    if (dir === 0) return;
-                    // chain off the in-flight target so rapid notches stack
-                    var base = scrollAnim.running ? scrollAnim.to : hourlyFlick.contentX;
-                    var targetX = full.stepCardsX(base, dir * (weatherRoot ? weatherRoot.cardsPerScroll : 1));
-                    // a notch against the end stop moves nothing, so it leaves a
-                    // picked day selected rather than flipping the highlight back
-                    if (Math.abs(targetX - base) < 0.5) return;
-                    full.chosenDay = -1;
-                    scrollAnim.stop();
-                    // the notch's glide is the user's (Appearance → Cards → Scroll animation)
-                    scrollAnim.duration = weatherRoot ? weatherRoot.cardSlideMs : scrollAnim.quickMs;
-                    scrollAnim.from = hourlyFlick.contentX;
-                    scrollAnim.to = targetX;
-                    scrollAnim.start();
+                    if (dir !== 0) full.scrollNotch(dir);
                 }
             }
 
@@ -891,6 +913,8 @@ Item {
                                 // identity guard means sliding A→B doesn't let A's exit wipe
                                 // B's freshly-set value (whichever order the events fire).
                                 HoverHandler {
+                                    id: cardHover
+                                    cursorShape: Qt.PointingHandCursor
                                     onHoveredChanged: {
                                         if (hovered) full.hoveredHourSample = card.hourData;
                                         else if (full.hoveredHourSample === card.hourData) full.hoveredHourSample = null;
@@ -902,20 +926,33 @@ Item {
                                 readonly property bool inView:
                                     (parent.x + width) > hourlyFlick.contentX
                                     && parent.x < (hourlyFlick.contentX + hourlyFlick.width)
+                                // a card opens its hour in the Detailed view: a touch
+                                // lighter, its edge clearer, while the pointer is on it
                                 color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g,
-                                               Kirigami.Theme.textColor.b, 0.06)
+                                               Kirigami.Theme.textColor.b, cardHover.hovered ? 0.10 : 0.06)
                                 border.width: 1
                                 border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g,
-                                                      Kirigami.Theme.textColor.b, 0.11)
+                                                      Kirigami.Theme.textColor.b, cardHover.hovered ? 0.24 : 0.11)
+                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                // a drag of the strip moves past the threshold, so it never
+                                // counts as a click
+                                TapHandler {
+                                    onTapped: if (full.weatherRoot) full.weatherRoot.showDetailedAt(card.hourData)
+                                }
 
                                 // "Corner split" precip wash: rain blooms blue from the
                                 // bottom-left, snow white from the top-right, each sized
                                 // and brightened by its share of the chance (so a wintry
                                 // mix shows both). Behind the content, clipped to the
                                 // rounded card; blank for dry hours. See precip-corner-split.js.
+                                // Off with Appearance → Daily forecast → Hourly cards → Show
+                                // precipitation gradient unticked.
                                 Canvas {
                                     id: tide
                                     anchors.fill: parent
+                                    visible: weatherRoot ? weatherRoot.hourlyPrecipGradient : true
+                                    onVisibleChanged: if (visible) requestPaint()
                                     // wash intensity, not the raw chance: a sample with no chance
                                     // (met.no outside the Nordics) falls back to its amount, so
                                     // its rain still shows (see precipWashPct)
@@ -1033,16 +1070,22 @@ Item {
                                                             // arrow trails the label instead
                                                 visible: hMetricRow.val.length > 0 && name.length > 0
                                                 weatherRoot: full.weatherRoot
-                                                name: weatherRoot ? weatherRoot.hourlyMetricIcon(hMetricRow.effId) : ""
-                                                colored: false   // monochrome, whatever the Weather Elements' icons
-                                                opacity: 0.75
+                                                name: weatherRoot ? weatherRoot.hourlyMetricIcon(hMetricRow.effId, hMetricRow.m) : ""
+                                                // Appearance → Daily forecast → Hourly cards → Use colored icons;
+                                                // the monochrome ones a little dimmed
+                                                colored: weatherRoot ? weatherRoot.hourlyIconsColored : false
+                                                opacity: colored ? 1 : 0.75
                                                 fontPx: weatherRoot ? weatherRoot.hourlyCardFontSize : 11
                                             }
                                             Label {
+                                                readonly property bool tinted: !!weatherRoot && weatherRoot.hourlyValuesColored
                                                 font.pixelSize: weatherRoot ? weatherRoot.hourlyCardFontSize : 11
                                                 opacity: 0.9
-                                                text: hMetricRow.val
-                                                // default theme text (white) — card readouts aren't colour-coded
+                                                // in its weather colour with Appearance → Daily forecast →
+                                                // Hourly cards → Use weather-specific color, else the text colour
+                                                textFormat: tinted ? Text.StyledText : Text.PlainText
+                                                text: tinted ? weatherRoot.hourlyValueTinted(hMetricRow.effId, hMetricRow.m, hMetricRow.val)
+                                                             : hMetricRow.val
                                             }
                                             Kirigami.Icon {   // wind direction (wind / wind+gust metrics)
                                                 visible: hMetricRow.val.length > 0 && (hMetricRow.effId === "wind" || hMetricRow.effId === "windGust") && hMetricRow.m && !isNaN(hMetricRow.m.windDir)

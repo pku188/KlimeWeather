@@ -800,8 +800,8 @@ Item {
     // too): the view's height must not change when the pills move, or Plasma resizes
     // the popup mid-drag (see main.qml's _dragW).
     readonly property real plotH:      Kirigami.Units.gridUnit * 14.0
-                                       - (pillsUnderHeader ? underHeaderPills.implicitHeight
-                                                             + underHeaderPills.Layout.topMargin
+                                       - (pillsUnderHeader ? underHeaderRow.implicitHeight
+                                                             + underHeaderRow.Layout.topMargin
                                                              + content.spacing : 0)
                                        - pillsBelowHero - Math.max(0, toolbar.heroDrop)
     readonly property real topReserve: Kirigami.Units.gridUnit * 4.1   // room for temp labels + the new-day marker above the peak
@@ -1308,6 +1308,9 @@ Item {
     implicitHeight: content.implicitHeight + pad + Math.round(pad * 1.0)
     // the card layout's minimum (FullView), so both layouts squeeze to the same width
     Layout.minimumWidth: Kirigami.Units.gridUnit * 32 + pad * 2
+    // and all of its height, as in the other layouts: nothing in it scrolls up or down.
+    // It holds still while the pills move (see plotH), so a drag never sees it change.
+    Layout.minimumHeight: implicitHeight
 
     // animations drive the window position (hourPos)
     NumberAnimation {
@@ -1464,12 +1467,11 @@ Item {
     WeatherToolbar {
         id: toolbar
         pad: simple.pad
-        switchTooltip: i18n("Switch to card layout")
-        switchIcon: "view-cards"
-        showZoom: true
         root: weatherRoot
         // the location line is centred on the top buttons; see WeatherToolbar.topDrop
         lineCap: rightBlock.capCenter
+        // the zoom, 12 / 24 / 48 hours, beside refresh
+        showZoom: true
     }
 
     ColumnLayout {
@@ -1488,6 +1490,10 @@ Item {
         RowLayout {
             id: headerRow
             Layout.fillWidth: true
+            // Out to the view's right edge, past the content's padding: the day pills and
+            // the layout buttons reach a pill's padding past the refresh glyph's edge, and
+            // a row ending at the padding doesn't hand the input on that strip to them.
+            Layout.rightMargin: -simple.pad
             // Pinned to the top of its cell. A popup taller than the content gets the
             // spare height spread between the rows (which gives the rows below their
             // breathing room), and a centred header would drift down with it, away
@@ -1526,7 +1532,7 @@ Item {
                 Layout.fillWidth: true
                 Layout.maximumWidth: implicitWidth
                 Layout.topMargin: toolbar.buttonCenterY - simple.headerY - capCenter
-                Layout.rightMargin: toolbar.rightInset - simple.pad
+                Layout.rightMargin: toolbar.rightInset
                 pillsInBlock: !simple.pillsUnderHeader
                 weatherRoot: simple.weatherRoot
                 toolbar: toolbar
@@ -1534,10 +1540,8 @@ Item {
                 // The location line is above the Weather Elements, so it may run over
                 // them; it only has to stay clear of the temperature.
                 leftBound: content.x + headerRow.x + heroRow.x + heroRow.heroTempWidth + Kirigami.Units.largeSpacing * 2
-                // the source sits beside the Weather Elements: it stays clear of them
-                sourceLeftBound: content.x + headerRow.x + heroRow.x + heroRow.width + Kirigami.Units.largeSpacing
-                // the pills sit beside the Weather Elements: they stay clear of them, by
-                // the row's spacing and the spacer item's
+                // the pills and the layout buttons sit beside the Weather Elements: they
+                // stay clear of them, by the row's spacing and the spacer item's
                 pillsLeftBound: content.x + headerRow.x + heroRow.x + heroRow.width
                                 + headerRow.spacing * 2
                 locationFontSize: weatherRoot ? weatherRoot.locationFontSize : 26
@@ -1552,18 +1556,26 @@ Item {
         // The day pills, when the room beside the Weather Elements would take more than
         // two rows of them (large day-button text in a narrow popup). A row of their
         // own then, still right-aligned, and wrapping too if even that is too narrow.
-        DayPills {
-            id: underHeaderPills
+        Item {
+            id: underHeaderRow
             visible: simple.pillsUnderHeader
-            Layout.alignment: Qt.AlignRight
+            Layout.fillWidth: true
             Layout.topMargin: Kirigami.Units.smallSpacing
-            Layout.rightMargin: rightBlock.Layout.rightMargin - rightBlock.pillsOverhang
-            wrapWidth: content.width - Layout.rightMargin
-            weatherRoot: simple.weatherRoot
-            count: weatherRoot ? weatherRoot.graphDays : 0
-            selectedDay: simple.selectedDay
-            onDayClicked: (index) => simple.goToDay(index)
-            onDayStepped: (delta) => simple.stepDay(delta)
+            // out to the view's edge, as the header row (see there)
+            Layout.rightMargin: -simple.pad
+            implicitHeight: underHeaderPills.implicitHeight
+            // where the plates end: level with the pills in the header block
+            readonly property real plateEnd: width - (toolbar.rightInset - rightBlock.pillsOverhang)
+            DayPills {
+                id: underHeaderPills
+                x: underHeaderRow.plateEnd - implicitWidth
+                wrapWidth: underHeaderRow.plateEnd
+                weatherRoot: simple.weatherRoot
+                count: weatherRoot ? weatherRoot.graphDays : 0
+                selectedDay: simple.selectedDay
+                onDayClicked: (index) => simple.goToDay(index)
+                onDayStepped: (delta) => simple.stepDay(delta)
+            }
         }
 
         // ── Graph: morphing curve + sliding icon/time filmstrip ────────────
@@ -1574,7 +1586,9 @@ Item {
             // stretches closer to the panel edges
             Layout.leftMargin: -simple.pad
             Layout.rightMargin: -simple.pad
-            Layout.topMargin: -Math.round(Kirigami.Units.gridUnit * 0.6)   // lift the whole graph (curve + icon/time rows) up slightly
+            // lift the whole graph (curve + icon/time rows) up slightly, less the air the
+            // views keep under the header
+            Layout.topMargin: -Math.round(Kirigami.Units.gridUnit * 0.6) + toolbar.contentGap
             Layout.preferredHeight: simple.plotH + simple.iconRowH + simple.timeRowH
                                     + Kirigami.Units.smallSpacing * 2
                                     + Kirigami.Units.gridUnit * 0.5
@@ -2249,18 +2263,15 @@ Item {
                             property real belowF: wantBelow ? 1 : 0
                             Behavior on belowF { NumberAnimation { duration: 300; easing.type: Easing.InOutQuad } }
                             y: aboveY + (belowY - aboveY) * belowF
-                            // Meteocons' sunrise / sunset, flat with the graph's "Use colored day
-                            // markers" (Appearance → Graph), else monochrome in the text colour
-                            // (main.qml readingIcon)
-                            Image {
+                            // sunrise / sunset, the Element icon pack's with the graph's "Use
+                            // colored day markers" (Appearance → Graph), else Meteocons'
+                            // monochrome in the text colour (ReadingImage)
+                            ReadingImage {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 width: parent.sz; height: parent.sz
-                                sourceSize: Qt.size(width, height)
-                                source: weatherRoot
-                                        ? weatherRoot.readingIcon(parent.modelData.rise ? "sunrise" : "sunset",
-                                                                  weatherRoot.dayMarkerIconColored,
-                                                                  Kirigami.Theme.textColor)
-                                        : ""
+                                weatherRoot: simple.weatherRoot
+                                name: parent.modelData.rise ? "sunrise" : "sunset"
+                                colored: weatherRoot ? weatherRoot.dayMarkerIconColored : true
                             }
                             Label {
                                 anchors.horizontalCenter: parent.horizontalCenter

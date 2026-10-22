@@ -1,6 +1,7 @@
 /*
- * Appearance settings — a Common tab for what both layouts share, then one tab
- * each for the card layout, the graph layout and the panel.
+ * Appearance settings — a Common tab for what the layouts share (and beside it the
+ * header's Weather Elements), then one tab each for the Daily forecast (the card
+ * layout), the Weather graph, the Detailed view and the panel.
  * Copyright 2026  pku188, bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
  */
 import QtQuick
@@ -8,8 +9,8 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import org.kde.kirigami as Kirigami
-import "../icons/meteocons/readings/monochrome.js" as MonoReadings
 import "panelelements.js" as PanelElements
+import "detailedelements.js" as DetailedElements
 
 Item {
     id: page
@@ -27,6 +28,8 @@ Item {
     // shared
     property string cfg_iconPack
     property string cfg_customIconDir
+    property string cfg_readingIconPack
+    property string cfg_readingIconDir
     // Detailed layout (forecast days moved here from the General page)
     property alias cfg_dailyDays:          dailyDaysSpin.value
     property alias cfg_heroIconSize:       heroSpin.value
@@ -42,8 +45,17 @@ Item {
     property alias cfg_hourlyCardFontSize: hourlyCardSpin.value
     property alias cfg_conditionFontSize:  condFontSpin.value
     property alias cfg_locationFontSize:   locFontSpin.value
+    property int   cfg_locationFontWeight
     property alias cfg_providerFontSize:   providerFontSpin.value
     property alias cfg_toolbarIconSize:    toolbarIconSpin.value
+    property alias cfg_layoutButtonFontSize: layoutButtonSpin.value
+    property alias cfg_dayPillFontSize:      dayPillSpin.value
+    // Detailed view
+    property alias cfg_detailedViewDays:     detailedDaysSpin.value
+    property alias cfg_detailedViewFontSize: detailedFontSpin.value
+    property int   cfg_detailedViewFontWeight
+    property alias cfg_detailedEntrancePercent: detailedEntranceSpin.value
+    property string cfg_detailedViewElements
     property int   cfg_cardAnimation
     // the older per-part switches, read only while cardAnimation was never chosen
     property bool  cfg_animatedDailyIcons
@@ -64,7 +76,6 @@ Item {
     property alias cfg_simpleHourFontSize:     simpleHourSpin.value
     property alias cfg_simpleGraphTempFontSize: simpleGraphTempSpin.value
     property alias cfg_simpleDayMarkerFontSize: simpleDayMarkerSpin.value
-    property alias cfg_dayPillFontSize:         dayPillSpin.value
     property alias cfg_simpleDailyDays:         graphDaysSpin.value
     property alias cfg_graphScrollHoursDay:     graphScrollDaySpin.value
     property alias cfg_graphScrollHoursDetail:  graphScrollDetailSpin.value
@@ -72,10 +83,6 @@ Item {
     property alias cfg_graphSlideMsDetail:      graphSlideDetailSpin.value
     property alias cfg_graphSlideMsDay:         graphSlideDaySpin.value
     property alias cfg_graphSlideMsWide:        graphSlideWideSpin.value
-    property int   cfg_graphAnimation
-    // the older per-part switches, read only while graphAnimation was never chosen
-    property bool  cfg_simpleAnimatedIcons
-    property bool  cfg_simpleHeaderAnim
     property int   cfg_graphColorMode
     property alias cfg_precipBandOpacity:      precipBandSpin.value
     property int   cfg_precipLabelMode
@@ -90,7 +97,6 @@ Item {
     property string cfg_hourlyMetric1Fallback2
     property string cfg_hourlyMetric2Fallback
     property string cfg_hourlyMetric2Fallback2
-    property int    cfg_detailDayStartHour
     // Panel (compact view)
     property alias cfg_panelIconPercent:   panelIconSpin.value
     property alias cfg_panelFontPercent:   panelFontSpin.value
@@ -108,6 +114,12 @@ Item {
     property alias cfg_dayMarkerIconColored: dayMarkerColorCheck.checked
     property alias cfg_readingIconsColored: readingColorCheck.checked
     property alias cfg_weatherSpecificColors: weatherColorsCheck.checked
+    property alias cfg_dailyHiLoColored:      dailyHiLoColorCheck.checked
+    property alias cfg_hourlyIconsColored:    hourlyIconColorCheck.checked
+    property alias cfg_hourlyValuesColored:   hourlyValueColorCheck.checked
+    property alias cfg_hourlyPrecipGradient:  hourlyPrecipGradientCheck.checked
+    property alias cfg_detailedIconsColored:  detailedIconColorCheck.checked
+    property alias cfg_detailedValuesColored: detailedValueColorCheck.checked
     property int   cfg_headerElementsStyle
     property alias cfg_panelSecondLinePercent: panelSecondarySpin.value
 
@@ -139,7 +151,9 @@ Item {
         { text: i18n("Snowfall today"),         id: "snowSum"    },
         { text: i18n("Cloud cover"),            id: "cloud"      },
         { text: i18n("Air pressure"),           id: "pressure"   },
-        { text: i18n("Sunrise / sunset"),       id: "sun"        }
+        { text: i18n("Sunrise / sunset"),       id: "sun"        },
+        { text: i18n("Date"),                   id: "date"       },
+        { text: i18n("Moon phase"),             id: "moon"       }
     ])
     // Per-hour options for the Detailed hourly-card readouts (chance/amount are
     // per-hour, unlike the header's daily-total precip/snow sums), and their fallbacks.
@@ -155,7 +169,8 @@ Item {
         { text: i18n("Humidity"),      id: "humidity"  },
         { text: i18n("UV Index"),      id: "uv"        },
         { text: i18n("Cloud cover"),   id: "cloud"     },
-        { text: i18n("Air pressure"),  id: "pressure"  }
+        { text: i18n("Air pressure"),  id: "pressure"  },
+        { text: i18n("Date"),          id: "date"      }
     ])
     // ── Panel Elements (cfg_panelElements JSON ↔ ListModel mirror) ──
     // Each element's name; a reading's as in the Weather Elements.
@@ -177,70 +192,25 @@ Item {
         case "dewPoint":   return i18n("Dew point");
         case "snowSum":    return i18n("Snowfall");
         case "cloud":      return i18n("Cloud cover");
+        case "date":       return i18n("Date");
+        case "moon":       return i18n("Moon phase");
         }
         return id;
     }
-    // The Meteocons reading icon each list entry shows (main.qml readingIcon): a
-    // reading's own, the one before it on the panel, a cloud with the sun for the
-    // weather icon and a thermometer for the temperature. The location and the
-    // condition take theirs from the icon theme (PanelElementIcon).
-    readonly property var panelElementIcons: ({
-        icon: "partly-cloudy-day", temp: "thermometer", hiLo: "thermometer", precipRate: "umbrella", wind: "wind",
-        feelsLike: "thermometer", humidity: "humidity", precipSum: "raindrops",
-        uv: "uv-index", pressure: "barometer", sun: "sunrise", dewPoint: "thermometer-raindrop",
-        snowSum: "snowflake", cloud: "cloudy"
-    })
-    // A monochrome reading icon in `tint`, as a data URL (as main.qml readingIcon).
-    property var _monoUrls: ({})
-    function monoReadingIcon(name, tint) {
-        var hex = "" + tint, key = name + hex;
-        if (!_monoUrls[key]) {
-            var svg = MonoReadings.svg[name];
-            if (!svg) return "";
-            _monoUrls[key] = "data:image/svg+xml;utf8," + encodeURIComponent(svg.replace(/currentColor/g, hex));
+    // the Panel Elements' editable list (Panel tab)
+    ElementsModel {
+        id: panelEdit
+        allIds: PanelElements.all
+        parse: function (json) {
+            return PanelElements.parse(json, page.cfg_panelDisplay, page.cfg_panelDetailed, page.cfg_panelSecondLine);
         }
-        return _monoUrls[key];
+        stringify: PanelElements.stringify
+        nameOf: page.panelElementName
+        json: page.cfg_panelElements
+        onEdited: (json) => page.cfg_panelElements = json
     }
-    // An element's icon in the lists, in the text colour.
-    component PanelElementIcon: Item {
-        id: elementIcon
-        property string elementId: ""
-        readonly property string reading: page.panelElementIcons[elementId] || ""
-        implicitWidth: Kirigami.Units.iconSizes.smallMedium
-        implicitHeight: implicitWidth
-        // the reading icons' artwork leaves the edges of their box empty
-        Image {
-            visible: elementIcon.reading.length > 0
-            anchors.centerIn: parent
-            width: Math.round(parent.width * 1.6)
-            height: width
-            sourceSize: Qt.size(width, height)
-            source: visible ? page.monoReadingIcon(elementIcon.reading, Kirigami.Theme.textColor) : ""
-        }
-        Kirigami.Icon {
-            visible: elementIcon.reading.length === 0
-            anchors.fill: parent
-            source: elementIcon.elementId === "location" ? "mark-location-symbolic" : "draw-text-symbolic"
-        }
-    }
-
-    ListModel { id: panelModel }   // { elementId, shown }, in the panel's order
-    // An entry of the list to add from, never shown: what one is tall (see addScroll).
-    ItemDelegate {
-        id: addRowProbe
-        opacity: 0
-        enabled: false
-        bottomPadding: Kirigami.Units.smallSpacing
-        contentItem: RowLayout {
-            spacing: Kirigami.Units.largeSpacing
-            PanelElementIcon { elementId: "temp" }
-            Label { text: "Xg" }
-        }
-    }
-    // the elements not on the panel, by name, for the list to add from: [{ id, text }]
-    property var panelAvailable: []
     // the ids shown on the panel, for the settings that apply to them
-    property var panelShownIds: []
+    readonly property var panelShownIds: panelEdit.shownIds
     readonly property bool panelShowsIcon: panelShownIds.length === 0 || panelShownIds.indexOf("icon") >= 0
     readonly property bool panelShowsTemp: panelShownIds.indexOf("temp") >= 0
     readonly property bool panelShowsReading: panelShownIds.some(function (id) {
@@ -252,53 +222,26 @@ Item {
     // spacing and separators need two elements to go between
     readonly property bool panelShowsSeveral: panelShownIds.length > 1
 
-    function _panelModelList() {
-        var out = [];
-        for (var i = 0; i < panelModel.count; ++i)
-            out.push({ id: panelModel.get(i).elementId, shown: panelModel.get(i).shown });
-        return out;
+    // ── Detailed view Elements (cfg_detailedViewElements) ──
+    // Each element's name: the sun and the moon, and a reading's as in the Weather
+    // Elements' list.
+    function detailedElementName(id) {
+        // the Detailed view's own, not a Weather Element of the other layouts
+        if (id === "weather") return i18n("Weather and temperature");
+        for (var i = 0; i < detailMetricOptions.length; ++i)
+            if (detailMetricOptions[i].id === id) return detailMetricOptions[i].text;
+        return id;
     }
-    // The model from cfg_panelElements — rebuilt only when that says something else,
-    // so a change made here doesn't recreate the rows — and the lists that follow it.
-    function _syncPanel() {
-        var list = PanelElements.parse(cfg_panelElements, cfg_panelDisplay, cfg_panelDetailed, cfg_panelSecondLine);
-        if (PanelElements.stringify(list) !== PanelElements.stringify(_panelModelList())) {
-            panelModel.clear();
-            for (var i = 0; i < list.length; ++i)
-                panelModel.append({ elementId: list[i].id, shown: list[i].shown });
-        }
-        var on = {};
-        list.forEach(function (el) { on[el.id] = true; });
-        panelShownIds = list.filter(function (el) { return el.shown; }).map(function (el) { return el.id; });
-        var avail = PanelElements.all.filter(function (id) { return !on[id]; })
-                                     .map(function (id) { return { id: id, text: panelElementName(id) }; });
-        avail.sort(function (a, b) { return a.text.localeCompare(b.text); });
-        panelAvailable = avail;
-        if (addList) addList.currentIndex = -1;
+    ElementsModel {
+        id: detailedEdit
+        allIds: DetailedElements.all
+        parse: DetailedElements.parse
+        stringify: DetailedElements.stringify
+        nameOf: page.detailedElementName
+        json: page.cfg_detailedViewElements
+        onEdited: (json) => page.cfg_detailedViewElements = json
     }
-    onCfg_panelElementsChanged: _syncPanel()
-    Component.onCompleted: _syncPanel()
-    function _storePanel() {
-        cfg_panelElements = PanelElements.stringify(_panelModelList());
-        _syncPanel();
-    }
-    function togglePanelElement(i) {
-        panelModel.setProperty(i, "shown", !panelModel.get(i).shown);
-        _storePanel();
-    }
-    function removePanelElement(i) {
-        panelModel.remove(i);
-        _storePanel();
-    }
-    // a new element goes at the end of the list, shown
-    function addPanelElement(id) {
-        panelModel.append({ elementId: id, shown: true });
-        _storePanel();
-    }
-    function movePanelElement(from, to) {
-        panelModel.move(from, to, 1);
-        _storePanel();
-    }
+
     // The last character of `text` as it is seen: a letter with its accents, or an
     // emoji with what belongs to it — a skin tone, the variation selector that makes
     // it colourful, the emoji joined to it (a family, a profession), the second letter
@@ -332,17 +275,15 @@ Item {
         return clusters.length > 0 ? clusters[clusters.length - 1].text : "";
     }
 
-    // Dragging a row: where it came from and where it would land; the rows between
-    // make room for it (see the rows' shift).
-    property int panelDragFrom: -1
-    property int panelDragTo: -1
-    property real panelDragPitch: 0
-    property bool panelRowsAnimate: false
-
     FolderDialog {
         id: iconFolderDialog
         title: i18n("Choose icon folder")
         onAccepted: page.cfg_customIconDir = selectedFolder
+    }
+    FolderDialog {
+        id: readingFolderDialog
+        title: i18n("Choose icon folder")
+        onAccepted: page.cfg_readingIconDir = selectedFolder
     }
 
     ColumnLayout {
@@ -353,8 +294,9 @@ Item {
             id: tabBar
             Layout.fillWidth: true
             TabButton { text: i18n("Common") }
-            TabButton { text: i18n("Cards") }
-            TabButton { text: i18n("Graph") }
+            TabButton { text: i18n("Daily forecast") }
+            TabButton { text: i18n("Weather graph") }
+            TabButton { text: i18n("Detailed view") }
             TabButton { text: i18n("Panel") }
         }
 
@@ -363,179 +305,290 @@ Item {
             Layout.fillHeight: true
             currentIndex: tabBar.currentIndex
 
-            // ── Common to both layouts ──
-            // The header is built the same way in the card and graph layouts — same
-            // icon, temperature, condition, location and source button, in the same
-            // spots — so these size them in both rather than twice over.
+            // ── Common to the layouts ──
+            // The header is built the same way in every layout — same icon,
+            // temperature, condition, location, source and buttons, in the same spots —
+            // so these size them in all of them rather than three times over. Beside
+            // them, the header's Weather Elements.
             ScrollView {
                 contentWidth: availableWidth
-                Kirigami.FormLayout {
-                    Layout.alignment: Qt.AlignTop
-                    // The condition-icon pack applies to both layouts and the panel,
-                    // which is what makes it a Common setting.
-                    ConfigComboBox {
-                        id: iconPackCombo
-                        Kirigami.FormData.label: i18n("Icon pack:")
-                        textRole: "text"
-                        // each option stores its pack id (matches the registry in main.qml);
-                        // a saved id missing here (the retired "basmilius") selects the
-                        // first entry, which is also what main.qml falls back to
-                        model: [
-                            { text: i18n("Meteocons (fill)"),       id: "meteocons-fill"       },
-                            { text: i18n("Meteocons (flat)"),       id: "meteocons-flat"       },
-                            { text: i18n("Meteocons (line)"),       id: "meteocons-line"       },
-                            { text: i18n("Meteocons (monochrome)"), id: "meteocons-monochrome" },
-                            { text: i18n("System theme"),           id: "system"               },
-                            { text: i18n("Custom folder…"),         id: "custom"               }
-                        ]
-                        Component.onCompleted: {
-                            for (var i = 0; i < model.length; ++i)
-                                if (model[i].id === page.cfg_iconPack) { currentIndex = i; break; }
+                RowLayout {
+                    spacing: Kirigami.Units.gridUnit * 2
+                    Kirigami.FormLayout {
+                        Layout.alignment: Qt.AlignTop
+                        // The condition-icon pack applies to both layouts and the panel,
+                        // which is what makes it a Common setting.
+                        ConfigComboBox {
+                            id: iconPackCombo
+                            Kirigami.FormData.label: i18n("Weather icon pack:")
+                            textRole: "text"
+                            // each option stores its pack id (matches the registry in main.qml);
+                            // a saved id missing here (the retired "basmilius") selects the
+                            // first entry, which is also what main.qml falls back to
+                            model: [
+                                { text: i18n("Meteocons (fill)"),       id: "meteocons-fill"       },
+                                { text: i18n("Meteocons (flat)"),       id: "meteocons-flat"       },
+                                { text: i18n("Meteocons (line)"),       id: "meteocons-line"       },
+                                { text: i18n("Meteocons (monochrome)"), id: "meteocons-monochrome" },
+                                { text: i18n("System theme"),           id: "system"               },
+                                { text: i18n("Custom folder…"),         id: "custom"               }
+                            ]
+                            Component.onCompleted: {
+                                for (var i = 0; i < model.length; ++i)
+                                    if (model[i].id === page.cfg_iconPack) { currentIndex = i; break; }
+                            }
+                            onActivated: page.cfg_iconPack = model[currentIndex].id
                         }
-                        onActivated: page.cfg_iconPack = model[currentIndex].id
-                    }
-                    RowLayout {
-                        Kirigami.FormData.label: i18n("Custom folder:")
-                        visible: page.cfg_iconPack === "custom"
-                        Button {
-                            text: i18n("Choose…")
-                            icon.name: "folder-open"
-                            onClicked: iconFolderDialog.open()
+                        RowLayout {
+                            Kirigami.FormData.label: i18n("Custom folder:")
+                            visible: page.cfg_iconPack === "custom"
+                            Button {
+                                text: i18n("Choose…")
+                                icon.name: "folder-open"
+                                onClicked: iconFolderDialog.open()
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                // cap the layout contribution so a long path can't inflate the
+                                // form width (elide trims rendering, not implicitWidth)
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 10
+                                elide: Text.ElideMiddle
+                                opacity: 0.7
+                                text: page.cfg_customIconDir
+                                      ? page.cfg_customIconDir.replace(/^file:\/\//, "")
+                                      : i18n("(none selected)")
+                            }
                         }
                         Label {
+                            visible: page.cfg_iconPack === "custom"
                             Layout.fillWidth: true
-                            // cap the layout contribution so a long path can't inflate the
-                            // form width (elide trims rendering, not implicitWidth)
-                            Layout.preferredWidth: Kirigami.Units.gridUnit * 10
-                            elide: Text.ElideMiddle
+                            Layout.preferredWidth: Kirigami.Units.gridUnit * 16
+                            wrapMode: Text.WordWrap
+                            font: Kirigami.Theme.smallFont
                             opacity: 0.7
-                            text: page.cfg_customIconDir
-                                  ? page.cfg_customIconDir.replace(/^file:\/\//, "")
-                                  : i18n("(none selected)")
+                            text: i18n("Folder with SVGs named like the bundled set (wi-day-sunny.svg, wi-night-clear.svg, …). Tip: copy contents/icons/meteocons/fill/static/ as a starting point so every condition is covered, then edit.")
+                        }
+                        // The colour icons before the readings, in every view that shows them
+                        // in colour; each view's "Use colored icons" still picks monochrome.
+                        ConfigComboBox {
+                            id: readingPackCombo
+                            Kirigami.FormData.label: i18n("Element icon pack:")
+                            textRole: "text"
+                            // each option stores its pack id (main.qml readingIconPack)
+                            model: [
+                                { text: i18n("Meteocons (flat)"), id: "meteocons-flat" },
+                                { text: i18n("Meteocons (line)"), id: "meteocons-line" },
+                                { text: i18n("Custom folder…"),   id: "custom"         }
+                            ]
+                            Component.onCompleted: {
+                                for (var i = 0; i < model.length; ++i)
+                                    if (model[i].id === page.cfg_readingIconPack) { currentIndex = i; break; }
+                            }
+                            onActivated: page.cfg_readingIconPack = model[currentIndex].id
+                            ToolTip.text: i18n("The icons of the Weather Elements wherever they are colored: in the header, on the hourly cards, in the Detailed view, on the panel and at the Weather graph's sunrise and sunset. Each of those has its own \"Use colored icons\"; without it, the icons are monochrome.")
+                        }
+                        RowLayout {
+                            Kirigami.FormData.label: i18n("Custom folder:")
+                            visible: page.cfg_readingIconPack === "custom"
+                            Button {
+                                text: i18n("Choose…")
+                                icon.name: "folder-open"
+                                onClicked: readingFolderDialog.open()
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                // as the icon pack's: a long path can't widen the form
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 10
+                                elide: Text.ElideMiddle
+                                opacity: 0.7
+                                text: page.cfg_readingIconDir
+                                      ? page.cfg_readingIconDir.replace(/^file:\/\//, "")
+                                      : i18n("(none selected)")
+                            }
+                        }
+                        Label {
+                            visible: page.cfg_readingIconPack === "custom"
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: Kirigami.Units.gridUnit * 16
+                            wrapMode: Text.WordWrap
+                            font: Kirigami.Theme.smallFont
+                            opacity: 0.7
+                            text: i18n("Folder with SVGs named like the bundled set (thermometer.svg, humidity.svg, wind.svg, …); an icon missing from it shows Meteocons' flat one. Tip: copy contents/icons/meteocons/readings/flat/ as a starting point, then edit.")
+                        }
+                        ConfigComboBox {
+                            id: animationCombo
+                            Kirigami.FormData.label: i18n("Weather icon animation:")
+                            textRole: "text"
+                            // each option adds to the one above it (main.qml cardAnimation)
+                            model: [
+                                { text: i18n("None"),                       value: 0 },
+                                { text: i18n("Header icon"),                value: 1 },
+                                { text: i18n("Header and daily tab icons"), value: 2 },
+                                { text: i18n("Full layout"),                value: 3 }
+                            ]
+                            // never chosen: what main.qml derives from the older switches
+                            Component.onCompleted: currentIndex = page.cfg_cardAnimation >= 0
+                                ? Math.min(3, page.cfg_cardAnimation)
+                                : (page.cfg_animatedHourlyIcons ? 3 : page.cfg_animatedDailyIcons ? 2 : 0)
+                            onActivated: page.cfg_cardAnimation = model[currentIndex].value
+                            ToolTip.text: i18n("Which icons move, in every layout: the header's, then the Daily forecast's daily tabs, then the hourly cards and the Weather graph's hour icons.")
+                        }
+                        ConfigSpinBox {
+                            id: heroSpin
+                            Kirigami.FormData.label: i18n("Header icon size:")
+                            from: 48
+                            to: 200
+                            stepSize: 4
+                        }
+                        ConfigSpinBox {
+                            id: tempSpin
+                            Kirigami.FormData.label: i18n("Temperature font:")
+                            from: 24
+                            to: 120
+                            stepSize: 2
+                        }
+                        ConfigSpinBox {
+                            id: condFontSpin
+                            Kirigami.FormData.label: i18n("Condition font:")
+                            from: 12
+                            to: 64
+                            stepSize: 1
+                        }
+                        ConfigSpinBox {
+                            id: locFontSpin
+                            Kirigami.FormData.label: i18n("Location font:")
+                            from: 12
+                            to: 64
+                            stepSize: 1
+                        }
+                        ConfigComboBox {
+                            id: locWeightCombo
+                            Kirigami.FormData.label: i18n("Location font style:")
+                            textRole: "text"
+                            // the value is the font weight itself
+                            model: [
+                                { text: i18n("Regular"),  value: 400 },
+                                { text: i18n("SemiBold"), value: 600 },
+                                { text: i18n("Bold"),     value: 700 }
+                            ]
+                            Component.onCompleted: {
+                                for (var i = 0; i < model.length; ++i)
+                                    if (model[i].value === page.cfg_locationFontWeight) { currentIndex = i; break; }
+                            }
+                            onActivated: page.cfg_locationFontWeight = model[currentIndex].value
+                            ToolTip.text: i18n("SemiBold needs a font that has it. Where yours doesn't, the nearest weight it has is used — normally Bold.")
+                        }
+                        ConfigSpinBox {
+                            id: providerFontSpin
+                            Kirigami.FormData.label: i18n("Weather source font:")
+                            from: 8
+                            to: 40
+                            stepSize: 1
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("Sizes the MET Norway / Open-Meteo button; its logo scales with the text.")
+                        }
+                        ConfigSpinBox {
+                            id: toolbarIconSpin
+                            Kirigami.FormData.label: i18n("Toolbar icon size:")
+                            from: 16
+                            to: 40
+                            stepSize: 1
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("Sizes the buttons in the popup's corners: keep open, zoom and refresh.")
+                        }
+                        ConfigSpinBox {
+                            id: layoutButtonSpin
+                            Kirigami.FormData.label: i18n("Layout buttons font:")
+                            from: 8
+                            to: 32
+                            stepSize: 1
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("Sizes the Forecast, Graph and Details buttons under the location.")
+                        }
+                        ConfigSpinBox {
+                            id: dayPillSpin
+                            Kirigami.FormData.label: i18n("Day buttons font:")
+                            from: 8
+                            to: 32
+                            stepSize: 1
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("Sizes the day buttons of the Detailed view and the Weather graph.")
+                        }
+                        ConfigSpinBox {
+                            id: windArrowSpin
+                            Kirigami.FormData.label: i18n("Wind direction arrow:")
+                            from: 10
+                            to: 48
+                            stepSize: 1
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("Size of the arrow that follows a wind reading: on the hourly cards, in the Weather Elements and in the Detailed view.")
                         }
                     }
-                    Label {
-                        visible: page.cfg_iconPack === "custom"
-                        Layout.fillWidth: true
-                        Layout.preferredWidth: Kirigami.Units.gridUnit * 16
-                        wrapMode: Text.WordWrap
-                        font: Kirigami.Theme.smallFont
-                        opacity: 0.7
-                        text: i18n("Folder with SVGs named like the bundled set (wi-day-sunny.svg, wi-night-clear.svg, …). Tip: copy contents/icons/meteocons/fill/static/ as a starting point so every condition is covered, then edit.")
-                    }
-                    ConfigSpinBox {
-                        id: heroSpin
-                        Kirigami.FormData.label: i18n("Header icon size:")
-                        from: 48
-                        to: 200
-                        stepSize: 4
-                    }
-                    ConfigSpinBox {
-                        id: tempSpin
-                        Kirigami.FormData.label: i18n("Temperature font:")
-                        from: 24
-                        to: 120
-                        stepSize: 2
-                    }
-                    ConfigSpinBox {
-                        id: condFontSpin
-                        Kirigami.FormData.label: i18n("Condition font:")
-                        from: 12
-                        to: 64
-                        stepSize: 1
-                    }
-                    ConfigSpinBox {
-                        id: locFontSpin
-                        Kirigami.FormData.label: i18n("Location font:")
-                        from: 12
-                        to: 64
-                        stepSize: 1
-                    }
-                    ConfigSpinBox {
-                        id: providerFontSpin
-                        Kirigami.FormData.label: i18n("Weather source font:")
-                        from: 8
-                        to: 40
-                        stepSize: 1
-                        ToolTip.visible: hovered
-                        ToolTip.text: i18n("Sizes the MET Norway / Open-Meteo button; its logo scales with the text.")
-                    }
-                    ConfigSpinBox {
-                        id: toolbarIconSpin
-                        Kirigami.FormData.label: i18n("Toolbar icon size:")
-                        from: 16
-                        to: 40
-                        stepSize: 1
-                        ToolTip.visible: hovered
-                        ToolTip.text: i18n("Sizes the buttons in the popup's corners: keep open, zoom, layout switch and refresh.")
-                    }
-                    ConfigSpinBox {
-                        id: elementsFontSpin
-                        Kirigami.FormData.label: i18n("Weather Elements font:")
-                        from: 7
-                        to: 32
-                        stepSize: 1
-                    }
-                    ConfigComboBox {
-                        id: elementsWeightCombo
-                        Kirigami.FormData.label: i18n("Weather Elements font style:")
-                        textRole: "text"
-                        // the value is the font weight itself
-                        model: [
-                            { text: i18n("Regular"),  value: 400 },
-                            { text: i18n("SemiBold"), value: 600 },
-                            { text: i18n("Bold"),     value: 700 }
-                        ]
-                        Component.onCompleted: {
-                            for (var i = 0; i < model.length; ++i)
-                                if (model[i].value === page.cfg_headerInfoFontWeight) { currentIndex = i; break; }
+                    Kirigami.FormLayout {
+                        Layout.alignment: Qt.AlignTop
+                        Layout.leftMargin: Kirigami.Units.gridUnit * 4
+                        // section titles as on the Location page
+                        Kirigami.Separator {
+                            Kirigami.FormData.label: i18n("Weather Elements")
+                            Kirigami.FormData.isSection: true
                         }
-                        onActivated: page.cfg_headerInfoFontWeight = model[currentIndex].value
-                        ToolTip.visible: hovered
-                        ToolTip.text: i18n("SemiBold needs a font that has it. Where yours doesn't, the nearest weight it has is used — normally Bold.")
-                    }
-                    ConfigComboBox {
-                        id: elementsStyleCombo
-                        Kirigami.FormData.label: i18n("Weather Elements style:")
-                        textRole: "text"
-                        model: [
-                            { text: i18n("Text"),  value: 0 },
-                            { text: i18n("Icons"), value: 1 }
-                        ]
-                        Component.onCompleted: currentIndex = page.cfg_headerElementsStyle === 1 ? 1 : 0
-                        onActivated: page.cfg_headerElementsStyle = model[currentIndex].value
-                        ToolTip.visible: hovered
-                        ToolTip.text: i18n("Icons shows each element's icon — the one the hourly cards use — in place of its label.")
-                    }
-                    CheckBox {
-                        id: readingColorCheck
-                        Kirigami.FormData.label: i18n("Weather Elements icon color:")
-                        text: i18n("Use colored icons")
-                        // the Weather Elements have icons only in their icon style
-                        enabled: elementsStyleCombo.currentIndex === 1
-                        ToolTip.visible: hovered
-                        ToolTip.text: i18n("Colors the icons before the Weather Elements.")
-                    }
-                    CheckBox {
-                        id: weatherColorsCheck
-                        Kirigami.FormData.label: i18n("Font color:")
-                        text: i18n("Use weather specific color")
-                        ToolTip.visible: hovered
-                        ToolTip.text: i18n("Colors the Weather Elements' values — blue for precipitation, green to red for the UV index, and so on — and the daily tabs' low and high temperatures. Off, they follow your theme.")
-                    }
-                    ConfigSpinBox {
-                        id: windArrowSpin
-                        Kirigami.FormData.label: i18n("Wind direction arrow:")
-                        from: 10
-                        to: 48
-                        stepSize: 1
-                        ToolTip.visible: hovered
-                        ToolTip.text: i18n("Size of the arrow that follows a wind reading, on the hourly cards and in both layouts' Weather Elements.")
+                        ConfigSpinBox {
+                            id: elementsFontSpin
+                            Kirigami.FormData.label: i18n("Font:")
+                            from: 7
+                            to: 32
+                            stepSize: 1
+                        }
+                        ConfigComboBox {
+                            id: elementsWeightCombo
+                            Kirigami.FormData.label: i18n("Font style:")
+                            textRole: "text"
+                            // the value is the font weight itself
+                            model: [
+                                { text: i18n("Regular"),  value: 400 },
+                                { text: i18n("SemiBold"), value: 600 },
+                                { text: i18n("Bold"),     value: 700 }
+                            ]
+                            Component.onCompleted: {
+                                for (var i = 0; i < model.length; ++i)
+                                    if (model[i].value === page.cfg_headerInfoFontWeight) { currentIndex = i; break; }
+                            }
+                            onActivated: page.cfg_headerInfoFontWeight = model[currentIndex].value
+                            ToolTip.text: i18n("SemiBold needs a font that has it. Where yours doesn't, the nearest weight it has is used — normally Bold.")
+                        }
+                        ConfigComboBox {
+                            id: elementsStyleCombo
+                            Kirigami.FormData.label: i18n("Style:")
+                            textRole: "text"
+                            model: [
+                                { text: i18n("Icons"), value: 1 },
+                                { text: i18n("Text"),  value: 0 }
+                            ]
+                            Component.onCompleted: currentIndex = page.cfg_headerElementsStyle === 0 ? 1 : 0
+                            onActivated: page.cfg_headerElementsStyle = model[currentIndex].value
+                            ToolTip.text: i18n("Icons shows each element's icon — the one the hourly cards use — in place of its label.")
+                        }
+                        CheckBox {
+                            id: readingColorCheck
+                            Kirigami.FormData.label: i18n("Icon color:")
+                            // the header's Weather Elements have icons only in the Icons style
+                            enabled: page.cfg_headerElementsStyle !== 0
+                            text: i18n("Use colored icons")
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("Colors the icons of the Weather Elements in the header.")
+                        }
+                        CheckBox {
+                            id: weatherColorsCheck
+                            Kirigami.FormData.label: i18n("Font color:")
+                            text: i18n("Use weather-specific color")
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("Colors the values of the Weather Elements in the header — blue for precipitation, green to red for the UV index, and so on. Off, they follow your theme.")
+                        }
                     }
                 }
             }
 
-            // ── Detailed layout ──
+            // ── Daily forecast (the card layout) ──
             ScrollView {
                 contentWidth: availableWidth
                 RowLayout {
@@ -610,39 +663,6 @@ Item {
                             to: 32
                             stepSize: 1
                         }
-                        ConfigComboBox {
-                            id: dayStartCombo
-                            Kirigami.FormData.label: i18n("Day starts at:")
-                            textRole: "text"
-                            // hour a non-today day opens at (detailDayStartHour): 6 AM skips
-                            // the overnight cards, Midnight opens at 00:00
-                            model: [
-                                { text: i18n("6 AM"),     value: 6 },
-                                { text: i18n("Midnight"), value: 0 }
-                            ]
-                            Component.onCompleted: {
-                                for (var i = 0; i < model.length; ++i)
-                                    if (model[i].value === page.cfg_detailDayStartHour) { currentIndex = i; break; }
-                            }
-                            onActivated: page.cfg_detailDayStartHour = model[currentIndex].value
-                        }
-                        ConfigComboBox {
-                            id: forecastAnimCombo
-                            Kirigami.FormData.label: i18n("Animation:")
-                            textRole: "text"
-                            // each option adds to the one above it (main.qml cardAnimation)
-                            model: [
-                                { text: i18n("None"),                       value: 0 },
-                                { text: i18n("Header icon"),                value: 1 },
-                                { text: i18n("Header and daily tab icons"), value: 2 },
-                                { text: i18n("Full layout"),                value: 3 }
-                            ]
-                            // never chosen: what main.qml derives from the older switches
-                            Component.onCompleted: currentIndex = page.cfg_cardAnimation >= 0
-                                ? Math.min(3, page.cfg_cardAnimation)
-                                : (page.cfg_animatedHourlyIcons ? 3 : page.cfg_animatedDailyIcons ? 2 : 0)
-                            onActivated: page.cfg_cardAnimation = model[currentIndex].value
-                        }
                         ConfigSpinBox {
                             id: cardDealSpin
                             Kirigami.FormData.label: i18n("Card entrance duration:")
@@ -658,13 +678,37 @@ Item {
                         }
                         CheckBox {
                             id: dayDateCheck
-                            Kirigami.FormData.label: i18n("Day tabs:")
+                            Kirigami.FormData.label: i18n("Daily tabs:")
                             text: i18n("Show the date under each day")
+                        }
+                        CheckBox {
+                            id: dailyHiLoColorCheck
+                            text: i18n("Use colored H/L")
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("The high temperature in orange and the low in blue. Off, they follow your theme.")
                         }
                         CheckBox {
                             id: hourlyFirstCheck
                             Kirigami.FormData.label: i18n("Hourly cards:")
-                            text: i18n("Show above the day tabs")
+                            text: i18n("Show above the daily tabs")
+                        }
+                        CheckBox {
+                            id: hourlyIconColorCheck
+                            text: i18n("Use colored icons")
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("Colors the icons before the hourly cards' readings.")
+                        }
+                        CheckBox {
+                            id: hourlyValueColorCheck
+                            text: i18n("Use weather-specific color")
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("Colors the hourly cards' readings — blue for precipitation, green to red for the UV index, and so on. Off, they follow your theme.")
+                        }
+                        CheckBox {
+                            id: hourlyPrecipGradientCheck
+                            text: i18n("Show precipitation gradient")
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("Tints a card blue from its lower left corner where rain is likely, and white from its upper right where snow is: the likelier, the stronger.")
                         }
 
                     }
@@ -683,7 +727,6 @@ Item {
                             model: page.detailMetricOptions
                             Component.onCompleted: currentIndex = page.detailMetricIndexOf(page.cfg_headerMetric1)
                             onActivated: page.cfg_headerMetric1 = page.detailMetricOptions[currentIndex].id
-                            ToolTip.visible: hovered
                             ToolTip.text: page.elementsHoverTip
                         }
                         ConfigComboBox {
@@ -693,7 +736,6 @@ Item {
                             model: page.detailMetricOptions
                             Component.onCompleted: currentIndex = page.detailMetricIndexOf(page.cfg_headerMetric2)
                             onActivated: page.cfg_headerMetric2 = page.detailMetricOptions[currentIndex].id
-                            ToolTip.visible: hovered
                             ToolTip.text: page.elementsHoverTip
                         }
                         ConfigComboBox {
@@ -703,7 +745,6 @@ Item {
                             model: page.detailMetricOptions
                             Component.onCompleted: currentIndex = page.detailMetricIndexOf(page.cfg_headerMetric3)
                             onActivated: page.cfg_headerMetric3 = page.detailMetricOptions[currentIndex].id
-                            ToolTip.visible: hovered
                             ToolTip.text: page.elementsHoverTip
                         }
                         ConfigComboBox {
@@ -713,7 +754,6 @@ Item {
                             model: page.detailMetricOptions
                             Component.onCompleted: currentIndex = page.detailMetricIndexOf(page.cfg_headerMetric4)
                             onActivated: page.cfg_headerMetric4 = page.detailMetricOptions[currentIndex].id
-                            ToolTip.visible: hovered
                             ToolTip.text: page.elementsHoverTip
                         }
                         Kirigami.Separator {
@@ -735,7 +775,6 @@ Item {
                             model: page.hourlyMetricOptions
                             Component.onCompleted: currentIndex = page.hourlyMetricIndexOf(page.cfg_hourlyMetric1Fallback)
                             onActivated: page.cfg_hourlyMetric1Fallback = page.hourlyMetricOptions[currentIndex].id
-                            ToolTip.visible: hovered
                             ToolTip.text: i18n("Shows the main metric, or the fallback on hours the main one has nothing to show.")
                         }
                         ConfigComboBox {
@@ -745,7 +784,6 @@ Item {
                             model: page.hourlyMetricOptions
                             Component.onCompleted: currentIndex = page.hourlyMetricIndexOf(page.cfg_hourlyMetric1Fallback2)
                             onActivated: page.cfg_hourlyMetric1Fallback2 = page.hourlyMetricOptions[currentIndex].id
-                            ToolTip.visible: hovered
                             ToolTip.text: i18n("Shows the main metric, or the fallback on hours the main one has nothing to show.")
                         }
                         ConfigComboBox {
@@ -763,7 +801,6 @@ Item {
                             model: page.hourlyMetricOptions
                             Component.onCompleted: currentIndex = page.hourlyMetricIndexOf(page.cfg_hourlyMetric2Fallback)
                             onActivated: page.cfg_hourlyMetric2Fallback = page.hourlyMetricOptions[currentIndex].id
-                            ToolTip.visible: hovered
                             ToolTip.text: i18n("Shows the main metric, or the fallback on hours the main one has nothing to show.")
                         }
                         ConfigComboBox {
@@ -773,14 +810,13 @@ Item {
                             model: page.hourlyMetricOptions
                             Component.onCompleted: currentIndex = page.hourlyMetricIndexOf(page.cfg_hourlyMetric2Fallback2)
                             onActivated: page.cfg_hourlyMetric2Fallback2 = page.hourlyMetricOptions[currentIndex].id
-                            ToolTip.visible: hovered
                             ToolTip.text: i18n("Shows the main metric, or the fallback on hours the main one has nothing to show.")
                         }
                     }
                 }
             }
 
-            // ── Simple layout ──
+            // ── Weather graph ──
             ScrollView {
                 contentWidth: availableWidth
                 RowLayout {
@@ -898,29 +934,6 @@ Item {
                         to: 32
                         stepSize: 1
                     }
-                    ConfigSpinBox {
-                        id: dayPillSpin
-                        Kirigami.FormData.label: i18n("Day buttons font:")
-                        from: 8
-                        to: 32
-                        stepSize: 1
-                    }
-                    ConfigComboBox {
-                        id: simpleAnimCombo
-                        Kirigami.FormData.label: i18n("Animation:")
-                        textRole: "text"
-                        // each option adds to the one above it (main.qml graphAnimation)
-                        model: [
-                            { text: i18n("None"),        value: 0 },
-                            { text: i18n("Header icon"), value: 1 },
-                            { text: i18n("Full layout"), value: 2 }
-                        ]
-                        // never chosen: what main.qml derives from the older switches
-                        Component.onCompleted: currentIndex = page.cfg_graphAnimation >= 0
-                            ? Math.min(2, page.cfg_graphAnimation)
-                            : (page.cfg_simpleAnimatedIcons ? 2 : page.cfg_simpleHeaderAnim ? 1 : 0)
-                        onActivated: page.cfg_graphAnimation = model[currentIndex].value
-                    }
                     ConfigComboBox {
                         id: graphColorCombo
                         Kirigami.FormData.label: i18n("Graph color:")
@@ -1022,6 +1035,129 @@ Item {
                         Component.onCompleted: currentIndex = page.detailMetricIndexOf(page.cfg_simpleHeaderMetric4)
                         onActivated: page.cfg_simpleHeaderMetric4 = page.detailMetricOptions[currentIndex].id
                     }
+                    }
+                }
+            }
+
+            // ── Detailed view ──
+            // Its forecast days and font, beside them the elements to add, and under
+            // both the Detailed view Elements: what it shows, in order — two to the
+            // first row, three to every row after it.
+            ScrollView {
+                id: detailedTab
+                contentWidth: availableWidth
+                ColumnLayout {
+                    width: detailedTab.availableWidth
+                    spacing: Kirigami.Units.largeSpacing
+
+                    // the form at the left, the list at the right, ending level with
+                    // the rows under them
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.rightMargin: Kirigami.Units.largeSpacing
+                        spacing: Kirigami.Units.gridUnit * 2
+                        Kirigami.FormLayout {
+                            Layout.alignment: Qt.AlignTop
+                            Layout.fillWidth: false
+                            ConfigSpinBox {
+                                id: detailedDaysSpin
+                                Kirigami.FormData.label: i18n("Forecast days:")
+                                from: 1
+                                to: 7
+                                ToolTip.visible: hovered
+                                ToolTip.text: i18n("The day buttons, and how far the view scrolls.")
+                            }
+                            ConfigSpinBox {
+                                id: detailedFontSpin
+                                Kirigami.FormData.label: i18n("Element font:")
+                                from: 8
+                                to: 32
+                                stepSize: 1
+                                ToolTip.visible: hovered
+                                ToolTip.text: i18n("The elements' names and values; their icons grow with it.")
+                            }
+                            ConfigComboBox {
+                                id: detailedWeightCombo
+                                Kirigami.FormData.label: i18n("Element font style:")
+                                textRole: "text"
+                                // the values' weight; the value is the font weight itself
+                                model: [
+                                    { text: i18n("Regular"),  value: 400 },
+                                    { text: i18n("SemiBold"), value: 600 },
+                                    { text: i18n("Bold"),     value: 700 }
+                                ]
+                                Component.onCompleted: {
+                                    for (var i = 0; i < model.length; ++i)
+                                        if (model[i].value === page.cfg_detailedViewFontWeight) { currentIndex = i; break; }
+                                }
+                                onActivated: page.cfg_detailedViewFontWeight = model[currentIndex].value
+                            }
+                            CheckBox {
+                                id: detailedIconColorCheck
+                                Kirigami.FormData.label: i18n("Element icon color:")
+                                text: i18n("Use colored icons")
+                                ToolTip.visible: hovered
+                                ToolTip.text: i18n("Colors the elements' icons, and the sun on its arc.")
+                            }
+                            CheckBox {
+                                id: detailedValueColorCheck
+                                Kirigami.FormData.label: i18n("Element font color:")
+                                text: i18n("Use weather-specific color")
+                                ToolTip.visible: hovered
+                                ToolTip.text: i18n("Colors the elements' values — blue for precipitation, green to red for the UV index, and so on. Off, they follow your theme.")
+                            }
+                            ConfigSpinBox {
+                                id: detailedEntranceSpin
+                                Kirigami.FormData.label: i18n("Element entrance duration:")
+                                // a percentage of the original pace, as the cards' entrance
+                                // (see entrancePace in DetailedView.qml)
+                                from: 0
+                                to: 150
+                                stepSize: 10
+                                textFromValue: (value, locale) => i18n("%1%", value)
+                                valueFromText: (text, locale) => parseInt(text.replace(/[^0-9]/g, "") || "0", 10)
+                                ToolTip.visible: hovered
+                                ToolTip.text: i18n("How long the elements take to come in when the view opens, as a percentage of the original pace: lower is faster, 0 turns the animation off.")
+                            }
+                        }
+                        Item { Layout.fillWidth: true }
+                        // the elements not in the view, to add from
+                        ElementAddList {
+                            Layout.alignment: Qt.AlignTop
+                            elements: detailedEdit
+                            buttonText: i18n("Add to view")
+                            emptyText: i18n("Every element is in the view.")
+                        }
+                    }
+
+                    // the section title as the Location page has it
+                    Kirigami.FormLayout {
+                        Layout.fillWidth: true
+                        Kirigami.Separator {
+                            Kirigami.FormData.label: i18n("Detailed view Elements")
+                            Kirigami.FormData.isSection: true
+                        }
+                        Item {
+                            implicitWidth: Kirigami.Units.gridUnit * 11
+                            implicitHeight: 0
+                        }
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: Kirigami.Units.largeSpacing
+                        Layout.rightMargin: Kirigami.Units.largeSpacing
+                        wrapMode: Text.WordWrap
+                        text: i18n("The view shows its elements in this order, three to a row.")
+                        opacity: 0.7
+                    }
+                    ElementRows {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: Kirigami.Units.largeSpacing
+                        Layout.rightMargin: Kirigami.Units.largeSpacing
+                        elements: detailedEdit
+                        nameOf: page.detailedElementName
+                        hideText: i18n("Hide in the view")
+                        showText: i18n("Show in the view")
                     }
                 }
             }
@@ -1178,63 +1314,11 @@ Item {
 
                         Item { Layout.fillWidth: true }
                         // the elements not on the panel, to add from
-                        ColumnLayout {
-                            id: addColumn
+                        ElementAddList {
                             Layout.alignment: Qt.AlignTop
-                            spacing: Kirigami.Units.smallSpacing
-                            ScrollView {
-                                id: addScroll
-                                Layout.preferredWidth: Kirigami.Units.gridUnit * 13
-                                // Seven entries tall, however many there are: measured on an
-                                // entry that isn't in the list (addRowProbe), so neither the
-                                // count nor the last entry changes it.
-                                Layout.preferredHeight: addRowProbe.implicitHeight * 7 + topPadding + bottomPadding
-                                Component.onCompleted: if (background) background.visible = true
-                                ListView {
-                                    id: addList
-                                    clip: true
-                                    currentIndex: -1
-                                    model: page.panelAvailable
-                                    delegate: ItemDelegate {
-                                        id: addItem
-                                        required property var modelData
-                                        required property int index
-                                        width: ListView.view.width
-                                        // the style pads the last entry of a list more at the
-                                        // bottom; here they are all alike, seven to the list
-                                        bottomPadding: Kirigami.Units.smallSpacing
-                                        highlighted: ListView.isCurrentItem
-                                        onClicked: addList.currentIndex = index
-                                        onDoubleClicked: page.addPanelElement(modelData.id)
-                                        contentItem: RowLayout {
-                                            spacing: Kirigami.Units.largeSpacing
-                                            PanelElementIcon { elementId: addItem.modelData.id }
-                                            Label {
-                                                Layout.fillWidth: true
-                                                text: addItem.modelData.text
-                                                elide: Text.ElideRight
-                                            }
-                                        }
-                                    }
-                                    Label {
-                                        anchors.centerIn: parent
-                                        width: parent.width - Kirigami.Units.largeSpacing * 2
-                                        visible: addList.count === 0
-                                        horizontalAlignment: Text.AlignHCenter
-                                        wrapMode: Text.WordWrap
-                                        text: i18n("Every element is on the panel.")
-                                        opacity: 0.6
-                                    }
-                                }
-                            }
-                            Button {
-                                id: addButton
-                                Layout.alignment: Qt.AlignRight
-                                text: i18n("Add to panel")
-                                icon.name: "list-add"
-                                enabled: addList.currentIndex >= 0 && addList.currentIndex < page.panelAvailable.length
-                                onClicked: page.addPanelElement(page.panelAvailable[addList.currentIndex].id)
-                            }
+                            elements: panelEdit
+                            buttonText: i18n("Add to panel")
+                            emptyText: i18n("Every element is on the panel.")
                         }
                     }
 
@@ -1252,131 +1336,15 @@ Item {
                         }
                     }
 
-                    // The rows (a Repeater, not a ListView — the page already scrolls).
-                    // A row drags up or down from anywhere on it; the rows it passes
-                    // make room, and it lands where it is let go.
-                    ColumnLayout {
-                        id: elementRows
+                    ElementRows {
                         Layout.fillWidth: true
                         Layout.leftMargin: Kirigami.Units.largeSpacing
                         Layout.rightMargin: Kirigami.Units.largeSpacing
-                        spacing: Kirigami.Units.smallSpacing
-
-                        Repeater {
-                            model: panelModel
-                            delegate: Rectangle {
-                                id: elementRow
-                                required property int index
-                                required property string elementId
-                                required property bool shown
-                                readonly property bool dragged: rowDrag.active
-                                // making room for the dragged row: a row's height up or down
-                                readonly property real shift: {
-                                    var f = page.panelDragFrom, t = page.panelDragTo;
-                                    if (f < 0 || index === f) return 0;
-                                    if (f < t && index > f && index <= t) return -page.panelDragPitch;
-                                    if (f > t && index < f && index >= t) return page.panelDragPitch;
-                                    return 0;
-                                }
-
-                                Layout.fillWidth: true
-                                implicitHeight: rowContent.implicitHeight + Kirigami.Units.smallSpacing * 2
-                                radius: 6
-                                z: dragged ? 1 : 0
-                                // the dragged row opaque, so the rows it passes don't show through
-                                color: dragged
-                                    ? Kirigami.ColorUtils.tintWithAlpha(Kirigami.Theme.backgroundColor,
-                                                                        Kirigami.Theme.highlightColor, 0.3)
-                                    : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g,
-                                              Kirigami.Theme.textColor.b, rowHover.hovered ? 0.10 : 0.05)
-                                Behavior on color { ColorAnimation { duration: 100 } }
-                                transform: Translate {
-                                    y: elementRow.dragged ? rowDrag.activeTranslation.y : elementRow.shift
-                                    Behavior on y {
-                                        enabled: page.panelRowsAnimate && elementRow.index !== page.panelDragFrom
-                                        NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic }
-                                    }
-                                }
-
-                                RowLayout {
-                                    id: rowContent
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.leftMargin: Kirigami.Units.smallSpacing
-                                    anchors.rightMargin: Kirigami.Units.smallSpacing
-                                    spacing: Kirigami.Units.largeSpacing
-
-                                    Kirigami.Icon {
-                                        source: "drag-handle-symbolic"
-                                        Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                                        Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                                        opacity: 0.6
-                                    }
-                                    // a hidden element's icon and name dimmed
-                                    PanelElementIcon {
-                                        elementId: elementRow.elementId
-                                        opacity: elementRow.shown ? 1 : 0.4
-                                    }
-                                    Label {
-                                        Layout.fillWidth: true
-                                        text: page.panelElementName(elementRow.elementId)
-                                        elide: Text.ElideRight
-                                        opacity: elementRow.shown ? 1 : 0.5
-                                    }
-                                    ToolButton {
-                                        icon.name: elementRow.shown ? "view-visible-symbolic" : "view-hidden-symbolic"
-                                        onClicked: page.togglePanelElement(elementRow.index)
-                                        ToolTip.visible: hovered
-                                        ToolTip.text: elementRow.shown ? i18n("Hide on the panel") : i18n("Show on the panel")
-                                        HoverHandler { cursorShape: Qt.ArrowCursor }
-                                    }
-                                    ToolButton {
-                                        icon.name: "edit-delete"
-                                        onClicked: page.removePanelElement(elementRow.index)
-                                        ToolTip.visible: hovered
-                                        ToolTip.text: i18n("Remove")
-                                        HoverHandler { cursorShape: Qt.ArrowCursor }
-                                    }
-                                }
-
-                                HoverHandler { id: rowHover; cursorShape: Qt.OpenHandCursor }
-                                DragHandler {
-                                    id: rowDrag
-                                    target: null
-                                    xAxis.enabled: false
-                                    cursorShape: Qt.ClosedHandCursor
-                                    onActiveChanged: {
-                                        if (active) {
-                                            page.panelRowsAnimate = true;
-                                            page.panelDragPitch = elementRow.height + elementRows.spacing;
-                                            page.panelDragFrom = elementRow.index;
-                                            page.panelDragTo = elementRow.index;
-                                            return;
-                                        }
-                                        // dropped: everything takes its new place at once
-                                        var from = page.panelDragFrom, to = page.panelDragTo;
-                                        page.panelRowsAnimate = false;
-                                        page.panelDragFrom = -1;
-                                        page.panelDragTo = -1;
-                                        if (from >= 0 && to >= 0 && from !== to) page.movePanelElement(from, to);
-                                    }
-                                    onActiveTranslationChanged: {
-                                        if (!active || page.panelDragPitch <= 0) return;
-                                        page.panelDragTo = Math.max(0, Math.min(panelModel.count - 1,
-                                            elementRow.index + Math.round(activeTranslation.y / page.panelDragPitch)));
-                                    }
-                                }
-                            }
-                        }
-
-                        Label {
-                            Layout.fillWidth: true
-                            visible: page.panelShownIds.length === 0
-                            wrapMode: Text.WordWrap
-                            text: i18n("With no element shown, the panel shows the weather icon.")
-                            opacity: 0.6
-                        }
+                        elements: panelEdit
+                        nameOf: page.panelElementName
+                        hideText: i18n("Hide on the panel")
+                        showText: i18n("Show on the panel")
+                        emptyText: i18n("With no element shown, the panel shows the weather icon.")
                     }
                 }
             }

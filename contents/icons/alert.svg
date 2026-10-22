@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- KlimeWeather weather alert mark: a warning triangle with its "!" cut out, drawn
+       on the toolbar icons' 24 px grid and tinted to the alert's severity colour.
+       Copyright 2026  pku188 — SPDX-License-Identifier: GPL-2.0-or-later -->
+  <style type="text/css" id="current-color-scheme">.ColorScheme-Text { color:#232629; }</style>
+  <path class="ColorScheme-Text" fill="currentColor" fill-rule="evenodd"
+        d="M11.11 4.17Q12 2.6 12.89 4.17L21.31 19.03Q22.2 20.6 20.4 20.6L3.6 20.6Q1.8 20.6 2.69 19.03Z
+           M10.9 9.2A1.1 1.1 0 0 1 13.1 9.2L12.75 14.1A0.75 0.75 0 0 1 11.25 14.1Z
+           M13.2 17.15A1.2 1.2 0 1 1 10.8 17.15A1.2 1.2 0 1 1 13.2 17.15Z"/>
+</svg>

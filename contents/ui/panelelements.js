@@ -6,9 +6,10 @@
  */
 .pragma library
 
-// The readings, in the order of the older panelSecondLine values (0–11).
+// The readings: first in the order of the older panelSecondLine values (0–11), then
+// the date and the moon's phase.
 var readings = ["hiLo", "precipRate", "wind", "feelsLike", "humidity", "precipSum",
-                "uv", "pressure", "sun", "dewPoint", "snowSum", "cloud"];
+                "uv", "pressure", "sun", "dewPoint", "snowSum", "cloud", "date", "moon"];
 // Every element: the weather icon, the temperature, the location's name, the
 // condition's, and the readings.
 var all = ["icon", "temp", "location", "condition"].concat(readings);

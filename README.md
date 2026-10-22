@@ -3,7 +3,7 @@
 
 Weather widget for KDE Plasma 6, without the noise.
 
-Two weather sources, two layouts, and readouts you choose.
+Two weather sources, three layouts, and readouts you choose.
 
 This is a fork of the [Bare Weather](https://github.com/bvlthvzvr/BareWeather), following its strict privacy principles and adding various QoL improvements.
 
@@ -16,17 +16,17 @@ This is a fork of the [Bare Weather](https://github.com/bvlthvzvr/BareWeather), 
 - **Open-Meteo** and **MET Norway** — switched with the source button in the popup.
 
 
-### Two layouts, one click apart
+### Three layouts, one click apart
 
+- **Forecast** — daily tabs with the date and high/low, over a scrollable strip of hourly cards. Click a card to open its hour in the Detailed view.
 - **Graph** — a temperature curve and precipitation band taking hourly readings in a 12, 24 or 48 hours graph view, with sunrise/sunset markers and day buttons.
-- **Cards** — day tabs with the date and high/low, over a scrollable strip of hourly cards.
+- **Details** — every Weather Element of one hour at once, with that hour's weather and temperature, and the sun and the moon on their arcs across the sky.
 
 
 ### Readouts you pick
 
-- Up to **7 days** of forecast with variety of **Weather Elements** available: air pressure, cloud cover, dew point,
-feels like, high/low temperature, humidity, hourly or daily precipitation, snowfall,
-sunrise/sunset, UV, wind (with a direction arrow) — labelled with text or with icons, colored or monochrome.
+- Up to **7 days** of forecast with variety of **Weather Elements** available: air pressure, cloud cover, dew point, feels like, high/low temperature, humidity, hourly or daily precipitation, snowfall,
+sunrise/sunset, UV, wind (with a direction arrow), the date and the moon's phase.
 - Show any of the Weather Elements on the **panel**, in the order you drag them into. On a vertical panel, they automatically wrap onto multiple lines.
 - Customizable unit types and time format which follow your system's locale settings by default.
 
@@ -37,10 +37,9 @@ sunrise/sunset, UV, wind (with a direction arrow) — labelled with text or with
 
 - **Meteocons icons in four styles** — fill, flat, line or monochrome, animated or still.
 Your system icon theme or a folder of your own icons work too.
-- **Icons throughout the toolbar** — refresh, zoom, layout switch and pin each have
-  their own icon.
+- **Icons throughout the toolbar** — refresh, zoom and pin each have their own icon.
 - **Personalize almost anything** — nearly every piece of text has its own font-size setting,
-with both layouts having additional customization options.
+with each layout having additional customization options.
 - **Redrawn wind direction icon** — a clear arrow at a size you choose, turning to
 the exact reported angle instead of snapping to the fixed set of compass points.
 - **Severe-weather alerts** from the KDE FOSS Public Alert Server, from a severity you set,

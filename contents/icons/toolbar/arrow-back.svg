@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- KlimeWeather popup icon: step back (an arrow to the left) — the Detailed view's previous hour,
+       the Daily forecast's earlier hourly cards. Drawn like the zoom icons.
+       Copyright 2026  pku188 — SPDX-License-Identifier: GPL-2.0-or-later -->
+  <style type="text/css" id="current-color-scheme">.ColorScheme-Text { color:#232629; }</style>
+  <path class="ColorScheme-Text" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M19.5 12H4.75M10.75 6L4.75 12L10.75 18"/>
+</svg>

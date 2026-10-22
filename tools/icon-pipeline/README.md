@@ -36,8 +36,11 @@ offsets). See `contents/icons/meteocons/ATTRIBUTION.md`.
 ## Reading icons (`contents/icons/meteocons/readings/`)
 
 The icons before a reading (Weather Elements, panel, hourly cards, the graph's
-sunrise and sunset) and in the panel settings' list of Panel Elements, from the static package, flat as files and monochrome as
-`monochrome.js` (recoloured at run time):
+sunrise and sunset), the Detailed view's moon and time-of-day icons, and those in the
+settings' lists of elements, from the static package, flat as files and monochrome as
+`monochrome.js` (recoloured at run time). The monochrome line icons come twice: `svg`
+drawn bolder for the small sizes (`MONO_WEIGHT`), `lighter` for the larger Detailed view
+(`DETAILED_WEIGHT`):
 
 ```fish
 python3 meteocons_packs.py --readings static/package ../../contents/icons/meteocons

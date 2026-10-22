@@ -54,7 +54,8 @@ AbstractButton {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
                 text: btn.root ? btn.root.locationShortName : ""
-                font.bold: true
+                // Appearance → Common → Location font style, Bold by default
+                font.weight: btn.root ? btn.root.locationFontWeight : Font.Bold
                 font.pixelSize: btn.fontSize
             }
         }

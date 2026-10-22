@@ -1,8 +1,11 @@
 /*
- * Severe-weather alert indicator — a small severity-coloured warning mark shown
- * beside the header metrics when the alert feed has an active alert. Hover shows
- * the full alert headline + description.
- * Copyright 2026  bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
+ * Severe-weather alert indicator — a severity-coloured warning mark (its own SVG,
+ * contents/icons/alert.svg) shown left of the location in the header when the alert
+ * feed has an active alert, as large as the toolbar's icons (Appearance → Common →
+ * Toolbar icon size). Hover shows the full alert headline + description: its text
+ * selectable (and copied as it is selected, for a middle-click paste), its web
+ * addresses links that open in the browser.
+ * Copyright 2026  pku188, bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
  */
 import QtQuick
 import QtQuick.Controls
@@ -13,12 +16,16 @@ Kirigami.Icon {
 
     property var weatherRoot
     readonly property var alert: weatherRoot ? weatherRoot.topAlert : null
+    // the toolbar glyphs' size
+    property int size: weatherRoot ? weatherRoot.toolbarIconSize : 24
 
     visible: weatherRoot && weatherRoot.showAlerts && alert !== null
-    source: "dialog-warning"
+    source: Qt.resolvedUrl("../icons/alert.svg")
+    isMask: true
     color: alert ? weatherRoot.alertColor(alert.severity) : "transparent"
-    implicitWidth: Kirigami.Units.iconSizes.small
-    implicitHeight: Kirigami.Units.iconSizes.small
+    roundToIconSize: false   // the exact toolbar size, not snapped to 16/22/32
+    implicitWidth: size
+    implicitHeight: size
 
     HoverHandler { id: hov }
 
@@ -35,6 +42,15 @@ Kirigami.Icon {
     Timer { id: showTimer; interval: 150; onTriggered: tip.visible = true }
     Timer { id: hideTimer; interval: 130; onTriggered: tip.visible = false }
 
+    // The alert's text as rich text: the rest escaped, the line breaks kept, and each
+    // web address a link (the punctuation that ends a sentence after one left out).
+    function _richDetail(t) {
+        var esc = String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        esc = esc.replace(/(https?:\/\/[^\s<>"]*[^\s<>".,;:!?)\]'])/g, '<a href="$1">$1</a>');
+        return esc.replace(/\n/g, "<br>");
+    }
+    readonly property string _detail: weatherRoot ? weatherRoot.alertDetail() : ""
+
     ToolTip {
         id: tip
         parent: indicator
@@ -44,19 +60,36 @@ Kirigami.Icon {
         // ScrollView (wheel works because the pointer is over the hovered tooltip)
         // instead of running off-screen.
         contentItem: Item {
-            implicitWidth: Math.min(tipLabel.implicitWidth, Kirigami.Units.gridUnit * 19)
-            implicitHeight: Math.min(tipLabel.implicitHeight, Kirigami.Units.gridUnit * 22)
+            implicitWidth: Math.min(measure.implicitWidth, Kirigami.Units.gridUnit * 19)
+            implicitHeight: Math.min(tipText.implicitHeight, Kirigami.Units.gridUnit * 22)
             HoverHandler { id: tipHov }
+            // the text's width on one line, which the wrapped text below can't tell
+            Label {
+                id: measure
+                visible: false
+                text: indicator._detail
+                font: tipText.font
+            }
             ScrollView {
                 id: tipScroll
                 anchors.fill: parent
                 contentWidth: availableWidth   // vertical scroll only
-                Label {
-                    id: tipLabel
+                // Selectable, unlike a Label. Long addresses break anywhere rather than
+                // run out of the box.
+                TextEdit {
+                    id: tipText
                     width: tipScroll.availableWidth
-                    text: weatherRoot ? weatherRoot.alertDetail() : ""
+                    readOnly: true
+                    selectByMouse: true
+                    textFormat: TextEdit.RichText
+                    wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+                    text: indicator._richDetail(indicator._detail)
+                    font: tip.font
                     color: tip.palette.toolTipText
-                    wrapMode: Text.WordWrap
+                    selectionColor: tip.palette.highlight
+                    selectedTextColor: tip.palette.highlightedText
+                    onLinkActivated: (link) => Qt.openUrlExternally(link)
+                    HoverHandler { cursorShape: tipText.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor }
                 }
             }
         }

@@ -107,7 +107,7 @@
     <entry name="simpleHeaderMetric1" type="String"><default>uv</default></entry>
     <entry name="simpleHeaderMetric2" type="String"><default>precipSum</default></entry>
     <entry name="simpleHeaderMetric3" type="String"><default>none</default></entry>
-    <entry name="simpleHeaderMetric4" type="String"><default>wind</default></entry>
+    <entry name="simpleHeaderMetric4" type="String"><default>none</default></entry>
     <entry name="hourlyMetric1" type="String"><default>wind</default></entry>
     <entry name="hourlyMetric2" type="String"><default>precipAmt</default></entry>
     <!-- per-slot fallbacks, tried in order when the primary readout has no value
@@ -192,7 +192,11 @@
       <default>20</default>
     </entry>
     <entry name="locationFontSize" type="Int">
-      <default>18</default>
+      <default>17</default>
+    </entry>
+    <!-- the location's font weight: 400 / 600 / 700 -->
+    <entry name="locationFontWeight" type="Int">
+      <default>600</default>
     </entry>
     <entry name="providerFontSize" type="Int">
       <default>15</default>
@@ -200,18 +204,41 @@
     <!-- Weather Elements style: 0 = text labels ("Humidity: 78%"), 1 = icons (the
          hourly cards' icon before each value) -->
     <entry name="headerElementsStyle" type="Int">
-      <default>0</default>
+      <default>1</default>
     </entry>
-    <!-- the Weather Elements' icons in Meteocons' flat colours, rather than monochrome
-         in the text colour. The panel has its own, panelColorIcon, and the graph's
-         markers dayMarkerIconColored; the hourly cards' stay monochrome. -->
+    <!-- the header's Weather Elements' icons in Meteocons' flat colours, rather than
+         monochrome in the text colour. The other views have their own (below), the
+         panel panelColorIcon and the graph's markers dayMarkerIconColored. -->
     <entry name="readingIconsColored" type="Bool">
       <default>false</default>
     </entry>
-    <!-- weather-specific text colours: the Weather Elements' values (blue precipitation,
-         the UV scale's green to red, …) and the card layout's daily low / high. Off,
-         they are in the theme's text colour. -->
+    <!-- weather-specific text colours for the header's Weather Elements' values (blue
+         precipitation, the UV scale's green to red, …). Off, they are in the theme's
+         text colour. -->
     <entry name="weatherSpecificColors" type="Bool">
+      <default>true</default>
+    </entry>
+    <!-- The same two for the other views (Appearance → Daily forecast, Detailed view):
+         the daily tabs' high and low in their colours; the hourly cards' readout icons
+         and values; the Detailed view's element icons and values. -->
+    <entry name="dailyHiLoColored" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="hourlyIconsColored" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="hourlyValuesColored" type="Bool">
+      <default>false</default>
+    </entry>
+    <!-- the hourly cards' precipitation wash: rain blue from the bottom-left corner,
+         snow white from the top-right (Appearance → Daily forecast → Hourly cards) -->
+    <entry name="hourlyPrecipGradient" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="detailedIconsColored" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="detailedValuesColored" type="Bool">
       <default>true</default>
     </entry>
     <!-- the graph's markers in colour: the new-day icons in the icon pack's colours
@@ -225,10 +252,43 @@
     <entry name="toolbarIconSize" type="Int">
       <default>24</default>
     </entry>
-    <!-- which popup layout to open with: false = Detailed (cards), true = Simple
-         (graph). Defaults to the card layout. -->
+    <!-- the popup's layout, picked with the buttons under the day buttons: "details"
+         the Detailed view, "cards" the card layout, "graph" the graph layout. Empty =
+         never picked: derived from simpleLayout below, so an upgrade keeps the
+         layout it had. -->
+    <entry name="popupLayout" type="String">
+      <default></default>
+    </entry>
+    <!-- older switch between the two first layouts, now only read to derive
+         popupLayout: false = the card layout, true = the graph layout -->
     <entry name="simpleLayout" type="Bool">
       <default>false</default>
+    </entry>
+    <!-- The Detailed view (Appearance → Detailed view): its forecast days (its day
+         buttons, and how far it scrolls), its elements in order — a JSON list of
+         {"id", "shown"}, see contents/ui/detailedelements.js; empty = all of them in
+         the default order — and their font: size in pixels, weight 400 / 600 / 700. -->
+    <entry name="detailedViewDays" type="Int">
+      <default>5</default>
+    </entry>
+    <entry name="detailedViewElements" type="String">
+      <default></default>
+    </entry>
+    <entry name="detailedViewFontSize" type="Int">
+      <default>16</default>
+    </entry>
+    <entry name="detailedViewFontWeight" type="Int">
+      <default>600</default>
+    </entry>
+    <!-- How the Detailed view's elements come in when it opens, as a PERCENTAGE of the
+         original pace (as cardDealDurationPercent): lower is faster, 0 = no animation.
+         See entrance in DetailedView.qml. -->
+    <entry name="detailedEntrancePercent" type="Int">
+      <default>60</default>
+    </entry>
+    <!-- the layout buttons' text size in pixels (Appearance → Common) -->
+    <entry name="layoutButtonFontSize" type="Int">
+      <default>15</default>
     </entry>
     <!-- Per-layout remembered popup size (0 = use the view's implicit size).
          main.qml drives the popup window directly (Window.window) to restore the
@@ -278,13 +338,20 @@
       <default>1000</default>
     </entry>
     <entry name="detailPopupWidth" type="Int">
-      <default>920</default>
+      <default>868</default>
     </entry>
     <entry name="detailPopupHeight" type="Int">
       <default>480</default>
     </entry>
     <entry name="simplePopupWidth" type="Int">
-      <default>920</default>
+      <default>868</default>
+    </entry>
+    <!-- the Detailed view's; its height follows the content until a drag sets one -->
+    <entry name="detailedViewPopupWidth" type="Int">
+      <default>868</default>
+    </entry>
+    <entry name="detailedViewPopupHeight" type="Int">
+      <default>0</default>
     </entry>
     <entry name="simplePopupHeight" type="Int">
       <default>480</default>
@@ -335,9 +402,10 @@
     <entry name="simpleGraphTempFontSize" type="Int">
       <default>16</default>
     </entry>
-    <!-- Simple-layout day buttons (the "Thu Fri Sat" pills in the header): pixel size -->
+    <!-- the day buttons (the "Thu Fri Sat" pills) of the Detailed view and the Weather
+         graph: pixel size (Appearance → Common) -->
     <entry name="dayPillFontSize" type="Int">
-      <default>16</default>
+      <default>15</default>
     </entry>
     <!-- Simple-layout graph new-day marker label font (the "Fri, 18/09" at midnight) -->
     <entry name="simpleDayMarkerFontSize" type="Int">
@@ -449,6 +517,15 @@
          "-monochrome"), "system" (theme weather-* icons), or "custom" -->
     <entry name="iconPack" type="String">
       <default>meteocons-fill</default>
+    </entry>
+    <!-- The icons before the readings in colour, wherever a view's "Use colored icons"
+         is on (Appearance → Common → Element icon pack): "meteocons-flat",
+         "meteocons-line" or "custom", the folder readingIconDir (a file:// URL). -->
+    <entry name="readingIconPack" type="String">
+      <default>meteocons-line</default>
+    </entry>
+    <entry name="readingIconDir" type="String">
+      <default></default>
     </entry>
     <!-- folder of the user's own icons when iconPack = "custom" (a file:// URL) -->
     <entry name="customIconDir" type="String">

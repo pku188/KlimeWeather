@@ -72,15 +72,24 @@ as a custom folder.
 ## Reading icons (`readings/`)
 
 The icons drawn before a reading — the Weather Elements' icon style, the panel's
-readings, the hourly cards' readouts and the graph's sunrise and sunset — and the
-ones the panel settings list the Panel Elements with, from **`@meteocons/svg-static` 0.1.0**, static, in two styles: `flat/<name>.svg`
-for "Use colored icons", and the monochrome set as `monochrome.js`, SVG strings
-drawn in `currentColor` that the widget recolours to the theme's text colour.
+readings, the hourly cards' readouts, the graph's sunrise and sunset and the Detailed
+view — and the ones the settings list the elements with, from
+**`@meteocons/svg-static` 0.1.0**, static, in three styles: `flat/<name>.svg` and
+the line set as `line.js`, the Element icon pack's two for "Use colored icons", and
+the monochrome set as `monochrome.js` — `line.js` and `monochrome.js` SVG strings
+drawn in `currentColor` that the widget recolours to the theme's text colour: the
+whole of a monochrome icon, and the neutral greys of a line icon (its near-black
+barometer and "UV", its near-white cloud and wind), which on one theme or the other
+vanished.
 Built by `tools/icon-pipeline/meteocons_packs.py --readings`: masks as above, and
 in the monochrome set the artwork painted white (humidity's "%", the umbrella's lit
 panel) cut out of the icon, so it shows the background as any symbolic icon does,
 and the line icons (not the solid ones or the thermometers) drawn 3 units (of 128)
-bolder — Meteocons' 2–4 unit lines came out under a pixel wide at the widget's sizes.
+bolder — Meteocons' 2–4 unit lines came out under a pixel wide at the widget's sizes —
+and 1 unit bolder for the Detailed view, whose icons are larger.
 
 thermometer, humidity, uv-index, raindrop, raindrops, umbrella, snowflake, cloudy,
-barometer, wind, sunrise, sunset, thermometer-raindrop, partly-cloudy-day.
+barometer, wind, sunrise, sunset, thermometer-raindrop, partly-cloudy-day; for the
+Detailed view the moon's eight phases (moon-new … moon-waning-crescent, drawn without
+the extra weight), moonrise and moonset, and the eight time-of-day icons
+(time-night … time-late-evening) with the hour range under their artwork taken out.

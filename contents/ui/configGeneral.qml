@@ -25,6 +25,7 @@ Kirigami.FormLayout {
     property string cfg_precipUnit
     property int    cfg_clockFormat
     property bool   cfg_use24Hour             // the older checkbox, read only while clockFormat was never chosen
+    property int    cfg_detailDayStartHour
 
     // What "Follow system" resolves to, shown in its brackets. The same rules as
     // main.qml's units, windUnitApi, pressureUnitApi, precipImperial and use24Hour —
@@ -75,6 +76,7 @@ Kirigami.FormLayout {
         pressureUnitCombo.sync();
         precipUnitCombo.sync();
         clockFormatCombo.sync();
+        dayStartCombo.sync();
     }
 
     // two sections, titled as on the Location page
@@ -219,7 +221,6 @@ Kirigami.FormLayout {
         }
         Component.onCompleted: sync()
         onActivated: page.cfg_precipUnit = model[currentIndex].value
-        ToolTip.visible: hovered
         ToolTip.text: i18n("Snowfall follows it: centimeters with millimeters, inches with inches.")
     }
     ConfigComboBox {
@@ -244,7 +245,28 @@ Kirigami.FormLayout {
         onActivated: page.cfg_clockFormat = model[currentIndex].value
     }
 
-    Item { Kirigami.FormData.isSection: true }
+    Kirigami.Separator {
+        Kirigami.FormData.label: i18n("Miscellaneous")
+        Kirigami.FormData.isSection: true
+    }
+    ConfigComboBox {
+        id: dayStartCombo
+        Kirigami.FormData.label: i18n("Day starts at:")
+        textRole: "text"
+        // the hour a day other than today opens at (detailDayStartHour), in the Daily
+        // forecast and the Detailed view: 6 AM skips the night, Midnight opens at 00:00
+        model: [
+            { text: i18n("6 AM"),     value: 6 },
+            { text: i18n("Midnight"), value: 0 }
+        ]
+        function sync() {
+            for (var i = 0; i < model.length; ++i)
+                if (model[i].value === page.cfg_detailDayStartHour) { currentIndex = i; break; }
+        }
+        Component.onCompleted: sync()
+        onActivated: page.cfg_detailDayStartHour = model[currentIndex].value
+        ToolTip.text: i18n("The hour a day opens at when you pick it, in the Daily forecast and the Detailed view. Today always opens at the current hour.")
+    }
     Button {
         text: i18n("Reset All Settings…")
         icon.name: "edit-reset"

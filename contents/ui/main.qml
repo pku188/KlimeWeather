@@ -19,14 +19,48 @@ import org.kde.notification
 import "providers"
 import "providers/grid.js" as Grid
 import "../icons/meteocons/readings/monochrome.js" as MonoReadings
+import "../icons/meteocons/readings/line.js" as LineReadings
 import "panelelements.js" as PanelElements
+import "detailedelements.js" as DetailedElements
+import "moon.js" as Moon
 
 PlasmoidItem {
     id: root
 
     readonly property bool keepOpen: Plasmoid.configuration.keepOpen || false
     function setKeepOpen(v) { Plasmoid.configuration.keepOpen = v; }
-    function toggleLayout() { Plasmoid.configuration.simpleLayout = !simpleLayout; }
+    // The popup's layout, picked with the buttons under the location, in this order:
+    // "cards" the Daily forecast, "graph" the Weather graph, "details" the Detailed
+    // view. Never picked: the older switch between the card and graph layouts
+    // (simpleLayout) decides.
+    readonly property var popupLayouts: ["cards", "graph", "details"]
+    readonly property string popupLayout: {
+        var l = Plasmoid.configuration.popupLayout || "";
+        if (popupLayouts.indexOf(l) >= 0) return l;
+        return Plasmoid.configuration.simpleLayout ? "graph" : "cards";
+    }
+    readonly property bool simpleLayout:   popupLayout === "graph"
+    readonly property bool detailedLayout: popupLayout === "details"
+    function setLayout(l) { if (popupLayouts.indexOf(l) >= 0) Plasmoid.configuration.popupLayout = l; }
+    // the wheel over the layout buttons: one layout along per notch, stopping at either end
+    function stepLayout(delta) {
+        var i = Math.max(0, Math.min(popupLayouts.length - 1, popupLayouts.indexOf(popupLayout) + delta));
+        setLayout(popupLayouts[i]);
+    }
+    // The hour the Detailed view shows, as its sample's time; "" the current hour. Back
+    // to the current hour whenever the view is left (DetailedView) and the popup opens;
+    // a click on an hourly card sets it before it opens the view.
+    property string detailedFocusTime: ""
+    onExpandedChanged: function () {
+        if (!root.expanded) return;
+        root.detailedFocusTime = "";
+        root.tickClock();
+    }
+    function showDetailedAt(sample) {
+        if (!sample || sample.dayBreak) return;
+        detailedFocusTime = sample.time;
+        setLayout("details");
+    }
     // Graph zoom: a whole day on screen (2-hour labels) or half a day (hourly
     // labels). Both draw the same hourly curve — see SimpleView's pointsVisible.
     // Also reachable from Appearance → Graph; this is the in-place shortcut.
@@ -92,6 +126,16 @@ PlasmoidItem {
     // blocks.
     readonly property int    graphDays: Math.max(3, Math.min(7, Plasmoid.configuration.simpleDailyDays || 3))
     readonly property int    graphZoom:       Math.max(0, Math.min(2, Plasmoid.configuration.graphZoom ?? 1))
+    // The Detailed view (Appearance → Detailed view): its days, its elements in order
+    // (each { id, shown }, see detailedelements.js) and their font.
+    readonly property int    detailedDays: Math.max(1, Math.min(7, Plasmoid.configuration.detailedViewDays || 5))
+    readonly property var    detailedElements: DetailedElements.parse(Plasmoid.configuration.detailedViewElements)
+    readonly property int    detailedFontSize: Plasmoid.configuration.detailedViewFontSize || 15
+    readonly property int    detailedFontWeight: Plasmoid.configuration.detailedViewFontWeight || 600
+    // how the elements come in, as a percentage of the original pace; 0 none
+    readonly property int    detailedEntrancePercent: Math.max(0, Plasmoid.configuration.detailedEntrancePercent ?? 60)
+    // the layout buttons' text (Appearance → Common)
+    readonly property int    layoutButtonFontSize: Plasmoid.configuration.layoutButtonFontSize || 14
     readonly property int    refreshMinutes: Plasmoid.configuration.refreshInterval || 15
     readonly property int    heroIconSize:   Plasmoid.configuration.heroIconSize   || 88
     readonly property int    tempFontSize:   Plasmoid.configuration.tempFontSize   || 88
@@ -129,33 +173,29 @@ PlasmoidItem {
     readonly property int    graphSlideMsWide:      Math.max(0, Plasmoid.configuration.graphSlideMsWide   ?? 800)
     readonly property int    conditionFontSize:   Plasmoid.configuration.conditionFontSize   || 28
     readonly property int    locationFontSize:    Plasmoid.configuration.locationFontSize    || 28
+    readonly property int    locationFontWeight:  Plasmoid.configuration.locationFontWeight  || 700
     readonly property int    providerFontSize:    Plasmoid.configuration.providerFontSize    || 16
     readonly property int    toolbarIconSize:     Plasmoid.configuration.toolbarIconSize     || 24
-    readonly property bool   simpleLayout:         Plasmoid.configuration.simpleLayout         || false
     readonly property int    simpleHourlyIconSize: Plasmoid.configuration.simpleHourlyIconSize || 34
-    // Which icons animate (Appearance → Cards / Graph → Animation). Card layout:
-    // 0 none, 1 the header icon, 2 the header and the daily tabs, 3 the full layout.
-    // Graph layout: 0 none, 1 the header icon, 2 the full layout. A setting never
-    // chosen (-1) is derived from the older per-part switches, so an upgrade keeps
-    // what the user had: the old "Daily tab icons" becomes header and tabs, and any
-    // old choice that animated the hourly icons becomes the full layout.
+    // Which icons animate, in every layout (Appearance → Common → Weather icon animation): 0 none,
+    // 1 the header icon, 2 the header and the Daily forecast's day tabs, 3 the full
+    // layout — the hourly cards and the Weather graph's hour icons too. The Detailed
+    // view has only the header's to animate. A setting never chosen (-1) is derived
+    // from the older per-part switches, so an upgrade keeps what the user had: the old
+    // "Daily tab icons" becomes header and tabs, and any old choice that animated the
+    // hourly icons becomes the full layout. (graphAnimation, the Weather graph's own
+    // setting until 2026-10, is no longer read.)
     readonly property int cardAnimation: {
         var m = Plasmoid.configuration.cardAnimation ?? -1;
         if (m >= 0) return Math.min(3, m);
         if (Plasmoid.configuration.animatedHourlyIcons ?? true) return 3;
         return (Plasmoid.configuration.animatedDailyIcons ?? true) ? 2 : 0;
     }
-    readonly property int graphAnimation: {
-        var m = Plasmoid.configuration.graphAnimation ?? -1;
-        if (m >= 0) return Math.min(2, m);
-        if (Plasmoid.configuration.simpleAnimatedIcons ?? true) return 2;
-        return (Plasmoid.configuration.simpleHeaderAnim ?? true) ? 1 : 0;
-    }
     readonly property bool   fullHeaderAnim:      cardAnimation >= 1
     readonly property bool   animatedDailyIcons:  cardAnimation >= 2
     readonly property bool   animatedHourlyIcons: cardAnimation >= 3
-    readonly property bool   simpleHeaderAnim:    graphAnimation >= 1
-    readonly property bool   simpleAnimatedIcons: graphAnimation >= 2
+    readonly property bool   simpleHeaderAnim:    cardAnimation >= 1
+    readonly property bool   simpleAnimatedIcons: cardAnimation >= 3
     readonly property int    graphColorMode:       Plasmoid.configuration.graphColorMode       ?? 2
     readonly property int    precipBandOpacity:    Math.max(0, Math.min(90, Plasmoid.configuration.precipBandOpacity ?? 30))
     readonly property int    precipLabelMode:      Math.max(0, Math.min(3, Plasmoid.configuration.precipLabelMode ?? 3))
@@ -321,8 +361,8 @@ PlasmoidItem {
     // instruction, then every other active alert as a one-liner. No caps — the
     // point-in-polygon filter keeps the set small (only alerts covering us).
     function alertDetail() {
-        if (!displayAlerts.length) return "";
-        var top = topAlert;
+        var top = topAlert;   // updates after displayAlerts: null for a moment
+        if (!displayAlerts.length || !top) return "";
         var s = top.headline;
         if (top.description) s += "\n\n" + _flowAlert(top.description);
         if (top.instruction) s += "\n\n" + _flowAlert(top.instruction);
@@ -368,7 +408,7 @@ PlasmoidItem {
     // decoupled from the Detailed cards' hourlyTempFontSize.
     readonly property int simpleGraphTempFontSize: Plasmoid.configuration.simpleGraphTempFontSize || 16
     readonly property int simpleDayMarkerFontSize: Plasmoid.configuration.simpleDayMarkerFontSize || 12
-    // graph layout's day buttons (DayPills)
+    // the day buttons (DayPills) of the Detailed view and the Weather graph
     readonly property int dayPillFontSize: Plasmoid.configuration.dayPillFontSize || 16
     readonly property var headerMetrics: [
         Plasmoid.configuration.headerMetric1 || "feelsLike",
@@ -452,13 +492,32 @@ PlasmoidItem {
         case "dewPoint":  return isNaN(m.dew) ? "" : tempStr(m.dew);
         case "cloud":     return (isNaN(m.cloud) || m.cloud < 10) ? "" : (Math.round(m.cloud) + "%");
         case "pressure":  return isNaN(m.pressure) ? "" : pressureStr(m.pressure);
+        case "date":      return weekdayDateText(m.date);   // the card says its hour itself
         }
         return "";   // "none" / unknown
     }
+    // An hourly card's readout `val` (hourlyMetricValue's for `id` and the hour `m`) in
+    // its weather colour, as the Weather Elements colour theirs, as styled text
+    // (Appearance → Daily forecast → Hourly cards → Use weather-specific color). A
+    // chance of 0% stays in the text colour; readings without a colour stay as they are.
+    function hourlyValueTinted(id, m, val) {
+        if (!val || !m) return val;
+        switch (id) {
+        case "precip":    return _tint(val, precipColor, Math.round(m.precip) > 0);
+        case "precipAmt":                                    // only an amount above zero prints
+        case "snow":      return _tint(val, precipColor, true);
+        case "humidity":  return _tint(val, humidityColor(m.humidity), true);
+        case "uv":        return "UV " + _tint("" + Math.round(m.uv), uvColor(m.uv), true);
+        case "feelsLike": return _tint(val, feelsColor(m.feels), true);
+        case "dewPoint":  return _tint(val, dewColor(m.dew), true);
+        }
+        return val;
+    }
     // The icon before an hourly card's readout (see readingIcon): "" for none — wind
     // has its own trailing direction arrow, and "none"/unknown get nothing.
-    function hourlyMetricIcon(id) {
+    function hourlyMetricIcon(id, m) {
         switch (id) {
+        case "date":      return m ? timeOfDayIcon(new Date(m.time).getHours()) : "time-afternoon";
         case "cloud":     return "cloudy";
         case "pressure":  return "barometer";
         case "precip":    return "umbrella";    // the chance (the amount is a raindrop)
@@ -577,7 +636,7 @@ PlasmoidItem {
     function metricText(id, dayIdx, hourSample) {
         var day = (dayIdx !== undefined && dayIdx >= 0 && dayIdx < dailyData.length) ? dailyData[dayIdx] : null;
         // word for the daily-total labels: "today" for day 0 / unset, else the
-        // focused day's name (so a scrolled view reads e.g. "Snowfall Sun: …")
+        // focused day's name (so a scrolled view reads e.g. "Snowfall (Sun): …")
         var whenWord = (dayIdx !== undefined && dayIdx > 0) ? dayName(dayIdx) : i18n("Today");
         if (id === "feelsLike") {
             var ft = (hourSample && !isNaN(hourSample.feels)) ? hourSample.feels : apparentTemp;
@@ -598,7 +657,7 @@ PlasmoidItem {
             return isNaN(dp) ? "" : i18n("Dew point: %1",
                 _tint(tempStr(dp), dewColor(dp), weatherSpecificColors));
         }
-        // the day's high and low, high first: "H/L: 18° | 9°"
+        // the day's high and low, high first: "H/L: ↑ 18°  ↓ 9°"
         if (id === "hiLo") {
             var dh = day ? day : (dailyData.length ? dailyData[0] : null);
             if (!dh || isNaN(dh.hi) || isNaN(dh.lo)) return "";
@@ -614,11 +673,11 @@ PlasmoidItem {
                              : i18n("Precip.: %1 / %2", amt,
                                     _precipChance(pc, weatherSpecificColors));
         }
-        // the day's total, and the day in brackets: "Precip.: 1.7 mm (Tue)"
+        // the day's total, the day in brackets: "Precip. (Tue): 1.7 mm"
         if (id === "precipSum") {
             var ps = day ? day.precipSum : precipSumToday;
-            return isNaN(ps) ? "" : i18n("Precip.: %1 (%2)",
-                _precipAmount(ps, weatherSpecificColors), whenWord);
+            return isNaN(ps) ? "" : i18n("Precip. (%1): %2", whenWord,
+                _precipAmount(ps, weatherSpecificColors));
         }
         if (id === "wind") {
             var ws = (hourSample && !isNaN(hourSample.wind)) ? hourSample.wind : windSpeed;
@@ -647,9 +706,11 @@ PlasmoidItem {
         }
         if (id === "snowSum") {
             var ss = day ? day.snowSum : snowSumToday;
-            return isNaN(ss) ? "" : i18n("Snowfall %1: %2", whenWord,
-                _tint(snowfallStr(ss), precipColor, weatherSpecificColors));
+            return isNaN(ss) ? "" : i18n("Snowfall (%1): %2", whenWord,
+                _snowAmount(ss, weatherSpecificColors));
         }
+        if (id === "date") return i18n("Date: %1", dateText(hourSample));
+        if (id === "moon") return i18n("Moon: %1", moonPhaseName(hourSample));
         // Combined sunrise/sunset, offered in both layouts' Weather Elements.
         // One compact line "↑ 5:23a  ↓ 8:23p"; falls back to today
         // (dailyData[0]) when no day is focused. The old "sunrise"/"sunset" ids are
@@ -665,6 +726,163 @@ PlasmoidItem {
         }
         return "";
     }
+    // ── The clock, for the Date element ──
+    // The time to the minute, as a true instant: it ticks on each minute's turn —
+    // not every so many seconds, which left the minutes up to a minute late — and
+    // again whenever the popup opens, after a sleep may have held the timer back.
+    property double clockMs: Date.now()
+    function tickClock() {
+        clockMs = Date.now();
+        clockTimer.interval = 60000 - (clockMs % 60000) + 20;
+        clockTimer.restart();
+    }
+    Timer {
+        id: clockTimer
+        interval: 1000
+        running: true
+        onTriggered: root.tickClock()
+    }
+    // `ms` (a true instant) as new Date() reads the forecast's own times: the
+    // location's clock (see locNow).
+    function locAt(ms) {
+        if (isNaN(utcOffsetSeconds)) return new Date(ms);
+        return new Date(ms + utcOffsetSeconds * 1000 + new Date(ms).getTimezoneOffset() * 60000);
+    }
+    // Is `s` the hour we're in — does its span hold the clock? No hour is now too.
+    function isCurrentSample(s) {
+        if (!s) return true;
+        var t = new Date(s.time).getTime(), now = locAt(clockMs).getTime();
+        return now >= t && now < t + (s.spanHours > 0 ? s.spanHours : 1) * 3600000;
+    }
+    // An hour as a true instant: the clock for the hour we're in.
+    function sampleUtcMs(s) {
+        if (isCurrentSample(s)) return clockMs;
+        var p = s.time.split(/[-T:]/);
+        var off = !isNaN(utcOffsetSeconds) ? utcOffsetSeconds : -new Date().getTimezoneOffset() * 60;
+        return Date.UTC(+p[0], +p[1] - 1, +p[2], +p[3], +p[4] || 0) - off * 1000;
+    }
+    // The Date element: "14:00 Fri, 16/10" — an hour, its weekday and its date as the
+    // layouts write them, by the Clock format; the hour we're in to the minute.
+    function dateText(s) {
+        var now = isCurrentSample(s), d = now ? locAt(clockMs) : new Date(s.time);
+        function pad(v) { return (v < 10 ? "0" : "") + v; }
+        var date = now ? d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) : s.date;
+        return d.toLocaleTimeString(Qt.locale(), use24Hour ? "H:mm" : "h:mm AP") + " " + weekdayDateText(date);
+    }
+    // its icon: the time of day of that hour
+    function dateIcon(s) {
+        return timeOfDayIcon((isCurrentSample(s) ? locAt(clockMs) : new Date(s.time)).getHours());
+    }
+    // The Moon phase element: the moon's phase at an hour (see moon.js), its name
+    // and its Meteocons icon.
+    readonly property var moonPhaseNames: [i18n("New moon"), i18n("Waxing crescent"), i18n("First quarter"),
+                                           i18n("Waxing gibbous"), i18n("Full moon"), i18n("Waning gibbous"),
+                                           i18n("Last quarter"), i18n("Waning crescent")]
+    function moonPhase(s) { return Moon.phase(sampleUtcMs(s)); }
+    function moonPhaseName(s) { return moonPhaseNames[moonPhase(s).index]; }
+    function moonPhaseIcon(s) { return Moon.PHASES[moonPhase(s).index]; }
+
+    // The Detailed view's elements: each one's name and its value, apart, as the
+    // Weather Elements' text style prints them (metricText) — the value in its
+    // weather colour when `colored`.
+    function metricLabel(id, dayIdx) {
+        var whenWord = (dayIdx !== undefined && dayIdx > 0) ? dayName(dayIdx) : i18n("Today");
+        switch (id) {
+        case "feelsLike":  return i18n("Feels like");
+        case "humidity":   return i18n("Humidity");
+        case "uv":         return i18n("UV Index");
+        case "dewPoint":   return i18n("Dew point");
+        case "hiLo":       return i18n("H/L");
+        case "precipRate": return i18n("Precip.");
+        case "precipSum":  return i18n("Precip. (%1)", whenWord);
+        case "wind":       return i18n("Wind");
+        case "cloud":      return i18n("Cloud cover");
+        case "pressure":   return i18n("Pressure");
+        case "snowSum":    return i18n("Snowfall (%1)", whenWord);
+        case "date":       return i18n("Date");
+        case "moon":       return i18n("Moon");
+        }
+        return "";
+    }
+    function metricValue(id, dayIdx, hourSample, colored) {
+        var day = (dayIdx !== undefined && dayIdx >= 0 && dayIdx < dailyData.length) ? dailyData[dayIdx] : null;
+        function hourly(field, fallback) {
+            return (hourSample && !isNaN(hourSample[field])) ? hourSample[field] : fallback;
+        }
+        switch (id) {
+        case "feelsLike": {
+            var ft = hourly("feels", apparentTemp);
+            return isNaN(ft) ? "" : _tint(tempStr(ft), feelsColor(ft), colored);
+        }
+        case "humidity": {
+            var hum = hourly("humidity", humidity);
+            return isNaN(hum) ? "" : _tint(Math.round(hum) + "%", humidityColor(hum), colored);
+        }
+        case "uv": {
+            var uv = hourly("uv", uvIndex);
+            return isNaN(uv) ? "" : uvIndexText(uv, colored);
+        }
+        case "dewPoint": {
+            var dp = hourly("dew", dewPoint);
+            return isNaN(dp) ? "" : _tint(tempStr(dp), dewColor(dp), colored);
+        }
+        case "hiLo": {
+            var dh = day ? day : (dailyData.length ? dailyData[0] : null);
+            return (!dh || isNaN(dh.hi) || isNaN(dh.lo)) ? "" : _hiLoText(dh.hi, dh.lo, colored);
+        }
+        case "precipRate": {
+            var pr = hourly("precipAmt", precipRate);
+            if (isNaN(pr)) return "";
+            var pc = _hourChance(hourSample), amt = _precipAmount(pr, colored);
+            return isNaN(pc) ? amt : amt + " / " + _precipChance(pc, colored);
+        }
+        case "precipSum": {
+            var ps = day ? day.precipSum : precipSumToday;
+            return isNaN(ps) ? "" : _precipAmount(ps, colored);
+        }
+        case "wind": {
+            var ws = hourly("wind", windSpeed);
+            if (isNaN(ws)) return "";
+            var gs = hourly("gust", windGust);
+            return (!isNaN(gs) && Math.round(gs) > Math.round(ws))
+                ? windLabel(ws) + " (G" + Math.round(gs) + ")" : windLabel(ws);
+        }
+        case "cloud": {
+            var cc = hourly("cloud", cloudCover);
+            return isNaN(cc) ? "" : Math.round(cc) + "%";
+        }
+        case "pressure": {
+            var pa = hourly("pressure", pressure);
+            return isNaN(pa) ? "" : pressureStr(pa);
+        }
+        case "snowSum": {
+            var ss = day ? day.snowSum : snowSumToday;
+            return isNaN(ss) ? "" : _snowAmount(ss, colored);
+        }
+        case "date": return dateText(hourSample);
+        case "moon": return moonPhaseName(hourSample);
+        }
+        return "";
+    }
+    // The icon for a Detailed view element at an hour: the Date's is that hour's time
+    // of day, the Moon phase's its phase.
+    function metricIconAt(id, s) {
+        if (id === "date") return dateIcon(s);
+        if (id === "moon") return moonPhaseIcon(s);
+        return metricIcons[id] || "";
+    }
+    // The Meteocons icon for an element of the Detailed view (the same one before it
+    // in the Weather Elements' icon style).
+    readonly property var metricIcons: ({
+        feelsLike: "thermometer", humidity: "humidity", uv: "uv-index", dewPoint: "thermometer-raindrop",
+        hiLo: "thermometer", precipRate: "umbrella", precipSum: "raindrops", wind: "wind",
+        cloud: "cloudy", pressure: "barometer", snowSum: "snowflake", sun: "sunrise", moon: "moon-full"
+    })
+    // The time-of-day icon for an hour (0–23), Meteocons' own split of the day.
+    function timeOfDayIcon(hour) {
+        return ["time-night", "time-late-night", "time-morning", "time-late-morning", "time-afternoon",
+                "time-late-afternoon", "time-evening", "time-late-evening"][Math.max(0, Math.min(7, Math.floor(hour / 3)))];
+    }
     readonly property string precipColor: "#42a5f5"
     readonly property string sunColor:    "#ffb74d"
 
@@ -673,35 +891,66 @@ PlasmoidItem {
     // readings, the hourly cards' readouts and the graph's sunrise and sunset:
     // each value after an icon — Meteocons' static reading icons, bundled in
     // contents/icons/meteocons/readings (tools/icon-pipeline/meteocons_packs.py).
-    readonly property bool elementsAsIcons: (Plasmoid.configuration.headerElementsStyle ?? 0) === 1
+    readonly property bool elementsAsIcons: (Plasmoid.configuration.headerElementsStyle ?? 1) === 1
     // "Weather Elements icon color" (Appearance → Common): the flat, coloured icons
-    // before the Weather Elements instead of the monochrome ones in the text colour. The
-    // panel and the graph's markers have their own; the hourly cards' stay monochrome.
+    // before the header's Weather Elements instead of the monochrome ones in the text
+    // colour. The other views, the panel and the graph's markers have their own.
     readonly property bool readingIconsColored: Plasmoid.configuration.readingIconsColored === true
-    // "Use weather specific color" (Appearance → Common): the Weather Elements' values
-    // and the card layout's daily low / high in their weather colours (blue
-    // precipitation, the UV scale's green to red, …), else in the theme's text colour.
+    // "Weather Elements font color" (Appearance → Common): the header's Weather Elements'
+    // values in their weather colours (blue precipitation, the UV scale's green to red,
+    // …), else in the theme's text colour.
     readonly property bool weatherSpecificColors: Plasmoid.configuration.weatherSpecificColors ?? true
+    // The same for the other views, each its own (Appearance → Daily forecast, Detailed
+    // view): the daily tabs' high and low in their colours, the hourly cards' readout
+    // icons and values, and the Detailed view's element icons and values.
+    readonly property bool dailyHiLoColored:      Plasmoid.configuration.dailyHiLoColored ?? true
+    readonly property bool hourlyIconsColored:    Plasmoid.configuration.hourlyIconsColored === true
+    readonly property bool hourlyValuesColored:   Plasmoid.configuration.hourlyValuesColored === true
+    // the hourly cards' precipitation wash (FullView's "corner split")
+    readonly property bool hourlyPrecipGradient:  Plasmoid.configuration.hourlyPrecipGradient ?? true
+    readonly property bool detailedIconsColored:  Plasmoid.configuration.detailedIconsColored === true
+    readonly property bool detailedValuesColored: Plasmoid.configuration.detailedValuesColored ?? true
     // The graph's markers — the new-day icons and sunrise / sunset — in colour
     // (Appearance → Graph → Day markers), else monochrome in the text colour.
     readonly property bool dayMarkerIconColored: Plasmoid.configuration.dayMarkerIconColored ?? true
-    // The icon `name` as an Image source: the flat icon's file, or the monochrome one
-    // drawn in `tint` — its SVG with the colour swapped in, as a data URL, so every copy
-    // at a size shares one rendering (Qt's pixmap cache keys on the URL). Built once
-    // per icon and colour.
+    // "Element icon pack" (Appearance → Common): the icons a reading has in colour —
+    // Meteocons' flat or line style, or the user's own folder (readingIconDir), its SVGs
+    // named as the bundled ones. Monochrome they are always Meteocons'.
+    readonly property string readingIconPack: {
+        var p = Plasmoid.configuration.readingIconPack || "";
+        return ["meteocons-flat", "meteocons-line", "custom"].indexOf(p) >= 0 ? p : "meteocons-flat";
+    }
+    readonly property string readingIconDir: (Plasmoid.configuration.readingIconDir || "").replace(/\/+$/, "")
+    function readingIconFlat(name) { return Qt.resolvedUrl("../icons/meteocons/readings/flat/" + name + ".svg"); }
+    // The icon `name` as an Image source (ReadingImage): in colour the Element icon
+    // pack's — a file, or Meteocons' line style with its greys in `tint` — else the
+    // monochrome one drawn in `tint`. The tinted ones are their SVG with the colour
+    // swapped in, as a data URL, so every copy at a size shares one rendering (Qt's
+    // pixmap cache keys on the URL), built once per icon and colour. `lighter`: the
+    // Detailed view's, larger than the rest — the monochrome line icons less bold and
+    // the line style's as drawn (see monochrome.js and line.js).
     property var _monoUrls: ({})
-    function readingIcon(name, colored, tint) {
-        if (!name) return "";
-        if (colored) return Qt.resolvedUrl("../icons/meteocons/readings/flat/" + name + ".svg");
-        var hex = "" + tint, key = name + hex;
-        var url = _monoUrls[key];
+    function _tintedIcon(key, svg, tint) {
+        var hex = "" + tint, url = _monoUrls[key + hex];
         if (!url) {
-            var svg = MonoReadings.svg[name];
-            if (!svg) return "";
             url = "data:image/svg+xml;utf8," + encodeURIComponent(svg.replace(/currentColor/g, hex));
-            _monoUrls[key] = url;
+            _monoUrls[key + hex] = url;
         }
         return url;
+    }
+    function readingIcon(name, colored, tint, lighter) {
+        if (!name) return "";
+        if (colored) {
+            if (readingIconPack === "custom")
+                return readingIconDir ? readingIconDir + "/" + name + ".svg" : readingIconFlat(name);
+            if (readingIconPack === "meteocons-line" && LineReadings.svg[name])
+                return lighter ? _tintedIcon("line-lighter|" + name + "|", LineReadings.lighter[name], tint)
+                               : _tintedIcon("line|" + name + "|", LineReadings.svg[name], tint);
+            return readingIconFlat(name);
+        }
+        var light = !!lighter && !!MonoReadings.lighter[name];
+        var svg = light ? MonoReadings.lighter[name] : MonoReadings.svg[name];
+        return svg ? _tintedIcon((light ? "lighter|" : "mono|") + name + "|", svg, tint) : "";
     }
     // How wide each icon's artwork is across its box (the value follows the artwork,
     // not the box's empty sides), and a size correction for those that fill their box
@@ -711,16 +960,25 @@ PlasmoidItem {
         "raindrop":    [0.30, 1],    "raindrops": [0.46, 1],  "umbrella": [0.56, 0.95],
         "snowflake":   [0.42, 1],    "cloudy": [0.62, 1.05],  "barometer": [0.62, 0.82],
         "wind":        [0.66, 1],    "sunrise": [0.75, 1],    "sunset": [0.75, 1],
-        "thermometer-raindrop": [0.31, 1]
+        "thermometer-raindrop": [0.31, 1],
+        "moon-new": [0.52, 1], "moon-waxing-crescent": [0.52, 1], "moon-first-quarter": [0.52, 1],
+        "moon-waxing-gibbous": [0.52, 1], "moon-full": [0.52, 1], "moon-waning-gibbous": [0.52, 1],
+        "moon-last-quarter": [0.52, 1], "moon-waning-crescent": [0.52, 1],
+        "moonrise": [0.52, 1], "moonset": [0.52, 1],
+        "time-night": [0.40, 1], "time-late-night": [0.38, 1], "time-morning": [0.50, 1],
+        "time-late-morning": [0.52, 1], "time-afternoon": [0.55, 1], "time-late-afternoon": [0.52, 1],
+        "time-evening": [0.50, 1], "time-late-evening": [0.38, 1]
     })
     function readingIconSpan(name)  { var a = _readingArt[name]; return a ? a[0] : 1; }
     function readingIconScale(name) { var a = _readingArt[name]; return a ? a[1] : 1; }
     function _part(icon, text) {
         return { icon: icon, text: text };
     }
-    // a day's high and low, high first, each in its colour when `colored`: "18° | 9°"
+    // a day's high and low, high first, as the sunrise and sunset: "↑ 18°  ↓ 9°" —
+    // the temperatures in their colours when `colored`, the arrows never (styled text)
     function _hiLoText(hi, lo, colored) {
-        return _tint(tempStr(hi), "#ff6e40", colored) + " | " + _tint(tempStr(lo), "#42a5f5", colored);
+        return "↑ " + _tint(tempStr(hi), "#ff6e40", colored)
+             + "&#160;&#160;↓ " + _tint(tempStr(lo), "#42a5f5", colored);
     }
     // A precipitation amount ("1.7 mm") and chance ("40%") as the Weather Elements and
     // the panel print them: in the precipitation blue when `colored`, but only when
@@ -729,6 +987,11 @@ PlasmoidItem {
     function _precipAmount(mm, colored) {
         var shown = precipImperial ? Math.round(mm / 25.4 * 100) : Math.round(mm * 10);
         return _tint(precipUnitStr(mm, false), precipColor, colored && shown > 0);
+    }
+    // A snowfall total ("2 cm") the same way: blue only once it prints above zero
+    // (snowfallStr prints "0" below 0.1 cm).
+    function _snowAmount(cm, colored) {
+        return _tint(snowfallStr(cm), precipColor, colored && cm >= 0.1);
     }
     function _precipChance(pct, colored) {
         return _tint(Math.round(pct) + "%", precipColor, colored && Math.round(pct) > 0);
@@ -787,7 +1050,7 @@ PlasmoidItem {
         }
         case "snowSum": {
             var ss = day ? day.snowSum : snowSumToday;
-            return isNaN(ss) ? [] : [_part("snowflake", _tint(snowfallStr(ss), precipColor, colored)
+            return isNaN(ss) ? [] : [_part("snowflake", _snowAmount(ss, colored)
                                                           + " (" + whenWord + ")")];
         }
         case "wind": {
@@ -812,6 +1075,8 @@ PlasmoidItem {
             if (!rise || !set) return [];
             return [_part("sunrise", rise), _part("sunset", set)];
         }
+        case "date": return [_part(dateIcon(hourSample), dateText(hourSample))];
+        case "moon": return [_part(moonPhaseIcon(hourSample), moonPhaseName(hourSample))];
         }
         return [];
     }
@@ -821,7 +1086,7 @@ PlasmoidItem {
     function panelMetricParts(id) {
         var c = panelColorIcon;
         switch (id) {
-        case "hiLo": {   // today's high and low: "18° | 9°"
+        case "hiLo": {   // today's high and low: "↑ 18°  ↓ 9°"
             if (isNaN(lowTemp) || isNaN(highTemp)) return [];
             return [_part("thermometer", _hiLoText(highTemp, lowTemp, c))];
         }
@@ -847,9 +1112,11 @@ PlasmoidItem {
         case "dewPoint": return metricParts("dewPoint", 0, null, c);
         case "snowSum": {  // today's snowfall: no "(Today)", as for the precipitation sum
             if (isNaN(snowSumToday)) return [];
-            return [_part("snowflake", _tint(snowfallStr(snowSumToday), precipColor, c))];
+            return [_part("snowflake", _snowAmount(snowSumToday, c))];
         }
         case "cloud": return metricParts("cloud", 0, null, c);
+        case "date":  return metricParts("date", 0, null, c);   // now, to the minute
+        case "moon":  return metricParts("moon", 0, null, c);
         }
         return [];
     }
@@ -1009,12 +1276,13 @@ PlasmoidItem {
     }
 
     // Continuous hourly timeline from now forward, with a day-break marker
-    // ({ dayBreak: true, date, label }) inserted whenever the date rolls over.
-    function timeline() {
+    // ({ dayBreak: true, date, label }) inserted whenever the date rolls over: the
+    // card layout's days, or `days` of them.
+    function timeline(days) {
         var out = [];
         var now = locNow();
         var lastDate = "";
-        var n = Math.min(dailyDays, dailyData.length);
+        var n = Math.min(days > 0 ? days : dailyDays, dailyData.length);
         var cutoff = n > 0 ? dailyData[n - 1].date : "";   // last day to include
         for (var i = 0; i < allHourly.length; ++i) {
             var h = allHourly[i];
@@ -2140,9 +2408,9 @@ PlasmoidItem {
 
     compactRepresentation: CompactView { weatherRoot: root }
 
-    // Full popup: switch between the detailed (card) view and the simple (graph)
-    // view per the simpleLayout setting. The wrapper forwards the inner view's
-    // implicit/minimum sizing so the popup sizes correctly for either layout.
+    // Full popup: the Detailed view, the card layout or the graph layout, per
+    // popupLayout. The wrapper forwards the inner view's implicit/minimum sizing so
+    // the popup sizes correctly for each layout.
     fullRepresentation: Item {
         id: fullRep
         AnimatedIconCache {
@@ -2150,8 +2418,15 @@ PlasmoidItem {
             Component.onCompleted: root.iconCache = iconCacheItem
             Component.onDestruction: if (root.iconCache === iconCacheItem) root.iconCache = null
         }
+        // The layout on screen. It follows popupLayout in showLayout, which resizes the
+        // popup in the same step; everything here that depends on the layout reads it
+        // (and not popupLayout, simpleLayout or detailedLayout, which bindings update in
+        // no set order: a switch from the graph to the Detailed view once passed through
+        // the card layout's view and size).
+        property string shownLayout: root.popupLayout
         readonly property var view: !root.hasLocation ? null
-                                  : (root.simpleLayout ? simpleLoader.item : detailLoader.item)
+                                  : shownLayout === "graph" ? simpleLoader.item
+                                  : shownLayout === "details" ? detailedLoader.item : detailLoader.item
         // Pin the WIDTH to the saved size once set. We drive the popup window
         // directly (below), but Plasma still follows this implicit size — and the
         // metric readouts change the view's implicit WIDTH on every scroll/pan, so
@@ -2168,8 +2443,14 @@ PlasmoidItem {
         // mid-drag snapped the popup back to its old width — the graph's day pills
         // moving under the header and back did it on every step, and the popup blinked.
         property real _dragW: 0
+        property real _dragH: 0
         function _followDrag() {
-            if (Date.now() - _lastDragMs < 1000) _dragW = Math.round(width);
+            if (Date.now() - _lastDragMs >= 1000) return;
+            // both read first: each assignment makes Plasma re-apply the preferred size,
+            // which would put the other dimension back where it was before the drag
+            var w = Math.round(width), h = Math.round(height);
+            _dragH = h;
+            _dragW = w;
         }
         implicitWidth:  _dragW > 0 ? _dragW
                       : (savedW > 0 ? savedW : (view ? view.implicitWidth : Kirigami.Units.gridUnit * 32))
@@ -2183,10 +2464,18 @@ PlasmoidItem {
         // (Appearance settings). Panel popup keeps its own implicit sizing.
         readonly property real _deskW: view ? view.implicitWidth  : Kirigami.Units.gridUnit * 32
         readonly property real _deskH: view ? view.implicitHeight : Kirigami.Units.gridUnit * 20
-        Layout.minimumWidth:  root.planar ? _deskW : (view ? view.Layout.minimumWidth  : 0)
-        Layout.minimumHeight: root.planar ? _deskH : (view ? view.Layout.minimumHeight : 0)
-        Layout.preferredWidth:  root.planar ? _deskW : implicitWidth
-        Layout.preferredHeight: root.planar ? _deskH : implicitHeight
+        // Not during a switch (_sizedLayout): Plasma grows the popup to a new minimum at
+        // once, and the new view showed for a frame at that size before applySize's.
+        Layout.minimumWidth:  root.planar ? _deskW : (view && _sizedLayout === shownLayout ? view.Layout.minimumWidth  : 0)
+        Layout.minimumHeight: root.planar ? _deskH : (view && _sizedLayout === shownLayout ? view.Layout.minimumHeight : 0)
+        Layout.preferredWidth:  root.planar ? _deskW : (_holdW > 0 ? _holdW : implicitWidth)
+        // The height Plasma sizes the popup to, where it does (see showLayout): the
+        // layout's saved one (or where a drag is), like the width — with the view's
+        // implicit height there, the new view showed for a few frames at that height and
+        // its content jumped. The implicit height itself stays unpinned (see above).
+        // During a switch both stay at the popup's size (_holdW, _holdH).
+        Layout.preferredHeight: root.planar ? _deskH : _holdH > 0 ? _holdH
+                              : (_dragH > 0 ? _dragH : (savedH > 0 ? savedH : implicitHeight))
 
         // On the desktop the widget floats frameless over the wallpaper, so its text
         // can wash out on bright/busy backgrounds. Drop a soft shadow behind the whole
@@ -2212,11 +2501,52 @@ PlasmoidItem {
         // CONTENT size (this Item's width/height); the window chrome delta is
         // measured live and re-added when applying, so 0 means "use the view's
         // implicit size" (first run).
-        readonly property int savedW: root.simpleLayout ? Plasmoid.configuration.simplePopupWidth
-                                                        : Plasmoid.configuration.detailPopupWidth
-        readonly property int savedH: root.simpleLayout ? Plasmoid.configuration.simplePopupHeight
-                                                        : Plasmoid.configuration.detailPopupHeight
+        readonly property int savedW: shownLayout === "graph" ? Plasmoid.configuration.simplePopupWidth
+                                    : shownLayout === "details" ? Plasmoid.configuration.detailedViewPopupWidth
+                                    : Plasmoid.configuration.detailPopupWidth
+        readonly property int savedH: shownLayout === "graph" ? Plasmoid.configuration.simplePopupHeight
+                                    : shownLayout === "details" ? Plasmoid.configuration.detailedViewPopupHeight
+                                    : Plasmoid.configuration.detailPopupHeight
+        // The layout the popup was last sized for. Until it catches up with
+        // shownLayout, a switch is under way and the size is applySize's to set.
+        property string _sizedLayout: root.popupLayout
         property bool _applying: false
+
+        // The popup's size, width and height in ONE step. Each size Qt is given, the
+        // popup draws a frame at — the width and the height set one after the other
+        // reached the compositor as two frames, the popup moving with each.
+        function _resizeWindow(win, w, h) {
+            if (win.width === w && win.height === h) return;
+            if (win.width !== w && win.height !== h) win.setGeometry(win.x, win.y, w, h);
+            else if (win.width !== w) win.width = w;
+            else win.height = h;
+        }
+
+        // A switch of layouts: show the new view and size the popup for it in the same
+        // step, before a frame is drawn. Plasma doesn't resize the popup itself once it
+        // has a size of its own saved (popupWidth/popupHeight, from the first close):
+        // when this waited for the view to paint first, the new view showed for a few
+        // frames at the old layout's size, and a size capture due then stored that size
+        // as the new layout's (the views took one another's size).
+        // Without that size saved, Plasma follows the preferred size instead, the width
+        // and the height one after the other, a frame each: the preferred size is held
+        // at the popup's (_holdW/_holdH) until applySize has resized it in one step.
+        property int _holdW: 0
+        property int _holdH: 0
+        function showLayout() {
+            if (shownLayout === root.popupLayout) return;
+            // a drag that just ended is still the old layout's to store
+            if (captureTimer.running) { captureTimer.stop(); captureSize(); }
+            _applying = true;   // the size changes from here on are no user's
+            _holdW = Math.round(width);
+            _holdH = Math.round(height);
+            shownLayout = root.popupLayout;
+            applySize();
+            _holdW = 0;
+            _holdH = 0;
+            Qt.callLater(function () { fullRep._applying = false; });
+            armFit();
+        }
 
         // On the desktop (Planar form factor) the full rep is embedded directly
         // in the containment view — its Window IS the desktop, not a popup. The
@@ -2229,17 +2559,26 @@ PlasmoidItem {
             return fullRep.Window.window;
         }
 
+        // The view's minimum size. A saved size can be under it — the Detailed view
+        // grows when its elements are rearranged (two rows with the sun and the moon in
+        // them are taller than one) — and the popup is never sized below it: Plasma
+        // grows a popup to a new minimum only while it is open, and a saved size applied
+        // on the next opening cut the view's last rows off.
+        function _minW() { return view ? Math.ceil(view.Layout.minimumWidth) : 0; }
+        function _minH() { return view ? Math.ceil(view.Layout.minimumHeight) : 0; }
+
         function applySize() {
             var win = _win();
-            if (!win || fullRep.width <= 0) return;
+            if (!win || fullRep.width <= 0) { _sizedLayout = shownLayout; return; }
             var chromeW = win.width  - fullRep.width;
             var chromeH = win.height - fullRep.height;
             _dragW = 0;   // the saved size is the one to apply now
-            var w = (savedW > 0 ? savedW : Math.round(implicitWidth))  + chromeW;
-            var h = (savedH > 0 ? savedH : Math.round(implicitHeight)) + chromeH;
+            _dragH = 0;
+            var w = Math.max(savedW > 0 ? savedW : Math.round(implicitWidth), _minW())  + chromeW;
+            var h = Math.max(savedH > 0 ? savedH : Math.round(implicitHeight), _minH()) + chromeH;
             _applying = true;
-            win.width  = w;
-            win.height = h;
+            _resizeWindow(win, w, h);
+            _sizedLayout = shownLayout;
             Qt.callLater(function () { fullRep._applying = false; });
         }
 
@@ -2257,14 +2596,18 @@ PlasmoidItem {
             if (_applying || fullRep.width <= 0 || fullRep.height <= 0) return;
             if (root.planar) return;   // desktop auto-fits to content; nothing to capture
             if (!_userCanResize()) return;
-            if (root.simpleLayout) {
+            if (shownLayout === "graph") {
                 Plasmoid.configuration.simplePopupWidth  = Math.round(fullRep.width);
                 Plasmoid.configuration.simplePopupHeight = Math.round(fullRep.height);
+            } else if (shownLayout === "details") {
+                Plasmoid.configuration.detailedViewPopupWidth  = Math.round(fullRep.width);
+                Plasmoid.configuration.detailedViewPopupHeight = Math.round(fullRep.height);
             } else {
                 Plasmoid.configuration.detailPopupWidth  = Math.round(fullRep.width);
                 Plasmoid.configuration.detailPopupHeight = Math.round(fullRep.height);
             }
-            _dragW = 0;   // the saved width has caught up with the drag
+            _dragW = 0;   // the saved size has caught up with the drag
+            _dragH = 0;
         }
 
         // User drags resize this Item; debounce, then store under the active
@@ -2281,11 +2624,17 @@ PlasmoidItem {
                 // a moment later: Plasma resizes the popup as the implicit width
                 // changes, and taking the width from inside that resize re-entered it
                 Qt.callLater(fullRep._followDrag);
-                if (root.simpleLayout) Plasmoid.configuration.simplePopupManual = true;
+                if (shownLayout === "graph") Plasmoid.configuration.simplePopupManual = true;
             }
             captureTimer.restart();
         }
-        onHeightChanged: { if (!_applying && _userCanResize()) _lastDragMs = Date.now(); captureTimer.restart(); }
+        onHeightChanged: {
+            if (!_applying && _userCanResize()) {
+                _lastDragMs = Date.now();
+                Qt.callLater(fullRep._followDrag);
+            }
+            captureTimer.restart();
+        }
         Timer { id: captureTimer; interval: 250; onTriggered: fullRep.captureSize() }
 
         // A font/metric change alters the view's implicit (and minimum) size, so
@@ -2306,27 +2655,33 @@ PlasmoidItem {
         // width converges.
         property double _fitArmedUntil: 0
         function armFit() {
-            if (!root.simpleLayout) return;
+            if (shownLayout !== "graph") return;
             _fitArmedUntil = Date.now() + 1200;
             fitTimer.restart();
         }
         onImplicitWidthChanged:  {
             _reflow();
-            if (root.simpleLayout && !Plasmoid.configuration.simplePopupManual
+            if (shownLayout === "graph" && !Plasmoid.configuration.simplePopupManual
                 && Date.now() < _fitArmedUntil) fitTimer.restart();
         }
         onImplicitHeightChanged: _reflow()
         function _reflow() {
             if (savedW <= 0 && savedH <= 0) return;      // nothing pinned → let implicit drive
             if (Date.now() - _lastDragMs < 200) return;  // a resize is in progress → don't fight it
+            if (_sizedLayout !== shownLayout) return;   // a switch: applySize sizes the popup
             var win = _win();
             if (!win || fullRep.width <= 0) return;
             captureTimer.stop();
             _applying = true;
             var chromeW = win.width  - fullRep.width;
             var chromeH = win.height - fullRep.height;
-            if (savedW > 0) win.width  = savedW + chromeW;
-            if (savedH > 0) win.height = savedH + chromeH;
+            // The Detailed view's height follows its content until a drag sets one: its
+            // rows grow when the header does (the layout buttons wrapping in a narrow
+            // popup), and Plasma left the popup at the height it had.
+            var w = savedW > 0 ? savedW + chromeW : win.width;
+            var h = savedH > 0 ? savedH + chromeH
+                  : shownLayout === "details" ? Math.round(implicitHeight) + chromeH : win.height;
+            _resizeWindow(win, Math.max(w, _minW() + chromeW), Math.max(h, _minH() + chromeH));
             Qt.callLater(function () { fullRep._applying = false; });
         }
 
@@ -2339,7 +2694,7 @@ PlasmoidItem {
         // latches simplePopupManual, which suppresses this so the user's size sticks.
         // The timer lets the new pills lay out before we measure.
         function fitToTabs() {
-            if (!root.simpleLayout || !view) return;
+            if (shownLayout !== "graph" || !view) return;
             if (Plasmoid.configuration.simplePopupManual) return;   // manual size wins
             var win = _win();
             if (!win || fullRep.width <= 0) return;
@@ -2358,12 +2713,13 @@ PlasmoidItem {
         // Apply the saved size on open and on layout switch. ⚠️ NOT on savedW/H
         // change — capture writes those on every drag, and re-applying then both
         // fought the drag and yanked the unpinned dimension to its implicit size.
-        Component.onCompleted: { Qt.callLater(applySize); armFit(); }
-
-        // Resizing the popup BEFORE the newly-shown view paints stretches the stale
-        // buffer for a frame, so on a switch we resize a couple frames later — the
-        // warm view is already up at the old size, correct content and all.
-        Timer { id: resizeAfterPaint; interval: 48; onTriggered: fullRep.applySize() }
+        Component.onCompleted: {
+            // from here on set only by showLayout (the assignments end the bindings)
+            shownLayout = root.popupLayout;
+            _sizedLayout = root.popupLayout;
+            Qt.callLater(applySize);
+            armFit();
+        }
 
         Connections {
             target: root
@@ -2374,23 +2730,24 @@ PlasmoidItem {
                     fullRep.armFit();
                 }
             }
-            // Both views stay warm (loaders below), so a switch just flips which is
-            // visible — no rebuild, no blank frame. Resize after the shown view paints.
-            function onSimpleLayoutChanged() { resizeAfterPaint.restart(); fullRep.armFit(); }
+            // The views stay warm (loaders below), so a switch just flips which is
+            // visible — no rebuild, no blank frame.
+            function onPopupLayoutChanged() { fullRep.showLayout(); }
         }
 
-        // Both layouts stay instantiated once built, toggling visibility instead of
+        // The layouts stay instantiated once built, toggling visibility instead of
         // swapping a single Loader's sourceComponent: destroying and recreating the view
         // on every switch left an empty frame (the "flash"), while a warm view paints
         // the instant it's shown. active:false until hasLocation keeps the lazy-until-
         // located behaviour and lets the empty-state notice below stand in.
         //
         // But only the layout on SCREEN is built up front, synchronously, so the popup
-        // opens with content. Building both at once made every first open pay for the
-        // layout you weren't looking at too — the card layout alone is most of the cost.
-        // The hidden one is built shortly after the visible one is ready, asynchronously
-        // (in small slices, so it never stalls a frame). `asynchronous` is bound to
-        // "hidden": switch to it before it has finished, and Qt completes it on the spot.
+        // opens with content. Building them all at once made every first open pay for
+        // the layouts you weren't looking at too — the card layout alone is most of the
+        // cost. The hidden ones are built shortly after the visible one is ready,
+        // asynchronously (in small slices, so they never stall a frame). `asynchronous`
+        // is bound to "hidden": switch to one before it has finished, and Qt completes
+        // it on the spot.
         //
         // The *Built latches keep a view alive once it exists. Without them, switching
         // before the warm-up began would drop the layout you just left (its `active`
@@ -2398,32 +2755,47 @@ PlasmoidItem {
         property bool warmHidden: false
         property bool detailBuilt: false
         property bool simpleBuilt: false
+        property bool detailedBuilt: false
+        readonly property var shownLoader: shownLayout === "graph" ? simpleLoader
+                                         : shownLayout === "details" ? detailedLoader : detailLoader
         Timer {
             interval: 400
-            running: root.hasLocation && !fullRep.warmHidden
-                     && (root.simpleLayout ? simpleLoader.status : detailLoader.status) === Loader.Ready
+            running: root.hasLocation && !fullRep.warmHidden && fullRep.shownLoader.status === Loader.Ready
             onTriggered: fullRep.warmHidden = true
         }
         Loader {
             id: detailLoader
+            readonly property bool shown: fullRep.shownLayout === "cards"
             anchors.fill: parent
-            active: root.hasLocation && (!root.simpleLayout || fullRep.warmHidden || fullRep.detailBuilt)
-            asynchronous: root.simpleLayout
+            active: root.hasLocation && (shown || fullRep.warmHidden || fullRep.detailBuilt)
+            asynchronous: !shown
             onLoaded: fullRep.detailBuilt = true
-            visible: !root.simpleLayout
+            visible: shown
             sourceComponent: detailComp
         }
         Loader {
             id: simpleLoader
+            readonly property bool shown: fullRep.shownLayout === "graph"
             anchors.fill: parent
-            active: root.hasLocation && (root.simpleLayout || fullRep.warmHidden || fullRep.simpleBuilt)
-            asynchronous: !root.simpleLayout
+            active: root.hasLocation && (shown || fullRep.warmHidden || fullRep.simpleBuilt)
+            asynchronous: !shown
             onLoaded: fullRep.simpleBuilt = true
-            visible: root.simpleLayout
+            visible: shown
             sourceComponent: simpleComp
         }
-        Component { id: detailComp; FullView   { weatherRoot: root } }
-        Component { id: simpleComp; SimpleView { weatherRoot: root } }
+        Loader {
+            id: detailedLoader
+            readonly property bool shown: fullRep.shownLayout === "details"
+            anchors.fill: parent
+            active: root.hasLocation && (shown || fullRep.warmHidden || fullRep.detailedBuilt)
+            asynchronous: !shown
+            onLoaded: fullRep.detailedBuilt = true
+            visible: shown
+            sourceComponent: detailedComp
+        }
+        Component { id: detailComp;   FullView     { weatherRoot: root } }
+        Component { id: simpleComp;   SimpleView   { weatherRoot: root } }
+        Component { id: detailedComp; DetailedView { weatherRoot: root } }
 
         // Out of the box there is no default city, so this stands in for the weather
         // view (null above). hasLocation flips in configLocation's _setLocation and

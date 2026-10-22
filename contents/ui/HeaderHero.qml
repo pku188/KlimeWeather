@@ -1,9 +1,10 @@
 /*
- * The left half of the popup header, shared by both layouts: the current-condition
+ * The left half of the popup header, shared by the layouts: the current-condition
  * icon and temperature, the condition under them, and the Weather Elements beside
- * them. Everything that differs between the two layouts comes in through the
- * properties below — which elements to list, which hour and day they read, and how
- * the animated icon behaves — and the view decides where the row sits.
+ * them (none in the Detailed view, whose elements are all below the header).
+ * Everything that differs between the layouts comes in through the properties below
+ * — which elements to list, which hour and day they read, and how the animated icon
+ * behaves — and the view decides where the row sits.
  *
  * Moved here from FullView and SimpleView, which each carried a copy.
  * Copyright 2026  pku188, bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
@@ -57,8 +58,6 @@ RowLayout {
             }
             if (w <= 0) continue;
             if (id === "wind") w += gap * 2 + weatherRoot.windArrowSize;         // the arrow after the speed
-            if (m === 0 && weatherRoot.showAlerts && weatherRoot.topAlert !== null)
-                w += gap + Kirigami.Units.iconSizes.small;                        // the alert "!"
             widest = Math.max(widest, Math.ceil(w) + 1);
         }
         return widest;
@@ -166,8 +165,8 @@ RowLayout {
         // the column on the left, whose condition is sized to include it. The
         // elements start at the same x either way; the condition just gets to use
         // that space.
-        // the user's Weather Elements (up to 4); the "!" alert indicator sits
-        // next to the first line
+        // the user's Weather Elements (up to 4); the alert mark is beside the location
+        // (HeaderRightBlock)
         Repeater {
             model: heroRow.metrics
             delegate: RowLayout {
@@ -187,13 +186,7 @@ RowLayout {
                     ? weatherRoot.metricParts(modelData, heroRow.selectedDay, heroRow.sample,
                                               weatherRoot.weatherSpecificColors) : []
                 readonly property bool hasReading: icons ? parts.length > 0 : metric.length > 0
-                // keep the FIRST row visible for the alert "!" even when its
-                // metric text is empty (e.g. metric set to "none", or a precip
-                // metric that's blank on a dry day) — an invisible parent would
-                // hide the AlertIndicator child along with the row.
                 visible: hasReading
-                         || (index === 0 && weatherRoot && weatherRoot.showAlerts
-                             && weatherRoot.topAlert !== null)
                 spacing: Kirigami.Units.smallSpacing
                 Label {
                     visible: !metricRow.icons
@@ -224,12 +217,6 @@ RowLayout {
                     Layout.leftMargin: Kirigami.Units.smallSpacing
                     Layout.preferredWidth: weatherRoot ? weatherRoot.windArrowSize : 21
                     Layout.preferredHeight: Layout.preferredWidth
-                    Layout.alignment: Qt.AlignVCenter
-                }
-                AlertIndicator {
-                    weatherRoot: heroRow.weatherRoot
-                    visible: metricRow.index === 0 && weatherRoot
-                             && weatherRoot.showAlerts && weatherRoot.topAlert !== null
                     Layout.alignment: Qt.AlignVCenter
                 }
             }

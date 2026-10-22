@@ -15,12 +15,23 @@ usage: meteocons_packs.py <svg-package-dir> <svg-static-package-dir> <out-dir>
 
 --readings writes the icons drawn before a reading (the Weather Elements' icon
 style, the panel's readings, the hourly cards' readouts and the graph's sunrise
-and sunset) and the ones the panel settings list its elements with, static, in
-the two styles they come in — flat, for "Use colored icons", and monochrome,
-tinted to the theme's text colour:
+and sunset), the Detailed view's moon and time-of-day icons, and the ones the
+settings list their elements with, static, in three styles — flat and line,
+the colour ones ("Use colored icons", from the Element icon pack), and
+monochrome, tinted to the theme's text colour:
 
     contents/icons/meteocons/readings/flat/<name>.svg
+    contents/icons/meteocons/readings/line.js
     contents/icons/meteocons/readings/monochrome.js
+
+The line style draws its outlines in neutral greys meant for one background or
+the other — the barometer and the "UV" nearly black, the cloud and the wind
+nearly white — so on a dark or a light theme some of it vanished. Its set
+(line.js, like monochrome.js a module of SVG strings) has those greys
+(LINE_INK) in currentColor, which the widget draws in the theme's text colour;
+its colours stay as drawn. Its lines come twice, as the monochrome set's do: a
+little bolder for the small icons (LINE_WEIGHT), and as drawn for the Detailed
+view (`lighter`), whose icons are larger.
 
 The monochrome set is a JavaScript module of SVG strings drawn in currentColor:
 the widget swaps in the theme's colour and hands Image the result as a data URL,
@@ -30,7 +41,8 @@ Its artwork painted white — humidity's "%", the umbrella's lit panel — is cu
 of the icon instead (a luminance mask), or it would stay white over the tint. And
 its line icons are drawn bolder (MONO_WEIGHT, not the solid icons or the
 thermometers): Meteocons' 2–4 unit lines came out under a pixel wide at the
-widget's sizes.
+widget's sizes. The larger Detailed view draws them a little bolder than drawn
+(DETAILED_WEIGHT), a second set in the module.
 
 The artwork is left as drawn; what changes is how it is written, so that Qt
 draws it the way a browser does.
@@ -99,20 +111,36 @@ STEMS = {
 }
 
 
-# The readings' icons, under their Meteocons names, and the weather icon's in the
-# panel settings' list of elements.
+# The readings' icons, under their Meteocons names; the weather icon's in the
+# settings' lists of elements; the Detailed view's moon — its phases, moonrise and
+# moonset — and the time-of-day icons before its date line (TIME_ICONS).
+MOON_PHASES = ("moon-new", "moon-waxing-crescent", "moon-first-quarter", "moon-waxing-gibbous",
+               "moon-full", "moon-waning-gibbous", "moon-last-quarter", "moon-waning-crescent")
+TIME_ICONS = ("time-night", "time-late-night", "time-morning", "time-late-morning",
+              "time-afternoon", "time-late-afternoon", "time-evening", "time-late-evening")
 READINGS = ("thermometer", "humidity", "uv-index", "raindrop", "raindrops", "umbrella",
             "snowflake", "cloudy", "barometer", "wind", "sunrise", "sunset",
-            "thermometer-raindrop", "partly-cloudy-day")
-READING_STYLES = ("monochrome", "flat")
+            "thermometer-raindrop", "partly-cloudy-day") + MOON_PHASES + ("moonrise", "moonset") + TIME_ICONS
+READING_STYLES = ("monochrome", "flat", "line")
+# The line style's neutral greys (see the module's docstring): drawn in the theme's
+# text colour (currentColor) instead.
+LINE_INK = {"#1E293B", "#202939", "#475569", "#71717A", "#D6DFE9", "#E2E8F0", "#E6EFFC"}
+# How much wider the line style's lines are in its small icons (the header, the hourly
+# cards, the panel, the graph's sunrise and sunset), in units of the 128-unit box: at
+# 2 the humidity drop's "%" and the snowflake's branches began to run together.
+LINE_WEIGHT = 1.5
 # How much bolder the monochrome line icons are drawn, in units of the 128-unit box:
 # every line grows this much wider (a stroke of the same colour around each shape,
 # filled outlines too — the cloud is a thin filled ring). 5 clogged the details.
-# Left as drawn: the solid icons (thickened, the two raindrops merged into one) and the
-# thermometers (thickened, the glass, mercury and drop ran into one hard-to-read shape).
+# Left as drawn: the solid icons (thickened, the two raindrops merged into one), the
+# thermometers (thickened, the glass, mercury and drop ran into one hard-to-read shape)
+# and the moon's phases (the dashed outline of the dark part outweighed the lit part).
 MONO_WEIGHT = 3
+# The same icons as the Detailed view draws them (monochrome.js `lighter`): larger
+# there, at MONO_WEIGHT their lines looked too heavy.
+DETAILED_WEIGHT = 1
 MONO_AS_DRAWN = {"humidity", "raindrop", "raindrops", "snowflake",
-                 "thermometer", "thermometer-raindrop"}
+                 "thermometer", "thermometer-raindrop"} | set(MOON_PHASES)
 
 
 def fail(path, msg):
@@ -386,19 +414,72 @@ def bolden(root, delta):
             el.set("stroke-linejoin", "round")
 
 
+def ink_to_current(root):
+    """Paint the line style's greys (LINE_INK) in currentColor, outside masks and clip
+    paths, whose colours are geometry."""
+    defined = set()
+    for tag in ("mask", "clipPath"):
+        for d in root.iter("{%s}%s" % (SVG, tag)):
+            defined.update(d.iter())
+    for el in root.iter():
+        if el in defined:
+            continue
+        for attr in ("fill", "stroke", "stop-color"):
+            if (el.get(attr) or "").upper() in LINE_INK:
+                el.set(attr, "currentColor")
+
+
+def thicken_lines(root, delta):
+    """Draw every stroked line of the icon `delta` units wider, whatever its colour
+    (the line style's; bolden() is the monochrome set's, which also outlines its
+    filled shapes)."""
+    defined = set()
+    for tag in ("mask", "clipPath"):
+        for d in root.iter("{%s}%s" % (SVG, tag)):
+            defined.update(d.iter())
+    for el in root.iter():
+        if el in defined or el.tag not in SHAPES:
+            continue
+        if el.get("stroke") not in (None, "none"):
+            el.set("stroke-width", "%g" % (float(el.get("stroke-width", "1")) + delta))
+
+
+def drop_label(root):
+    """Take out the hour range a time-of-day icon prints under its artwork ("12-15"):
+    unreadable at a line's height, and the date line beside it says the hour."""
+    parent = {c: p for p in root.iter() for c in p}
+    for el in list(root.iter()):
+        if el.get("id") == "Label" and el in parent:
+            parent[el].remove(el)
+
+
 def build_readings(src_static, out):
     dest = os.path.join(out, "readings")
     os.makedirs(os.path.join(dest, "flat"), exist_ok=True)
-    mono = {}
+    mono, lighter, line, line_lighter = {}, {}, {}, {}
     for style in READING_STYLES:
         for name in READINGS:
             path = os.path.join(src_static, style, name + ".svg")
             tree = ET.parse(path)
             luminance_masks(tree.getroot(), path)
+            if name in TIME_ICONS:
+                drop_label(tree.getroot())
             if style == "flat":
                 tree.write(os.path.join(dest, "flat", name + ".svg"), encoding="unicode")
+            elif style == "line":
+                ink_to_current(tree.getroot())
+                line_lighter[name] = ET.tostring(tree.getroot(), encoding="unicode")
+                thicken_lines(tree.getroot(), LINE_WEIGHT)
+                line[name] = ET.tostring(tree.getroot(), encoding="unicode")
             else:
                 if name not in MONO_AS_DRAWN:
+                    light = ET.parse(path)
+                    luminance_masks(light.getroot(), path)
+                    if name in TIME_ICONS:
+                        drop_label(light.getroot())
+                    bolden(light.getroot(), DETAILED_WEIGHT)
+                    knockout_white(light.getroot(), path)
+                    lighter[name] = ET.tostring(light.getroot(), encoding="unicode")
                     bolden(tree.getroot(), MONO_WEIGHT)
                 knockout_white(tree.getroot(), path)
                 mono[name] = ET.tostring(tree.getroot(), encoding="unicode")
@@ -410,8 +491,30 @@ def build_readings(src_static, out):
                  "var svg = {\n")
         for name in READINGS:
             js.write("    %s: %s,\n" % (json.dumps(name), json.dumps(mono[name])))
+        js.write("};\n"
+                 "// The bolder ones (svg) with their lines at DETAILED_WEIGHT, for the Detailed view.\n"
+                 "var lighter = {\n")
+        for name in READINGS:
+            if name in lighter:
+                js.write("    %s: %s,\n" % (json.dumps(name), json.dumps(lighter[name])))
         js.write("};\n")
-    print("wrote %d flat reading icons and monochrome.js to %s" % (len(READINGS), dest))
+    with open(os.path.join(dest, "line.js"), "w") as js:
+        js.write(".pragma library\n"
+                 "// Meteocons' line reading icons (MIT, see ../ATTRIBUTION.md), for the Element\n"
+                 "// icon pack's \"Meteocons (line)\": their neutral greys in currentColor, which\n"
+                 "// the widget swaps for the theme's text colour, their colours as drawn.\n"
+                 "// Generated by tools/icon-pipeline/meteocons_packs.py --readings; edit that, not this.\n"
+                 "// The small icons, their lines LINE_WEIGHT bolder.\n"
+                 "var svg = {\n")
+        for name in READINGS:
+            js.write("    %s: %s,\n" % (json.dumps(name), json.dumps(line[name])))
+        js.write("};\n"
+                 "// The same as drawn, for the Detailed view.\n"
+                 "var lighter = {\n")
+        for name in READINGS:
+            js.write("    %s: %s,\n" % (json.dumps(name), json.dumps(line_lighter[name])))
+        js.write("};\n")
+    print("wrote %d reading icons: flat, line.js and monochrome.js, to %s" % (len(READINGS), dest))
 
 
 if __name__ == "__main__":

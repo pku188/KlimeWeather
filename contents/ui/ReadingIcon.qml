@@ -1,6 +1,6 @@
 /*
- * The icon before a reading: Meteocons' monochrome icon in the text colour, or its
- * flat one when coloured (see main.qml readingIcon). An Image, so every copy of an
+ * The icon before a reading: Meteocons' monochrome icon in the text colour, or the
+ * Element icon pack's when coloured (see ReadingImage). An Image, so every copy of an
  * icon at one size shares one rendering — the hourly cards hold a couple hundred.
  *
  * Sized against the reading's font. It takes the width of its artwork — or of a fixed
@@ -25,11 +25,13 @@ Item {
                                  : Math.ceil(boxSize * (weatherRoot ? weatherRoot.readingIconSpan(name) : 1))
     implicitHeight: fontPx
 
-    Image {
+    ReadingImage {
         anchors.centerIn: parent
         width: icon.boxSize
         height: width
-        sourceSize: Qt.size(width, height)
-        source: icon.weatherRoot ? icon.weatherRoot.readingIcon(icon.name, icon.colored, icon.tint) : ""
+        weatherRoot: icon.weatherRoot
+        name: icon.name
+        colored: icon.colored
+        tint: icon.tint
     }
 }

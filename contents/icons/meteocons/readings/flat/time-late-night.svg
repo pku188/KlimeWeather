@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+<g id="time-late-night" clip-path="url(#clip0_2045_49504)">
+<g id="Time">
+<g id="Moon">
+<path id="Moon_2" d="M61.9117 38C50.715 39.2083 42 48.5617 42 59.93C42 72.1183 52.015 82 64.3683 82C74.7817 82 83.5067 74.97 86 65.465C71.137 67.0586 58.0386 52.7567 61.9117 38Z" fill="#72B9D5" />
+</g>
+<g id="Sleepy">
+<path id="Z" d="M73.1143 37.95L68.1023 43.76H73.2683V46H64.7283V43.9L69.6423 38.272H65.0643V36.032H73.1143V37.95Z" fill="#202939" />
+<path id="Z_2" d="M82.1143 49.95L77.1023 55.76H82.2683V58H73.7283V55.9L78.6423 50.272H74.0643V48.032H82.1143V49.95Z" fill="#202939" />
+</g>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_2045_49504">
+<rect width="128" height="128" fill="white" />
+</clipPath>
+</defs>
+</svg>

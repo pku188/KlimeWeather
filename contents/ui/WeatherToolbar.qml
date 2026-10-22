@@ -1,9 +1,11 @@
 /*
- * The header chrome shared by FullView and SimpleView: the pin in the top-left
- * corner, a button row in the top-right corner — zoom in and zoom out (graph layout
- * only), switch layout, refresh — and the header geometry both layouts place their
- * content by, so the icon, temperature, location and source sit in the same spots in
- * either layout.
+ * The header chrome shared by the three layouts: the pin in the top-left corner,
+ * refresh in the top-right corner with the view's own buttons left of it — the
+ * Weather graph's zoom (ZoomButtons), the Detailed view's and the Daily forecast's
+ * arrows (StepButtons) — and the header geometry the layouts place their content by,
+ * so the icon, temperature, location, source and buttons sit in the same spots in
+ * every layout. The layouts themselves are switched with the buttons under the
+ * location (HeaderRightBlock).
  *
  * All of it is laid out for 24 px toolbar glyphs; a different Toolbar icon size
  * (Appearance → Common) moves the header with the buttons by the difference. So does
@@ -17,13 +19,19 @@ import org.kde.kirigami as Kirigami
 Item {
     id: bar
     property real pad: 0
-    property string switchTooltip: ""
-    property string switchIcon: ""   // glyph for the layout switch: the layout it switches TO
-    property bool showZoom: false   // graph layout only — see the first button
     property var root: null   // weatherRoot reference
     // Middle of the location line's capitals from that line's top (the view's
     // HeaderRightBlock.capCenter). The line is centred on the top buttons; see topDrop.
     property real lineCap: 0
+    // The view's own buttons, left of refresh: the Weather graph's zoom, or a step back
+    // and forward (StepButtons), each enabled while there is a step that way.
+    property bool showZoom: false
+    property bool stepButtons: false
+    property bool canStepBack: false
+    property bool canStepForward: false
+    property string stepBackText: ""
+    property string stepForwardText: ""
+    signal stepped(int delta)
 
     // The glyphs' size, and how far it is from the 24 px the geometry below is laid
     // out for.
@@ -48,10 +56,17 @@ Item {
     // Elements. Both views convert these into their own layout margins. It goes down
     // by half the icon growth, as the location's line does (it is centred on the top
     // buttons), so the location keeps its distance from the Weather Elements — and by
-    // the whole topDrop, which moves the line down with the buttons.
+    // the whole topDrop, which moves the line down with the buttons. heroLower px lower
+    // than it first was: in a narrow popup a long location name runs on above the
+    // Weather Elements, and sat too close to them — the more so once the view's buttons
+    // beside refresh pushed the location further left.
     readonly property int heroRowX: Math.round(pad) - Math.round(Kirigami.Units.gridUnit * 0.6) + headerShift
     readonly property int heroDrop: Math.round(iconGrowth / 2) + topDrop
-    readonly property int heroRowY: Math.round(Kirigami.Units.gridUnit * 1.2) + heroDrop
+    readonly property int heroLower: 8
+    readonly property int heroRowY: Math.round(Kirigami.Units.gridUnit * 1.2) + heroLower + heroDrop
+    // Air the views add between the header and what follows it (the daily tabs, the
+    // graph, the Detailed view's elements).
+    readonly property int contentGap: 6
     // Extra space after the temperature, before the Weather Elements. The condition
     // under the temperature may run into it (see HeaderHero).
     readonly property int headerGap: Math.round(Kirigami.Units.gridUnit * 1)
@@ -66,12 +81,13 @@ Item {
     readonly property int conditionPull: -Math.round(Kirigami.Units.gridUnit * 0.5) + 4
     // Vertical centre of the corner buttons' glyphs; the location sits on this line.
     readonly property real buttonCenterY: row.y + buttonSize / 2
-    // Left edge the row has with all four buttons — the graph layout's zoom-in button —
-    // whether or not the zoom buttons are shown. The location lines up with it in both
-    // layouts, so it keeps its spot when the layout switches.
-    readonly property real fullButtonsLeft: row.x + row.width - 4 * buttonSize - 3 * row.spacing
-    // Bottom edge of the corner buttons.
+    // Left edge of the top-right buttons (the view's own and refresh): the source and
+    // the location line up with it.
+    readonly property real buttonsLeft: row.x
+    // Bottom edge of the corner buttons, and the right edge of their plates: the day
+    // pills' and the layout buttons' plates end there too.
     readonly property real buttonsBottom: row.y + buttonSize
+    readonly property real buttonsRight: row.x + row.width
     // Space between the first line — the location and the corner buttons, whichever
     // reaches lower — and the source button and day pills below it. 3 px more than
     // the 9 px the two lines first had between them, which read as cramped once the
@@ -109,35 +125,24 @@ Item {
         anchors.rightMargin: Math.round(bar.pad * 0.35)
         spacing: 2
 
-        // Graph zoom, 12 / 24 / 48 hours — meaningless in the card layout, so these only
-        // appear on the graph. Leftmost, so the layout switch and refresh sit in the
-        // same spots in both layouts. At either end of the range the button that would
-        // go further is disabled: no hover plate, no tooltip, dimmed.
-        ToolbarButton {
+        ZoomButtons {
             visible: bar.showZoom
-            glyphSize: bar.iconSize
-            iconName: "zoom-in"
-            enabled: bar.root && bar.root.graphZoom > 0
-            disabledOpacity: 0.5
-            onClicked: if (bar.root) bar.root.zoomGraphIn()
-            ToolTip.text: (bar.root && bar.root.graphZoom === 2) ? i18n("Zoom in to 24 hours")
-                                                                 : i18n("Zoom in to 12 hours")
+            root: bar.root
         }
-        ToolbarButton {
-            visible: bar.showZoom
-            glyphSize: bar.iconSize
-            iconName: "zoom-out"
-            enabled: bar.root && bar.root.graphZoom < 2
-            disabledOpacity: 0.5
-            onClicked: if (bar.root) bar.root.zoomGraphOut()
-            ToolTip.text: (bar.root && bar.root.graphZoom === 0) ? i18n("Zoom out to 24 hours")
-                                                                 : i18n("Zoom out to 48 hours")
+        StepButtons {
+            visible: bar.stepButtons
+            root: bar.root
+            canBack: bar.canStepBack
+            canForward: bar.canStepForward
+            backText: bar.stepBackText
+            forwardText: bar.stepForwardText
+            onStepped: (delta) => bar.stepped(delta)
         }
-        ToolbarButton {
-            glyphSize: bar.iconSize
-            iconName: bar.switchIcon
-            onClicked: if (bar.root) bar.root.toggleLayout()
-            ToolTip.text: bar.switchTooltip
+        // a little air between the view's buttons and refresh
+        Item {
+            visible: bar.showZoom || bar.stepButtons
+            width: Kirigami.Units.smallSpacing
+            height: 1
         }
         ToolbarButton {
             glyphSize: bar.iconSize
