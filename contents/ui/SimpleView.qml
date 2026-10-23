@@ -816,6 +816,10 @@ Item {
     readonly property int dayLineDashes: Math.ceil(plotH / (dayLineDash + dayLineGap)) + 1
     readonly property real markerClearGap: Kirigami.Units.smallSpacing   // air left between a marker and a readout it dodges
     readonly property real sunMarkGap:     Kirigami.Units.smallSpacing * 3   // sun marker's own gap above the temp label
+    // The sunrise and sunset markers' time, and with it their icon (sunMarkerFontPx * 3.1):
+    // in proportion to the day labels (Appearance → Weather graph → Day markers font),
+    // 11 px at its default of 14.
+    readonly property int sunMarkerFontPx: Math.max(7, Math.round((weatherRoot ? weatherRoot.simpleDayMarkerFontSize : 14) * 11 / 14))
     readonly property real markerRamp:     Kirigami.Units.gridUnit       // how far out a marker starts easing over a readout
     // A new-day marker is icon + date WIDE — several columns at 48 hours — and it
     // is centred on its midnight line, so it reaches well past its own column.
@@ -1055,8 +1059,8 @@ Item {
         var colW = spanX / denom;                 // px per curve column
         var rx = sunGlowHalfCols * colW;          // horizontal radius
         // upward reach measured in sun-glyph heights, so the glow never overshoots
-        // the icon pinned above the line (icon = hourlyInfoFontSize * 3.1, see marker delegate).
-        var iconSz = weatherRoot ? weatherRoot.hourlyInfoFontSize * 3.1 : 34;
+        // the icon pinned above the line (icon = sunMarkerFontPx * 3.1, see marker delegate).
+        var iconSz = sunMarkerFontPx * 3.1;
         var ry = iconSz * sunGlowRiseIcons;       // upward reach
         if (rx <= 0 || ry <= 0) return;
 
@@ -2241,7 +2245,7 @@ Item {
                         delegate: Column {
                             required property var modelData
                             readonly property real mx: simple.xAtTime(modelData.ms)
-                            readonly property real sz: weatherRoot ? Math.round(weatherRoot.hourlyInfoFontSize * 3.1) : 34
+                            readonly property real sz: Math.round(simple.sunMarkerFontPx * 3.1)
                             z: 50
                             spacing: -Math.round(sz * 0.22)   // pull the time up under the icon's empty bottom margin
                             visible: !isNaN(mx) && mx > -sz && mx < plot.width + sz
@@ -2282,7 +2286,7 @@ Item {
                                 color: !(weatherRoot && weatherRoot.dayMarkerIconColored) ? Kirigami.Theme.textColor
                                        : (parent.modelData.rise ? simple.sunRiseColor : simple.sunGold)
                                 font.bold: true
-                                font.pixelSize: weatherRoot ? weatherRoot.hourlyInfoFontSize : 11
+                                font.pixelSize: simple.sunMarkerFontPx
                             }
                         }
                     }

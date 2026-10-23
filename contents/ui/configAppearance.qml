@@ -929,10 +929,12 @@ Item {
                     }
                     ConfigSpinBox {
                         id: simpleDayMarkerSpin
-                        Kirigami.FormData.label: i18n("Day label font:")
+                        Kirigami.FormData.label: i18n("Day markers font:")
                         from: 8
                         to: 32
                         stepSize: 1
+                        ToolTip.visible: hovered
+                        ToolTip.text: i18n("The date at each new day on the graph, and the sunrise and sunset times with their icons.")
                     }
                     ConfigComboBox {
                         id: graphColorCombo

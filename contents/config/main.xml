@@ -175,9 +175,6 @@
     <entry name="hourlyIconSize" type="Int">
       <default>46</default>
     </entry>
-    <entry name="hourlyInfoFontSize" type="Int">
-      <default>11</default>
-    </entry>
     <!-- Detailed hourly-card element font (time + per-hour readouts/glyphs) -->
     <entry name="hourlyCardFontSize" type="Int">
       <default>13</default>

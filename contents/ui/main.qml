@@ -151,9 +151,7 @@ PlasmoidItem {
     // card layout: the hourly cards above the day tabs (Appearance → Cards)
     readonly property bool   hourlyCardsFirst:  Plasmoid.configuration.hourlyCardsFirst === true
     readonly property int    hourlyIconSize:     Plasmoid.configuration.hourlyIconSize     || 38
-    readonly property int    hourlyInfoFontSize: Plasmoid.configuration.hourlyInfoFontSize || 11
-    // Detailed hourly-card element font (time + per-hour readouts/glyphs); SimpleView
-    // keeps hourlyInfoFontSize, so this control only affects the Detailed cards.
+    // Detailed hourly-card element font (time + per-hour readouts/glyphs)
     readonly property int    hourlyCardFontSize:  Plasmoid.configuration.hourlyCardFontSize  || 13
     readonly property int    hourlyTempFontSize: Plasmoid.configuration.hourlyTempFontSize || 15
     // hour a non-today day opens at in the Detailed timeline (6 = 6 AM, 0 = midnight).
