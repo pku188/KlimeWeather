@@ -43,10 +43,12 @@ Kirigami.Icon {
     Timer { id: hideTimer; interval: 130; onTriggered: tip.visible = false }
 
     // The alert's text as rich text: the rest escaped, the line breaks kept, and each
-    // web address a link (the punctuation that ends a sentence after one left out).
-    function _richDetail(t) {
+    // web address a link in `linkColor` (the punctuation that ends a sentence after one
+    // left out).
+    function _richDetail(t, linkColor) {
         var esc = String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        esc = esc.replace(/(https?:\/\/[^\s<>"]*[^\s<>".,;:!?)\]'])/g, '<a href="$1">$1</a>');
+        esc = esc.replace(/(https?:\/\/[^\s<>"]*[^\s<>".,;:!?)\]'])/g,
+                          '<a href="$1" style="color:' + linkColor + '">$1</a>');
         return esc.replace(/\n/g, "<br>");
     }
     readonly property string _detail: weatherRoot ? weatherRoot.alertDetail() : ""
@@ -60,6 +62,12 @@ Kirigami.Icon {
         // ScrollView (wheel works because the pointer is over the hovered tooltip)
         // instead of running off-screen.
         contentItem: Item {
+            // The colours the style draws the tooltip's background in (its own text
+            // takes them too): the tooltip's Kirigami colour set. The palette's
+            // toolTipText needn't match that background — on a user's Plasma it came out
+            // black on a dark tooltip, whatever the colour scheme.
+            Kirigami.Theme.colorSet: tip.Kirigami.Theme.colorSet
+            Kirigami.Theme.inherit: false
             implicitWidth: Math.min(measure.implicitWidth, Kirigami.Units.gridUnit * 19)
             implicitHeight: Math.min(tipText.implicitHeight, Kirigami.Units.gridUnit * 22)
             HoverHandler { id: tipHov }
@@ -83,11 +91,11 @@ Kirigami.Icon {
                     selectByMouse: true
                     textFormat: TextEdit.RichText
                     wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
-                    text: indicator._richDetail(indicator._detail)
+                    text: indicator._richDetail(indicator._detail, Kirigami.Theme.linkColor)
                     font: tip.font
-                    color: tip.palette.toolTipText
-                    selectionColor: tip.palette.highlight
-                    selectedTextColor: tip.palette.highlightedText
+                    color: Kirigami.Theme.textColor
+                    selectionColor: Kirigami.Theme.highlightColor
+                    selectedTextColor: Kirigami.Theme.highlightedTextColor
                     onLinkActivated: (link) => Qt.openUrlExternally(link)
                     HoverHandler { cursorShape: tipText.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor }
                 }
