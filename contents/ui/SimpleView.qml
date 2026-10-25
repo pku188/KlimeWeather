@@ -521,36 +521,37 @@ Item {
     // ── which hours get a precipitation readout ──────────────────────────
     // An hour qualifies when it has snow, a measurable amount, or a published chance
     // of at least pctLabelMin (_readoutWanted) — the same test at every zoom and for
-    // every provider. A SPELL is a run of consecutive qualifying hours, unbroken.
+    // every provider.
     //
-    // At 12 hours every qualifying hour is labelled. At 24 and 48 hours that reads
-    // too densely (the 12-hour view is there for the full detail), so each spell is
-    // thinned to:
-    //   • its first hour, and every second hour after that;
-    //   • plus its wettest hour, judged on the AMOUNT alone (and only when some hour
-    //     in the spell actually has one) — and the hours either side of that peak
-    //     give way to it.
+    // Consecutive hours that would print the very same readout are one reading, not
+    // several, so a run of them is one candidate, at its middle. That is what a 6-hour
+    // block looks like once it is spread over the hourly grid — the same split amount
+    // on every hour — and what a flat stretch of one chance looks like.
     //
-    // Then, at EVERY zoom: consecutive hours that would print the very same readout
-    // are one reading, not several, so a run of them keeps a single label at its
-    // middle. That is what a 6-hour block looks like once it is spread over the
-    // hourly grid — the same split amount on every hour — and what a flat stretch of
-    // one chance looks like. A run only keeps its label if the step above labelled
-    // some hour of it; for an even-length run the middle hour already labelled is
-    // preferred, so at 24 and 48 hours no two labels ever end up on neighbouring hours.
+    // The candidates are then placed by where their labels land: the plot's columns at
+    // this zoom and popup width, each label's own width, and its height riding the rain
+    // curve. Wettest first (the amount, then the chance, then the earlier hour), each
+    // one whose label would come within readoutGap of a label already placed is left
+    // out. So every zoom keeps as many readings as it can show legibly — at 12 hours
+    // mostly all of them, at 48 one every few hours through a long spell, always the
+    // peak — and two readings at different heights, a shower low on the curve beside a
+    // downpour high on it, can stand close.
     //
-    // Worked out once per forecast, zoom and readout setting — never per scroll — so
-    // a label belongs to its hour.
+    // Worked out once per forecast, zoom, popup width and readout setting — never per
+    // scroll — so a label belongs to its hour. Its height is read from the rain curve
+    // alone, which stays put at any scroll (the temperature curve's scale follows the
+    // window), so a readout that climbs over the temperature label instead lands a
+    // little off that estimate.
     function _readoutWanted(s) {
         if (!s || !weatherRoot) return false;
         if (snowCm(s) >= 0.1) return true;
         if (weatherRoot.hasPrecipAmt(precipMm(s))) return true;
         return weatherRoot.hasPrecipChance(s) && s.precip >= pctLabelMin;
     }
-    // What an hour's readout would print, as one string: two hours with the same key
-    // show the same label. Only the halves the readout setting lets through count,
-    // so hiding the chance lets hours that differ only in their chance merge.
-    function _readoutKey(s) {
+    // What an hour's readout prints: `slot` the snow or rain amount, `pct` the chance
+    // ("" for a half that doesn't print). Only the halves the readout setting lets
+    // through count.
+    function _readoutTexts(s) {
         var sn = snowCm(s), amt = precipMm(s);
         var slot = !showPrecipAmt ? ""
                  : sn >= 0.1 ? weatherRoot.snowfallStr(sn, true)
@@ -559,7 +560,36 @@ Item {
         var pct = (showPrecipPct && weatherRoot.hasPrecipChance(s)
                    && (s.precip >= pctLabelMin || (sn < 0.1 && weatherRoot.hasPrecipAmt(amt))))
                   ? Math.round(s.precip) + "%" : "";
-        return slot + "|" + pct;
+        return { slot: slot, pct: pct };
+    }
+    // The same as one string: two hours with the same key show the same label, so
+    // hiding the chance lets hours that differ only in their chance merge.
+    function _readoutKey(s) {
+        var t = _readoutTexts(s);
+        return t.slot + "|" + t.pct;
+    }
+    // The readout labels' fonts, as roGroup draws them: snow and the chance bold, the
+    // rain amount smaller.
+    FontMetrics { id: readoutBoldFont; font.bold: true; font.pixelSize: simple.graphReadoutFontSize }
+    FontMetrics { id: readoutAmtFont; font.pixelSize: Math.round(simple.graphReadoutFontSize * 0.85) }
+    // Least room between two readouts' labels, across and up or down.
+    readonly property real readoutGap: Math.round(Kirigami.Units.smallSpacing * 1.5)
+    // What an hour's readout covers: its width, and the top and bottom of what it
+    // draws, riding the hour's rain curve as roGroup does (readoutTopFor, without the
+    // entrance's rise).
+    function _readoutBox(s) {
+        var t = _readoutTexts(s);
+        var slotW = !t.slot ? 0 : (snowCm(s) >= 0.1 ? readoutBoldFont : readoutAmtFont).advanceWidth(t.slot);
+        var w = Math.max(slotW, t.pct ? readoutBoldFont.advanceWidth(t.pct) : 0);
+        var slotH = showPrecipAmt ? readoutRowH : 0;
+        var chanceRow = showPrecipPct && weatherRoot.hasPrecipChance(s);
+        var frac = Math.max(0, Math.min(1, weatherRoot.precipWashPct(s) / 100));
+        var top = plotH - frac * precipMaxFrac * plotH - 14 - (slotH + 1 + (chanceRow ? readoutRowH : 0));
+        // an empty row is transparent: the label runs from the first row that prints
+        // to the last
+        return { w: w,
+                 y0: t.slot ? top : top + slotH + 1,
+                 y1: t.pct ? top + slotH + 1 + readoutRowH : top + slotH };
     }
     readonly property var readoutPlan: {
         // _readoutKey consults these; reading them here too makes the plan rebuild
@@ -567,48 +597,34 @@ Item {
         // readoutRowsByHour uses
         if (!samples || !samples.length || !weatherRoot || !weatherRoot.units) return null;
         if (showPrecipAmt === undefined || showPrecipPct === undefined) return null;
-        var n = samples.length, shown = [], i, j, k;
-        var thin = labelStride >= 2;   // 24 and 48 hours
+        var n = samples.length, shown = [], cand = [], i, j, k;
         for (i = 0; i < n; ++i) shown.push(false);
+        // the candidates: each run of identical readouts, at its middle
         for (i = 0; i < n; i = j + 1) {
             j = i;
             if (!_readoutWanted(samples[i])) continue;
-            while (j + 1 < n && _readoutWanted(samples[j + 1])) ++j;
-            if (!thin) {
-                for (k = i; k <= j; ++k) shown[k] = true;
-            } else {
-                // the spell's first hour, then every second hour of it
-                for (k = i; k <= j; k += 2) shown[k] = true;
-                // and its wettest hour — `top` starts at 0, so a spell that is all
-                // chance and no measurable rain adds nothing here
-                var top = 0, pick = -1;
-                for (k = i; k <= j; ++k) {
-                    var amt = precipMm(samples[k]);
-                    if (amt > top) { top = amt; pick = k; }
-                }
-                if (pick >= 0) {
-                    shown[pick] = true;
-                    // The peak outranks the every-second-hour rule on either side of
-                    // it: whatever that rule picked immediately before or after gives
-                    // way, so the wettest hour is never crowded by a neighbour.
-                    if (pick - 1 >= i) shown[pick - 1] = false;
-                    if (pick + 1 <= j) shown[pick + 1] = false;
-                }
+            var key = _readoutKey(samples[i]);
+            while (j + 1 < n && _readoutWanted(samples[j + 1]) && _readoutKey(samples[j + 1]) === key) ++j;
+            // a run that prints nothing (the readout setting hides what it has) takes no room
+            if (key !== "|") cand.push(Math.floor((i + j) / 2));
+        }
+        // wettest first: the amount (or the snow), then the chance, then the earlier hour
+        function wet(g) { return Math.max(precipMm(samples[g]), snowCm(samples[g])); }
+        function chance(g) { var p = samples[g].precip; return isNaN(p) ? 0 : p; }
+        cand.sort(function (a, b) { return (wet(b) - wet(a)) || (chance(b) - chance(a)) || (a - b); });
+        // each where its label clears every label already placed
+        var colW = plotW / pointsVisible, placed = [];
+        for (k = 0; k < cand.length; ++k) {
+            var g = cand[k], box = _readoutBox(samples[g]), x = g * colW, clear = true;
+            for (var q = 0; q < placed.length && clear; ++q) {
+                var o = placed[q];
+                var across = Math.abs(x - o.x) - (box.w + o.w) / 2;
+                var upDown = Math.max(box.y0 - o.y1, o.y0 - box.y1);
+                if (across < readoutGap && upDown < readoutGap) clear = false;
             }
-            // runs of identical readouts inside the spell keep one label, mid-run
-            var keys = [];
-            for (k = i; k <= j; ++k) keys.push(_readoutKey(samples[k]));
-            for (var a = i, b; a <= j; a = b + 1) {
-                b = a;
-                while (b + 1 <= j && keys[b + 1 - i] === keys[a - i]) ++b;
-                if (b === a) continue;
-                var any = false;
-                for (k = a; k <= b; ++k) if (shown[k]) { any = true; break; }
-                if (!any) continue;
-                var lo = Math.floor((a + b) / 2), hi = Math.ceil((a + b) / 2);
-                var mid = (shown[hi] && !shown[lo]) ? hi : lo;
-                for (k = a; k <= b; ++k) shown[k] = false;
-                shown[mid] = true;
+            if (clear) {
+                placed.push({ x: x, w: box.w, y0: box.y0, y1: box.y1 });
+                shown[g] = true;
             }
         }
         return shown;
@@ -865,8 +881,7 @@ Item {
         // where the marker's bottom edge would sit with no lift at all
         var bottom = markerCurveY(g, hourX(g)) - tLabelH;
         // half the width of the two boxes that must not meet: the marker, and a
-        // readout label (~3.4 character-widths, the same estimate readoutPlan
-        // stacks by). markerRamp softens the cutoff, so an hour just out of reach
+        // readout label (~3.4 character-widths). markerRamp softens the cutoff, so an hour just out of reach
         // asks for part of the clearance rather than none.
         var span = dayMarkerHalfW + graphReadoutFontSize * 1.7;
         var off = shift || 0;
