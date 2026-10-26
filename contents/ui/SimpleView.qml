@@ -330,6 +330,38 @@ Item {
         }
         return out;
     }
+    // The hour just outside the window on either side — its temperature and its rain
+    // wash — blended between the two window frames as the columns are, or through the
+    // day morph: the curves run on toward them past the plot's edges instead of flat
+    // (curvePoints). Where the forecast has no hour there (its very first and last
+    // hours), the edge column's own value, so the curve runs out flat as before.
+    function _edgesAt(w) {
+        var n = samples ? samples.length : 0;
+        function at(idx, orIdx) {
+            if (idx >= 0 && idx < n) return samples[idx];
+            return (orIdx >= 0 && orIdx < n) ? samples[orIdx] : null;
+        }
+        var l = at(w - 1, w), r = at(w + pointsVisible, Math.min(n - 1, w + pointsVisible - 1));
+        function wash(s) { return s && weatherRoot ? weatherRoot.precipWashPct(s) : 0; }
+        return { tL: l ? l.temp : 0, tR: r ? r.temp : 0, pL: wash(l), pR: wash(r) };
+    }
+    readonly property var curEdges: {
+        // read here, not only in _edgesAt, so the binding follows them
+        var _deps = [samples, pointsVisible, weatherRoot];
+        var morphing = dayMorphT < 1;
+        var a = _edgesAt(morphing ? morphFromBase : hourFloor);
+        var b = _edgesAt(morphing ? morphToBase : hourCeil);
+        var f = morphing ? dayMorphT : curFrac;
+        return { tL: a.tL + (b.tL - a.tL) * f, tR: a.tR + (b.tR - a.tR) * f,
+                 pL: a.pL + (b.pL - a.pL) * f, pR: a.pR + (b.pR - a.pR) * f };
+    }
+    // The points a curve is drawn through: the columns `xs`/`ys` and, either side, the
+    // hour outside the window at its own column's place past the edge (`yl`, `yr`).
+    function curvePoints(xs, ys, yl, yr) {
+        var n = xs.length;
+        return { xs: [xAt(-1)].concat(xs, [xAt(n)]), ys: [yl].concat(ys, [yr]) };
+    }
+
     // Rain WASH per column on the 0-100 chance scale — what the precip band is drawn
     // from, and the silhouette the readouts and markers ride above. Where an hour has
     // a real chance this IS that chance, unchanged; where it has none (met.no outside
@@ -1062,10 +1094,11 @@ Item {
     // Paint the radial sun bloom + line streak for every on-screen sun event.
     // Drawn straight onto the chart canvas (after the fills, before the crisp temp
     // line) so the line sits on top of its own glow. xs/ty are the live (morphing)
-    // curve columns; gx0/gx1 the horizontal span shared with the gradients. Each
+    // curve columns, `curve` the same with the hours past the edges (curvePoints) that
+    // the line is drawn through; gx0/gx1 the horizontal span shared with the gradients. Each
     // event: a tall radial ellipse (core on the line, fading up, clipped above the
     // curve) plus a soft horizontal streak laid along the line itself.
-    function drawSunBloom(ctx, xs, ty, gx0, gx1, w) {
+    function drawSunBloom(ctx, xs, ty, curve, gx0, gx1, w) {
         var peaks = sunBloomPeaks();
         if (!peaks.length) return;
         var n = xs.length, spanX = gx1 - gx0;
@@ -1083,12 +1116,11 @@ Item {
         // trace the curve, then close up-and-over the top so the glow can't spill below.
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(0, ty[0]);
-        ctx.lineTo(xs[0], ty[0]);
-        smooth(ctx, xs, ty);
-        ctx.lineTo(w, ty[n - 1]);
-        ctx.lineTo(w, 0);
-        ctx.lineTo(0, 0);
+        var ce = curve.xs.length - 1;
+        ctx.moveTo(curve.xs[0], curve.ys[0]);
+        smooth(ctx, curve.xs, curve.ys);
+        ctx.lineTo(curve.xs[ce], 0);
+        ctx.lineTo(curve.xs[0], 0);
         ctx.closePath();
         ctx.clip();
 
@@ -1171,10 +1203,8 @@ Item {
             ctx.globalAlpha = passes[s][1];
             ctx.lineWidth = passes[s][0];
             ctx.beginPath();
-            ctx.moveTo(0, ty[0]);
-            ctx.lineTo(xs[0], ty[0]);
-            smooth(ctx, xs, ty);
-            ctx.lineTo(w, ty[n - 1]);
+            ctx.moveTo(curve.xs[0], curve.ys[0]);
+            smooth(ctx, curve.xs, curve.ys);
             ctx.stroke();
         }
         ctx.restore();
@@ -1716,6 +1746,7 @@ Item {
                         Connections {
                             target: simple
                             function onCurTempsChanged()  { chart.requestPaint(); }
+                            function onCurEdgesChanged()  { chart.requestPaint(); }
                             function onCurPrecipChanged() { chart.requestPaint(); }
                             function onCurSnowChanged()   { chart.requestPaint(); }
                             function onColorModeChanged()  { chart.requestPaint(); }
@@ -1737,6 +1768,16 @@ Item {
                                 ty.push(simple.tempY(ct[i]));
                                 py.push(simple.precipY(cp[i]));
                             }
+                            // the curves run on through the hour past each edge — the
+                            // temperature only as far as the scale's ends, which fit the
+                            // hours on screen: an hour past them would send the curve
+                            // diving out of the plot at the edge
+                            var ed = simple.curEdges;
+                            var tTop = simple.tempY(simple.tmax), tBottom = simple.tempY(simple.tmin);
+                            function edgeY(t) { return Math.max(tTop, Math.min(tBottom, simple.tempY(t))); }
+                            var tc = simple.curvePoints(xs, ty, edgeY(ed.tL), edgeY(ed.tR));
+                            var pc = simple.curvePoints(xs, py, simple.precipY(ed.pL), simple.precipY(ed.pR));
+                            var ce = tc.xs.length - 1;
                             var tCol = Kirigami.Theme.textColor;
                             // temperature fill + line: when colouring is on, a
                             // horizontal temp-colour gradient (cold blue → hot
@@ -1807,16 +1848,14 @@ Item {
                                 pLineStyle = simple.rgba(tCol, 0.5);
                             }
 
-                            // precipitation area (flat-extended to both edges) — the
-                            // shaded band beneath the rain curve, as dense as
-                            // precipBandA asks for (0 = nothing but the line).
+                            // precipitation area (on past both edges) — the shaded band
+                            // beneath the rain curve, as dense as precipBandA asks for
+                            // (0 = nothing but the line).
                             ctx.beginPath();
-                            ctx.moveTo(0, py[0]);
-                            ctx.lineTo(xs[0], py[0]);
-                            simple.smoothMonotone(ctx, xs, py);
-                            ctx.lineTo(width, py[n - 1]);
-                            ctx.lineTo(width, height);
-                            ctx.lineTo(0, height);
+                            ctx.moveTo(pc.xs[0], pc.ys[0]);
+                            simple.smoothMonotone(ctx, pc.xs, pc.ys);
+                            ctx.lineTo(pc.xs[ce], height);
+                            ctx.lineTo(pc.xs[0], height);
                             ctx.closePath();
                             ctx.fillStyle = pBandStyle;
                             ctx.fill();
@@ -1846,16 +1885,14 @@ Item {
                                 ctx.globalCompositeOperation = "source-over";
                             }
 
-                            // temperature area (flat-extended to both edges), laid in
-                            // BEHIND the faded band via destination-over so the temp
-                            // wash shows through where the band has thinned out.
+                            // temperature area (on past both edges), laid in BEHIND the
+                            // faded band via destination-over so the temp wash shows
+                            // through where the band has thinned out.
                             ctx.beginPath();
-                            ctx.moveTo(0, ty[0]);
-                            ctx.lineTo(xs[0], ty[0]);
-                            simple.smooth(ctx, xs, ty);
-                            ctx.lineTo(width, ty[n - 1]);
-                            ctx.lineTo(width, height);
-                            ctx.lineTo(0, height);
+                            ctx.moveTo(tc.xs[0], tc.ys[0]);
+                            simple.smooth(ctx, tc.xs, tc.ys);
+                            ctx.lineTo(tc.xs[ce], height);
+                            ctx.lineTo(tc.xs[0], height);
                             ctx.closePath();
                             ctx.globalCompositeOperation = "destination-over";
                             ctx.fillStyle = tBandStyle;
@@ -1864,25 +1901,21 @@ Item {
 
                             // precipitation line
                             ctx.beginPath();
-                            ctx.moveTo(0, py[0]);
-                            ctx.lineTo(xs[0], py[0]);
-                            simple.smoothMonotone(ctx, xs, py);
-                            ctx.lineTo(width, py[n - 1]);
+                            ctx.moveTo(pc.xs[0], pc.ys[0]);
+                            simple.smoothMonotone(ctx, pc.xs, pc.ys);
                             ctx.lineWidth = 2;
                             ctx.strokeStyle = pLineStyle;
                             ctx.stroke();
 
                             // sun bloom: the warm radial glow + line streak at each
                             // sunrise/sunset, under the crisp line so the line tops its glow.
-                            simple.drawSunBloom(ctx, xs, ty, gx0, gx1, width);
+                            simple.drawSunBloom(ctx, xs, ty, tc, gx0, gx1, width);
 
                             // temperature line — drawn LAST so the temp curve always
                             // stays on top of the precip wash, even at 100% precip.
                             ctx.beginPath();
-                            ctx.moveTo(0, ty[0]);
-                            ctx.lineTo(xs[0], ty[0]);
-                            simple.smooth(ctx, xs, ty);
-                            ctx.lineTo(width, ty[n - 1]);
+                            ctx.moveTo(tc.xs[0], tc.ys[0]);
+                            simple.smooth(ctx, tc.xs, tc.ys);
                             ctx.lineWidth = simple.colorTempLine ? 2.2 : 2;
                             ctx.strokeStyle = tLineStyle;
                             ctx.stroke();
