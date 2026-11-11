@@ -89,15 +89,28 @@ Item {
     property var hoveredSample: null
     function sampleAtX(px) {
         if (!samples.length || plotW <= 0) return null;
-        // inverse of hourX(): x = (g - hourPos + 0.5) * (plotW / pointsVisible)
-        var g = Math.round(px * pointsVisible / plotW - 0.5 + hourPos);
+        // inverse of hourX(): x = edgeInset + (g - hourPos + 0.5) * colW
+        var g = Math.round((px - edgeInset) / colW - 0.5 + hourPos);
+        // the room past the edge hours (edgeInset) reads as those hours
+        var first = Math.round(hourPos);
+        g = Math.max(first, Math.min(first + pointsVisible - 1, g));
         if (g < 0 || g >= samples.length) return null;
         return samples[g];
     }
 
+    // With a day picked that the window can't start at (the last ones at 48 hours), that
+    // day's first hour instead, so the hour and the day-based elements speak of the same
+    // day — as the card layout's active card does.
+    // While the window pans to a picked day (posAnim, see goToDay), the hour it lands
+    // on, from the start, as the hour labels do (labelBase): following the window there
+    // walked the hour-based elements through every hour it passed (the Date element's
+    // icon through the times of day), where the day-based ones change once.
     readonly property var focusedSample: {
         if (!samples.length) return null;
-        var c = Math.max(0, Math.min(samples.length - 1, Math.round(hourPos)));
+        var c = Math.max(0, Math.min(samples.length - 1, Math.round(posAnim.running ? posAnim.to : hourPos)));
+        if (chosenDay >= 0 && chosenDay < dayCount && weatherRoot
+                && weatherRoot.dayIndexForDate(samples[c].date) !== selectedDay)
+            c = dayFirstSampleIndex(selectedDay);
         return samples[c];
     }
 
@@ -257,7 +270,48 @@ Item {
     // while its *x* slides every frame — smooth, and never rebuilt.
     readonly property int  windowBase: Math.floor(hourPos)
     readonly property int  poolSize:   pointsVisible + 3
-    function hourX(g) { return (g - hourPos + 0.5) * (plotW / pointsVisible); }
+    function hourX(g) { return edgeInset + (g - hourPos + 0.5) * colW; }
+    // Room kept free at each end of the graph, so the first and last hour's icon,
+    // clock label and temperature are never cut by the edge. They are centred on
+    // their column, and half a column of room was too little where columns are
+    // narrow: at 48 hours, ~9 px for a 34 px icon. The curve and the rain band run on
+    // into it toward the hour past the edge (curEdges — flat at the forecast's own
+    // ends, where there is no such hour), while the labels and markers of the hours
+    // out there fade away (windowFade). Only what is missing is added: nothing at 12
+    // hours in a popup of the usual width, ~10 px a side at 48.
+    TextMetrics {
+        id: hourLabelMetrics
+        font.pixelSize: weatherRoot ? weatherRoot.simpleHourFontSize : 11
+        // two digits either way: "22:00", or "10 PM"
+        text: new Date(2000, 0, 1, 22, 0).toLocaleTimeString(Qt.locale(),
+                  weatherRoot && weatherRoot.use24Hour ? "H:mm" : "h AP")
+    }
+    TextMetrics {
+        id: tempLabelMetrics
+        font.bold: true
+        font.pixelSize: weatherRoot ? weatherRoot.simpleGraphTempFontSize : 13
+        text: weatherRoot ? weatherRoot.tempStr(-10) : "-10°"
+    }
+    readonly property real edgeInset: {
+        var half = Math.max(weatherRoot ? weatherRoot.simpleHourlyIconSize : 24,
+                            hourLabelMetrics.width, tempLabelMetrics.width) / 2 + dayMarkerEdge;
+        // The edge column's centre sits edgeInset + colW / 2 in, and colW narrows as
+        // edgeInset grows: solved for the inset that puts that centre `half` in.
+        var n = pointsVisible;
+        return Math.max(0, Math.min(plotW / 4, (half - plotW / (2 * n)) * n / (n - 1)));
+    }
+    // the width the window's columns share, and one column of it
+    readonly property real innerW: Math.max(1, plotW - 2 * edgeInset)
+    readonly property real colW:   innerW / pointsVisible
+    // How much of what belongs to (fractional) hour `gf` shows: all of it inside the
+    // window, fading out over `fadeHours` past either end. At rest the window ends on
+    // whole hours, so the labels and markers of hours outside it are gone — the room
+    // at the edges is for the curve, not for them — while a scroll still slides them
+    // in and out smoothly.
+    function windowFade(gf, fadeHours) {
+        var out = Math.max(hourPos - gf, gf - (hourPos + pointsVisible - 1), 0);
+        return Math.max(0, 1 - out / fadeHours);
+    }
     // a sample STARTS a new day when its date differs from the previous sample's.
     // Works for both hourly (midnight IS a sample) and every-2h (when "now" is odd, no
     // sample lands exactly on hour 0, so an hour-0 test would MISS the rollover and the
@@ -292,7 +346,7 @@ Item {
 
     readonly property var dayStartsInWindow: {
         var out = [];
-        var extra = Math.ceil(2 * dayMarkerHalfW / (plotW / pointsVisible));
+        var extra = Math.ceil(2 * dayMarkerHalfW / colW);
         for (var k = -1 - extra; k <= poolSize + extra; ++k)
             if (isDayStart(windowBase + k)) out.push(windowBase + k);
         return out;
@@ -357,9 +411,12 @@ Item {
     }
     // The points a curve is drawn through: the columns `xs`/`ys` and, either side, the
     // hour outside the window at its own column's place past the edge (`yl`, `yr`).
+    // Those two are pinned to the plot's edges once the room kept there (edgeInset)
+    // puts them inside it, so the curve still reaches both edges.
     function curvePoints(xs, ys, yl, yr) {
         var n = xs.length;
-        return { xs: [xAt(-1)].concat(xs, [xAt(n)]), ys: [yl].concat(ys, [yr]) };
+        return { xs: [Math.min(0, xAt(-1))].concat(xs, [Math.max(plotW, xAt(n))]),
+                 ys: [yl].concat(ys, [yr]) };
     }
 
     // Rain WASH per column on the 0-100 chance scale — what the precip band is drawn
@@ -645,7 +702,7 @@ Item {
         function chance(g) { var p = samples[g].precip; return isNaN(p) ? 0 : p; }
         cand.sort(function (a, b) { return (wet(b) - wet(a)) || (chance(b) - chance(a)) || (a - b); });
         // each where its label clears every label already placed
-        var colW = plotW / pointsVisible, placed = [];
+        var colW = innerW / pointsVisible, placed = [];
         for (k = 0; k < cand.length; ++k) {
             var g = cand[k], box = _readoutBox(samples[g]), x = g * colW, clear = true;
             for (var q = 0; q < placed.length && clear; ++q) {
@@ -792,7 +849,7 @@ Item {
         ? (new Date(samples[1].time).getTime() - sampleT0Ms) : NaN
     function xAtTime(ms) {
         if (isNaN(sampleT0Ms) || isNaN(sampleStepMs) || sampleStepMs <= 0 || nPts < 1) return NaN;
-        return ((ms - sampleT0Ms) / sampleStepMs - hourPos + 0.5) * (plotW / nPts);
+        return edgeInset + ((ms - sampleT0Ms) / sampleStepMs - hourPos + 0.5) * (innerW / nPts);
     }
     // compact sun-event time, matching the hour axis: "6:18a" / "7:48p" (12h) or
     // "6:18" / "19:48" (24h)
@@ -817,7 +874,7 @@ Item {
         // below are tested against. Working from the UNLIFTED position keeps this
         // out of a circle with the delegate's own y.
         var baseTop = curveYAtX(px) - tempLabelH - mh - sunMarkGap;
-        var col = Math.round(px / (plotW / nPts) - 0.5), lift = 0;
+        var col = Math.round((px - edgeInset) / (innerW / nPts) - 0.5), lift = 0;
         for (var c = col - 1; c <= col + 1; ++c) {
             var g = Math.round(hourPos) + c;
             var rows = readoutRowsAt(c, g);
@@ -908,7 +965,7 @@ Item {
     function markerLift(g, shift) {
         var lift = markerGap;
         if (nPts < 1) return lift;
-        var colW = plotW / nPts;
+        var colW = innerW / nPts;
         var tLabelH = (weatherRoot ? weatherRoot.simpleGraphTempFontSize : 13) * 1.4;
         // where the marker's bottom edge would sit with no lift at all
         var bottom = markerCurveY(g, hourX(g)) - tLabelH;
@@ -960,6 +1017,10 @@ Item {
         var a = curTemps; if (!a.length) return [0, 1];
         var lo = 1e9, hi = -1e9;
         for (var i = 0; i < a.length; ++i) { var v = a[i]; if (v < lo) lo = v; if (v > hi) hi = v; }
+        // minimum span (4 °F ≈ 2.2 °C) so a near-flat window draws near-flat instead of
+        // stretching a sub-degree wobble over the full graph height
+        var minSpan = (weatherRoot && weatherRoot.units === "fahrenheit") ? 4 : 4 / 1.8;
+        if (hi - lo < minSpan) { var mid = (lo + hi) / 2; lo = mid - minSpan / 2; hi = mid + minSpan / 2; }
         return [lo, hi];
     }
     readonly property real tmin: tRange[0]
@@ -968,7 +1029,7 @@ Item {
     // x for point `i` when a day fills the width as `count` equal cells, the
     // point centered in its cell. Cell-centering makes consecutive days in the
     // sliding filmstrip tile seamlessly (uniform spacing across day seams).
-    function xAtFor(i, count) { return count > 0 ? (i + 0.5) * (plotW / count) : 0; }
+    function xAtFor(i, count) { return count > 0 ? edgeInset + (i + 0.5) * (innerW / count) : 0; }
     // curve column x: the curve is `nPts` columns wide (24 hourly / 12 every-2h).
     function xAt(i) { return xAtFor(i, nPts); }
     // entrance reveal factor: 0 = curves flat on the baseline, 1 = full shape.
@@ -1560,7 +1621,10 @@ Item {
                 weatherRoot: simple.weatherRoot
                 toolbar: toolbar
                 metrics: simple.weatherRoot ? simple.weatherRoot.simpleHeaderMetrics : []
-                selectedDay: simple.selectedDay
+                // the hovered hour's day while the pointer is over the graph, else the
+                // selected one
+                selectedDay: simple.hoveredSample && simple.weatherRoot
+                             ? simple.weatherRoot.dayIndexForDate(simple.hoveredSample.date) : simple.selectedDay
                 // the hour under the pointer, else the one the graph is focused on
                 sample: simple.hoveredSample || simple.focusedSample
                 // what the header can be handed: any hour of the graph, any day button
@@ -1662,7 +1726,7 @@ Item {
                         // continuous, so it can't morph (same as a slow finger-drag)
                         simple.cancelDayMorph();
                         posAnim.stop();
-                        var hourW = simple.plotW / simple.pointsVisible;
+                        var hourW = simple.colW;
                         var slid = simple.clampHour(simple.hourPos - pd / hourW);
                         if (slid !== simple.hourPos) simple.chosenDay = -1;
                         simple.hourPos = slid;
@@ -1682,7 +1746,9 @@ Item {
                                   : posAnim.running   ? posAnim.to
                                   : simple.hourPos;
                         var targetW = simple.clampHour(Math.round(baseh) + steps * simple.scrollHours);
-                        if (targetW === Math.round(simple.hourPos) && !flickAnim.running && !posAnim.running) return;
+                        // a notch that can't move the destination (spinning on at either
+                        // end) must not re-arm the morph, or the readouts blink
+                        if (targetW === Math.round(baseh)) return;
                         simple.chosenDay = -1;
                         simple.notchMorph(targetW);
                     }
@@ -1708,7 +1774,7 @@ Item {
                 onPositionChanged: (m) => {
                     if (!simple.dragging) return;
                     var now = Date.now(), dt = Math.max(1, now - lastT);
-                    var hourW = simple.plotW / simple.pointsVisible;
+                    var hourW = simple.colW;
                     var newH = simple.clampHour(startPos - (m.x - startX) / hourW);
                     velocity = 0.6 * velocity + 0.4 * ((newH - simple.hourPos) / dt * 1000);
                     if (newH !== simple.hourPos) simple.chosenDay = -1;   // a click alone keeps it
@@ -1947,7 +2013,9 @@ Item {
                             opacity: labelled ? 1 : 0
                             visible: opacity > 0
                             Behavior on opacity { NumberAnimation { duration: simple.lblFadeDur; easing.type: Easing.InOutQuad } }
-                            x: simple.xAt(index) - width / 2
+                            // inside the plot even where a reading is wider than the
+                            // "-10°" edgeInset was measured from
+                            x: Math.max(0, Math.min(simple.plotW - width, simple.xAt(index) - width / 2))
                             y: simple.curTempY(index) - height - Kirigami.Units.smallSpacing
                             text: weatherRoot ? weatherRoot.tempStr(degree) : ""
                             font.bold: true
@@ -2129,7 +2197,7 @@ Item {
                             onSTextChanged: if (sText.length > 0) sShown = sText
                             onATextChanged: if (aText.length > 0) aShown = aText
                             spacing: 1
-                            x: Math.max(0, simple.xAt(index) - width / 2)
+                            x: Math.max(0, Math.min(simple.plotW - width, simple.xAt(index) - width / 2))
                             y: Math.max(0, simple.readoutTopFor(simple.curTempY(index),
                                                                simple.curPrecipY(index), height))
                             // Snow + rain-amount share ONE fixed-height slot above the
@@ -2208,7 +2276,10 @@ Item {
                             // tab), keyed by the marker's date rather than the 00:00 code
                             readonly property var dayEntry: (weatherRoot && sample)
                                 ? weatherRoot.dailyData[weatherRoot.dayIndexForDate(sample.date)] : null
-                            visible: sample !== null
+                            // A midnight outside the window has no marker at rest: the
+                            // day after the last hour was cut in half at the edge.
+                            opacity: simple.windowFade(g, 1)
+                            visible: sample !== null && opacity > 0
                                      && lineX > -width && lineX < plot.width + width
                             width: markerRow.width
                             height: markerRow.height
@@ -2296,8 +2367,12 @@ Item {
                             readonly property real sz: Math.round(simple.sunMarkerFontPx * 3.1)
                             z: 50
                             spacing: -Math.round(sz * 0.22)   // pull the time up under the icon's empty bottom margin
-                            visible: !isNaN(mx) && mx > -sz && mx < plot.width + sz
-                            x: mx - width / 2
+                            // Outside the window only as long as a quarter hour: a sun
+                            // event falls between hours, so a longer fade would leave one
+                            // just past the last hour half drawn at rest.
+                            opacity: isNaN(mx) ? 0 : simple.windowFade((modelData.ms - simple.sampleT0Ms) / simple.sampleStepMs, 0.25)
+                            visible: opacity > 0 && mx > -sz && mx < plot.width + sz
+                            x: Math.max(0, Math.min(simple.plotW - width, mx - width / 2))
                             // above the temp number when there's headroom; when the curve
                             // rides high (no room for the icon+time+readout stack) drop
                             // BELOW the line, where nothing else is drawn. Instead of
@@ -2361,7 +2436,9 @@ Item {
                             readonly property real cx: simple.hourX(g)
                             // Only labelled hours get an icon — at day width the curve
                             // has 24 points and 24 icons would overlap into a smear.
-                            visible: shown && cx > -width && cx < gcol.width + width
+                            // gone outside the window, its edge room included (windowFade)
+                            opacity: simple.windowFade(g, 1)
+                            visible: shown && opacity > 0 && cx > -width && cx < gcol.width + width
                             width: weatherRoot ? weatherRoot.simpleHourlyIconSize : 24
                             height: width
                             x: cx - width / 2
@@ -2403,7 +2480,8 @@ Item {
                             readonly property int g: simple.filmG(index)
                             readonly property var modelData: (g >= 0 && g < simple.samples.length) ? simple.samples[g] : null
                             readonly property real cx: simple.hourX(g)
-                            visible: modelData !== null
+                            opacity: simple.windowFade(g, 1)   // as the icons above
+                            visible: modelData !== null && opacity > 0
                                      && cx > -width && cx < gcol.width + width
                             x: cx - width / 2
                             anchors.verticalCenter: parent.verticalCenter

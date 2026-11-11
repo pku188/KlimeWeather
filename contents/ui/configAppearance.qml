@@ -30,6 +30,7 @@ Item {
     property string cfg_customIconDir
     property string cfg_readingIconPack
     property string cfg_readingIconDir
+    property alias cfg_backgroundTransparency: backgroundTransparencySpin.value
     // Detailed layout (forecast days moved here from the General page)
     property alias cfg_dailyDays:          dailyDaysSpin.value
     property alias cfg_heroIconSize:       heroSpin.value
@@ -153,7 +154,8 @@ Item {
         { text: i18n("Air pressure"),           id: "pressure"   },
         { text: i18n("Sunrise / sunset"),       id: "sun"        },
         { text: i18n("Date"),                   id: "date"       },
-        { text: i18n("Moon phase"),             id: "moon"       }
+        { text: i18n("Moon phase"),             id: "moon"       },
+        { text: i18n("Weather and temperature"), id: "weather"   }
     ])
     // Per-hour options for the Detailed hourly-card readouts (chance/amount are
     // per-hour, unlike the header's daily-total precip/snow sums), and their fallbacks.
@@ -223,11 +225,8 @@ Item {
     readonly property bool panelShowsSeveral: panelShownIds.length > 1
 
     // ── Detailed view Elements (cfg_detailedViewElements) ──
-    // Each element's name: the sun and the moon, and a reading's as in the Weather
-    // Elements' list.
+    // Each element's name, as in the Weather Elements' list.
     function detailedElementName(id) {
-        // the Detailed view's own, not a Weather Element of the other layouts
-        if (id === "weather") return i18n("Weather and temperature");
         for (var i = 0; i < detailMetricOptions.length; ++i)
             if (detailMetricOptions[i].id === id) return detailMetricOptions[i].text;
         return id;
@@ -432,6 +431,18 @@ Item {
                                 : (page.cfg_animatedHourlyIcons ? 3 : page.cfg_animatedDailyIcons ? 2 : 0)
                             onActivated: page.cfg_cardAnimation = model[currentIndex].value
                             ToolTip.text: i18n("Which icons move, in every layout: the header's, then the Daily forecast's daily tabs, then the hourly cards and the Weather graph's hour icons.")
+                        }
+                        ConfigSpinBox {
+                            id: backgroundTransparencySpin
+                            Kirigami.FormData.label: i18n("Background transparency:")
+                            from: 0
+                            to: 100
+                            stepSize: 5
+                            // the unit lives on the value, as with the precipitation gradient
+                            textFromValue: (value, locale) => i18n("%1%", value)
+                            valueFromText: (text, locale) => parseInt(text.replace(/[^0-9]/g, "") || "0", 10)
+                            ToolTip.visible: hovered
+                            ToolTip.text: i18n("How see-through the widget's background is: the popup's when the widget is on a panel, and on the desktop the frame that \"Show Background\" adds. 0% leaves the theme's background as it is.")
                         }
                         ConfigSpinBox {
                             id: heroSpin

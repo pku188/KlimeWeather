@@ -85,6 +85,39 @@ PlasmoidItem {
     // is the applet box, not a popup window. The popup machinery below no-ops here.
     readonly property bool planar: Plasmoid.formFactor === PlasmaCore.Types.Planar
 
+    // Background transparency (Appearance → Common) as the background's opacity; 1
+    // leaves the theme's background as it is. It fades the popup's background (see
+    // fullRepresentation) and the desktop frame below.
+    readonly property real backgroundOpacity: 1 - Math.max(0, Math.min(100, Plasmoid.configuration.backgroundTransparency ?? 0)) / 100
+    // The frame "Show Background" puts around the widget on the desktop. Neither the
+    // widget's to draw nor to reach through any API: the containment draws it as the
+    // background of the container this item is the content (applet) of. With the
+    // frame off it is still there, only without an image, so the fade shows nothing.
+    readonly property Item desktopFrame: {
+        if (!planar) return null;
+        for (var p = root.parent; p; p = p.parent)
+            if (p.applet === root) return p.background || null;
+        return null;
+    }
+    Binding {
+        target: root.desktopFrame
+        when: root.desktopFrame !== null
+        property: "opacity"
+        value: root.backgroundOpacity
+        restoreMode: Binding.RestoreBindingOrValue
+    }
+    // A theme with a "blurred" frame lays a blurred copy of the wallpaper under it, as
+    // an item of its own; it fades along, or a fully transparent frame left a blurred
+    // box on the wallpaper.
+    readonly property Item desktopFrameBlur: desktopFrame && desktopFrame.maskItem ? desktopFrame.maskItem : null
+    Binding {
+        target: root.desktopFrameBlur
+        when: root.desktopFrameBlur !== null
+        property: "opacity"
+        value: root.backgroundOpacity
+        restoreMode: Binding.RestoreBindingOrValue
+    }
+
     // ── Live weather state ────────────────────────────────────────────────
     property real temperature: NaN
     property int  weatherCode: -1
@@ -295,8 +328,10 @@ PlasmoidItem {
 
     // ── Severe-weather alerts (KDE FOSS Public Alert Server, worldwide) ────
     readonly property bool showAlerts: Plasmoid.configuration.showAlerts
-    property var weatherAlerts: []    // [{ event, severity, headline, ends, expires, description, instruction }]
+    property var weatherAlerts: []    // [{ id, sent, event, severity, urgency, headline, starts, ends, expires, description, instruction }]
     property int _alertGen: 0         // bumped per fetch; stale responses are dropped
+    property var _alertCache: ({})    // alert id → parsed alert, or null when it is not one to show here
+    property string _alertCacheKey: ""   // the point _alertCache was made for; a new point empties it
     function alertRank(sev) {
         return sev === "Extreme" ? 4 : sev === "Severe" ? 3
              : sev === "Moderate" ? 2 : sev === "Minor" ? 1 : 0;
@@ -315,6 +350,10 @@ PlasmoidItem {
     readonly property var displayAlerts: weatherAlerts.filter(function (a) { return root._alertShown(a); })
     function _alertShown(a) {
         if (alertRank(a.severity) < minAlertRank) return false;
+        // CAP urgency "Past" = responsive action no longer required. GDACS never sets an
+        // <expires>, so a finished cyclone would otherwise stay up for as long as the
+        // server holds it.
+        if (a.urgency === "Past") return false;
         // Drop alerts already past their CAP <expires> so a stale record from the
         // beta server (or one that lapses between the 15-min fetches) doesn't linger.
         // Filter on the REAL expires only (not the onset fallback `ends` uses), and
@@ -709,6 +748,7 @@ PlasmoidItem {
         }
         if (id === "date") return i18n("Date: %1", dateText(hourSample));
         if (id === "moon") return i18n("Moon: %1", moonPhaseName(hourSample));
+        if (id === "weather") return _weatherText(_weatherOf(hourSample));
         // Combined sunrise/sunset, offered in both layouts' Weather Elements.
         // One compact line "↑ 5:23a  ↓ 8:23p"; falls back to today
         // (dailyData[0]) when no day is focused. The old "sunrise"/"sunset" ids are
@@ -1075,8 +1115,27 @@ PlasmoidItem {
         }
         case "date": return [_part(dateIcon(hourSample), dateText(hourSample))];
         case "moon": return [_part(moonPhaseIcon(hourSample), moonPhaseName(hourSample))];
+        // the condition's own icon (ElementReading), not a reading icon
+        case "weather": {
+            var w = _weatherOf(hourSample), wt = _weatherText(w);
+            return wt ? [{ icon: "", weather: w, text: wt }] : [];
+        }
         }
         return [];
+    }
+    // The "Weather and temperature" element (the Detailed view's "weather"): an hour's
+    // condition and temperature. The hour we're in shows the header's own — the current
+    // temperature, not the hour's forecast a degree off it — as the Detailed view does;
+    // another hour its own, its condition as the hourly cards read it (likely rain is rain).
+    function _weatherOf(s) {
+        if (isCurrentSample(s)) return { code: heroCode, day: heroDay, cloud: heroCloud, temp: temperatureText };
+        return { code: precipAwareCode(s.code, s.precip, s.precipAmt, s.snow, s.temp),
+                 day: s.day, cloud: s.cloud, temp: tempStr(s.temp) };
+    }
+    // as the Weather Elements print it: "3° Overcast"
+    function _weatherText(w) {
+        return w.code < 0 ? "" : i18nc("@info a temperature, then a weather condition", "%1 %2",
+                                       w.temp, conditionText(w.code, w.day));
     }
     // The panel reading `id` (an element of panelElements, see panelelements.js) as
     // icon parts, for now and today; none when it has no data. Coloured like the popup
@@ -1333,9 +1392,10 @@ PlasmoidItem {
         return Grid.build(allHourly, dailyData, days, locNow().getTime());
     }
 
-    // Privacy: weather/alerts are computed on multi-km grids, so we only ever
-    // send ~1 km-precise coordinates to the network (2 decimals). The full
-    // precision stays in the config for saved locations.
+    // Privacy: weather is computed on multi-km grids, so we only ever send ~1
+    // km-precise coordinates to the weather providers (2 decimals). The full
+    // precision stays in the config for saved locations. (Alerts don't use this —
+    // they send a fixed grid cell, see fetchAlerts.)
     readonly property int coordPrecision: 2
     function coarseCoord(v) {
         var p = Math.pow(10, coordPrecision);
@@ -1347,7 +1407,10 @@ PlasmoidItem {
     // model below — see providers/OpenMeteo.qml for the full contract. Adding a
     // provider = one file there plus one line in the registry; no view file, and
     // none of the icon/condition machinery, knows a provider exists.
-    OpenMeteo { id: openMeteoProvider }
+    OpenMeteo {
+        id: openMeteoProvider
+        forecastModel: Plasmoid.configuration.openMeteoModel
+    }
     MetNo     { id: metNoProvider }
 
     readonly property var providers: ({ "openmeteo": openMeteoProvider, "metno": metNoProvider })
@@ -1721,28 +1784,34 @@ PlasmoidItem {
 
     // ── Severe-weather alerts (KDE FOSS Public Alert Server) ──────────────
     // Global, FOSS, privacy-focused (alerts.kde.org). Two steps: query a
-    // deliberately COARSE bounding box (alertBoxDeg) so the server learns only a
+    // deliberately COARSE grid cell (alertCellDeg) so the server learns only a
     // rough region — not the point — then pull each matching CAP 1.2 alert.
     // Anything but a clean result → no banner.
-    readonly property real alertBoxDeg: 0.3   // ±deg box (~±33 km) around the location
+    readonly property real alertCellDeg: 0.6   // grid cell edge (~66 km); every point inside sends the same cell
+    readonly property int  alertCap: 120       // most alerts read per refresh
+    readonly property int  alertParallel: 20   // downloads in flight at once (see _fetchAlertDetails)
     function fetchAlerts() {
-        if (!showAlerts || !hasLocation) { weatherAlerts = []; return; }
+        if (!showAlerts || !hasLocation) { weatherAlerts = []; _alertCache = {}; return; }
         var lat = Plasmoid.configuration.latitude;
         var lon = Plasmoid.configuration.longitude;
         if (lat === undefined || lon === undefined || isNaN(lat) || isNaN(lon)) return;
-        // round to ~1 km BEFORE building the box: the box edges are symmetric, so
-        // its centre = the coordinate we send. Coarsening here keeps that centre
-        // ~1 km-precise, matching the weather request (raw lat/lon would let the
-        // server recover the exact point from (min+max)/2).
-        lat = coarseCoord(lat);
-        lon = coarseCoord(lon);
+        // cached results hold the point-in-polygon verdict for ONE point
+        var ck = lat + "," + lon;
+        if (ck !== _alertCacheKey) { _alertCache = {}; _alertCacheKey = ck; }
+        // Snap to a FIXED grid, not a box centred on the point: a centred box's
+        // (min+max)/2 hands the server the point itself (to whatever precision it is
+        // rounded to). A grid cell is the same for every point inside it, so only the
+        // cell leaves the machine; the exact point stays local (point-in-polygon). The
+        // cell always holds the point, so every alert covering it still comes back.
+        var c = alertCellDeg;
+        var latMin = Math.floor(lat / c) * c;
+        var lonMin = Math.floor(lon / c) * c;
         var gen = ++root._alertGen;   // this fetch's id; a newer one supersedes it
-        var d = alertBoxDeg;
         var url = "https://alerts.kde.org/alert/area"
-                + "?min_lat=" + Math.max(-90,  lat - d).toFixed(3)
-                + "&max_lat=" + Math.min(90,   lat + d).toFixed(3)
-                + "&min_lon=" + Math.max(-180, lon - d).toFixed(3)
-                + "&max_lon=" + Math.min(180,  lon + d).toFixed(3);
+                + "?min_lat=" + Math.max(-90,  latMin).toFixed(3)
+                + "&max_lat=" + Math.min(90,   latMin + c).toFixed(3)
+                + "&min_lon=" + Math.max(-180, lonMin).toFixed(3)
+                + "&max_lon=" + Math.min(180,  lonMin + c).toFixed(3);
         var xhr = new XMLHttpRequest();
         xhr.timeout = 8000;   // don't hang on a half-up route at boot (see fetchWeather)
         xhr.ontimeout = function () { if (gen === root._alertGen) root.weatherAlerts = []; };
@@ -1753,47 +1822,92 @@ PlasmoidItem {
             var ids;
             try { ids = JSON.parse(xhr.responseText) || []; }
             catch (e) { root.weatherAlerts = []; return; }
-            if (!ids.length) { root.weatherAlerts = []; return; }
-            root._fetchAlertDetails(ids.slice(0, 12), gen);   // cap to keep it polite
+            if (!ids.length) { root.weatherAlerts = []; root._alertCache = {}; return; }
+            // The list is in no particular order (not by date), so a cap cuts alerts at
+            // random — it was 12, and one storm can put dozens in a cell: Bare Weather
+            // counted 41 in one over Brussels (KMI sends one per province per update).
+            ids = ids.slice(0, root.alertCap);
+            var keep = {};
+            ids.forEach(function (id) { keep[id] = true; });
+            for (var id in root._alertCache) if (!keep[id]) delete root._alertCache[id];   // gone from the list
+            root._fetchAlertDetails(ids, gen);
         };
         xhr.open("GET", url);
         xhr.send();
     }
-    // pull each CAP alert by id, parse, and publish once the whole batch is in
+    // Pull each CAP alert by id, parse, and publish once the whole batch is in. An alert
+    // never changes under its id (an update or cancel arrives as a NEW alert), so one
+    // already read is answered from _alertCache and a refresh downloads only the new
+    // ids. Downloads run alertParallel at a time: all at once, the 8 s timeout (which
+    // starts at send) also counted the wait in line, and a big batch on a slow link
+    // lost its last alerts silently.
     function _fetchAlertDetails(ids, gen) {
-        var results = [], pending = ids.length;
-        for (var k = 0; k < ids.length; ++k) {
-            var x = new XMLHttpRequest();
+        var results = [], todo = [];
+        ids.forEach(function (id) {
+            if (id in root._alertCache) { var hit = root._alertCache[id]; if (hit) results.push(hit); }
+            else todo.push(id);
+        });
+        function publish() {
+            var shown = root._newestVersions(results);
+            root.weatherAlerts = shown;
+            root._notifyNewAlerts(shown);
+        }
+        var pending = todo.length, next = 0;
+        if (!pending) { publish(); return; }
+        function start() {
+            if (gen !== root._alertGen || next >= todo.length) return;
+            var id = todo[next++], x = new XMLHttpRequest(), fin = false;
             // a hung detail would never decrement `pending`, so results never
             // publish — time it out and count it as a skipped (failed) detail.
-            var settle = (function (xhr, id) {
-                var fin = false;
-                return function (use) {
-                    if (fin || gen !== root._alertGen) return;   // superseded/done → drop
-                    fin = true;
-                    if (use && xhr.status === 200) {
-                        var a = root._parseCapAlert(xhr.responseText);
-                        // store the FULL set; the minimum-severity filter is applied at
-                        // display time (displayAlerts) so the level can change live
-                        if (a) { a.id = id; results.push(a); }
-                    }
-                    if (--pending === 0 && gen === root._alertGen) {
-                        root.weatherAlerts = results;
-                        root._notifyNewAlerts(results);
-                    }
-                };
-            })(x, ids[k]);
+            function settle(use) {
+                if (fin || gen !== root._alertGen) return;   // superseded/done → drop
+                fin = true;
+                if (use && x.status === 200) {
+                    var a = root._parseCapAlert(x.responseText);
+                    if (a) a.id = id;
+                    // null too: "not one to show here" is worth remembering. Failures
+                    // are not cached, so they retry on the next refresh.
+                    root._alertCache[id] = a;
+                    // store the FULL set; the minimum-severity filter is applied at
+                    // display time (displayAlerts) so the level can change live
+                    if (a) results.push(a);
+                }
+                if (--pending === 0) publish();
+                else start();
+            }
             x.timeout = 8000;
-            x.ontimeout = (function (fn) { return function () { fn(false); }; })(settle);
-            x.onreadystatechange = (function (xhr, fn) { return function () {
-                if (xhr.readyState !== XMLHttpRequest.DONE) return;
-                fn(true);
-            }; })(x, settle);
+            x.ontimeout = function () { settle(false); };
+            x.onreadystatechange = function () {
+                if (x.readyState !== XMLHttpRequest.DONE) return;
+                settle(true);
+            };
             // no trailing slash: /alert/{id} 301-redirects to the raw CAP file
             // (QML XHR follows the same-origin redirect automatically)
-            x.open("GET", "https://alerts.kde.org/alert/" + encodeURIComponent(ids[k]));
+            x.open("GET", "https://alerts.kde.org/alert/" + encodeURIComponent(id));
             x.send();
         }
+        for (var k = 0; k < Math.min(root.alertParallel, todo.length); ++k) start();
+    }
+    // Agencies re-send a warning on every update, and the copies linger until they
+    // expire (KMI/Belgium: 7 of one rain warning). So of the alerts with the same event
+    // and headline whose times overlap, only the newest <sent> stays. Overlapping only:
+    // DWD's headline doesn't name the place or the night ("Amtliche WARNUNG vor
+    // FROST"), and tonight's frost must not hide behind tomorrow night's.
+    function _newestVersions(list) {
+        // an alert's time: from its onset (else when it was sent) until it expires
+        // (open-ended without an <expires>)
+        function from(a)  { return new Date(a.starts).getTime() || a.sent; }
+        function until(a) { return new Date(a.expires).getTime() || Infinity; }
+        var byNewest = list.slice().sort(function (a, b) { return b.sent - a.sent; });
+        var kept = [];
+        byNewest.forEach(function (a) {
+            var superseded = kept.some(function (k) {
+                return k.event === a.event && k.headline === a.headline
+                    && from(a) < until(k) && from(k) < until(a);
+            });
+            if (!superseded) kept.push(a);
+        });
+        return list.filter(function (a) { return kept.indexOf(a) >= 0; });
     }
     // ── Alert notifications ───────────────────────────────────────────────
     // "Notify about new alerts" (General): every alert the widget shows goes to
@@ -1884,6 +1998,11 @@ PlasmoidItem {
         var m = s.match(new RegExp("<" + tag + "\\b[^>]*>([\\s\\S]*?)<\\/" + tag + ">"));
         return m ? root._xmlUnescape(m[1].trim()) : "";
     }
+    // value of a CAP <parameter> by name ("" if absent)
+    function _capParam(s, name) {
+        var m = s.match(new RegExp("<valueName>" + name + "</valueName>\\s*<value>([\\s\\S]*?)</value>", "i"));
+        return m ? root._xmlUnescape(m[1].trim()) : "";
+    }
     // ray-cast point-in-polygon. polyStr is a CAP <polygon> ("lat,lon lat,lon …").
     // Runs locally on our exact config coords — nothing is sent.
     function _pointInRing(lon, lat, polyStr) {
@@ -1897,6 +2016,13 @@ PlasmoidItem {
         return c;
     }
     function _parseCapAlert(xml) {
+        // Only real warnings: not a test or an exercise (<status>), and not a
+        // cancellation — the server keeps a Cancel message as an alert of its own
+        // (DWD sends them), which shown would read as the warning it calls off.
+        var status = root._capTag(xml, "status");
+        if (status && status !== "Actual") return null;
+        var msgType = root._capTag(xml, "msgType");
+        if (msgType && msgType !== "Alert" && msgType !== "Update") return null;
         var infos = xml.match(/<info\b[\s\S]*?<\/info>/g);
         if (!infos || !infos.length) return null;
         var want = Qt.locale().name.substring(0, 2).toLowerCase();
@@ -1921,10 +2047,17 @@ PlasmoidItem {
             if (!inAny) return null;
         }
         var ev = root._capTag(blk, "event");
+        // Some senders tag their lowest "green / no action" level Moderate in <severity>
+        // (KMI Belgium's awareness_level "1; Green; Minor", GDACS's alertlevel "Green"),
+        // which would headline it as a real warning. Trust the colour: green → Minor.
+        var green = /^(1;|green\b)/i.test(root._capParam(blk, "awareness_level") || root._capParam(blk, "alertlevel"));
         return {
+            sent:        new Date(root._capTag(xml, "sent")).getTime() || 0,   // top-level; ms, for _newestVersions
             event:       ev,
-            severity:    root._capTag(blk, "severity") || "Unknown",
+            severity:    green ? "Minor" : (root._capTag(blk, "severity") || "Unknown"),
+            urgency:     root._capTag(blk, "urgency"),
             headline:    root._capTag(blk, "headline") || ev,
+            starts:      root._capTag(blk, "onset") || root._capTag(blk, "effective") || "",   // for _newestVersions
             ends:        root._capTag(blk, "expires") || root._capTag(blk, "onset") || "",
             expires:     root._capTag(blk, "expires") || "",   // real CAP <expires>, for the expiry filter (ends may fall back to onset)
             description: root._capTag(blk, "description") || "",
@@ -2384,6 +2517,11 @@ PlasmoidItem {
         function onLatitudeChanged()        { root.fetchWeather(); root.weatherAlerts = []; alertsDebounce.restart(); }
         function onLongitudeChanged()       { root.fetchWeather(); root.weatherAlerts = []; alertsDebounce.restart(); }
         function onWeatherProviderChanged() { root.fetchWeather(); }
+        // only Open-Meteo's requests name a model; fetched once the provider above
+        // has taken the new one
+        function onOpenMeteoModelChanged() {
+            if (root.providerId === "openmeteo") Qt.callLater(root.fetchWeather);
+        }
         // the offset feeds straight into a met.no request — a new zone means the
         // forecast has to be rebuilt on the new clock
         function onLocationTimezoneChanged() { root.fetchWeather(); }
@@ -2555,6 +2693,29 @@ PlasmoidItem {
         function _win() {
             if (Plasmoid.formFactor === PlasmaCore.Types.Planar) return null;
             return fullRep.Window.window;
+        }
+
+        // The popup's background, faded by Background transparency (the desktop's
+        // frame is root.desktopFrame). Plasma's popup window draws it as an item of its
+        // own beside the popup's content (mainItem) — the only other child of the
+        // window's content. Only in a popup made for this widget (appletInterface):
+        // embedded on the desktop this item's window is the desktop's, and in the
+        // system tray the popup is the tray's, shared with its other widgets. A desktop
+        // widget too small for its full view gets a popup of its own too, faded the same.
+        readonly property Item _popupBackground: {
+            var win = fullRep.Window.window;
+            if (!win || win.appletInterface !== root || !win.mainItem) return null;
+            var kids = win.contentItem.children;
+            for (var i = 0; i < kids.length; ++i)
+                if (kids[i] !== win.mainItem) return kids[i];
+            return null;
+        }
+        Binding {
+            target: fullRep._popupBackground
+            when: fullRep._popupBackground !== null
+            property: "opacity"
+            value: root.backgroundOpacity
+            restoreMode: Binding.RestoreBindingOrValue
         }
 
         // The view's minimum size. A saved size can be under it — the Detailed view

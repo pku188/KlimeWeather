@@ -23,11 +23,34 @@ Item {
     property int leadDay: 0
     property int chosenDay: -1
     readonly property int selectedDay: (chosenDay >= 0 && chosenDay < dayTabsRep.count) ? chosenDay : leadDay
-    // hour whose card the pointer is over, so the header's instantaneous metrics
-    // (cloud, humidity, UV, feels, wind) track it like the graph scrubs — null when
-    // not hovering, so they fall back to the current reading. Day-based metrics
-    // (precip/snow totals, sun) keep following selectedDay regardless.
+    // hour whose card the pointer is over, so the header's Weather Elements read it
+    // like the graph scrubs: its hour, and for the day-based ones (precip/snow totals,
+    // sun, high/low) its day. null when not hovering, so they fall back to the active
+    // card's hour and the selected day.
     property var hoveredHourSample: null
+    // Timeline index of the entry at the strip's left edge.
+    readonly property int leadEntry: leadingEntry(hourlyFlick.contentX)
+    // The active card: the hour the Weather Elements read when no card is hovered.
+    // The card at the strip's left edge, as the graph reads the hour its window starts
+    // at, so scrolling the cards moves the elements through the hours too — unscrolled,
+    // the current hour. With a day picked that the strip can't bring to its edge (the
+    // last ones), the card that day opens on instead, so the hour and the day-based
+    // elements speak of the same day.
+    // While the strip scrolls to a picked day, the card it lands on, from the start:
+    // following the edge there walked the hour-based elements through every hour it
+    // passed (the Date element's icon through the times of day), where the day-based
+    // ones change once.
+    readonly property var activeHourSample: {
+        var tl = timeline;
+        if (!tl.length || !weatherRoot) return null;
+        var edge = (chosenDay >= 0 && scrollAnim.running) ? leadingEntry(scrollAnim.to) : leadEntry;
+        var i = Math.max(0, Math.min(tl.length - 1, edge));
+        if (chosenDay >= 0 && weatherRoot.dayIndexForDate(tl[i].date) !== selectedDay)
+            i = leadingEntry(dayCardX(selectedDay));
+        // a day divider stands for the day it opens: that day's first card
+        while (i < tl.length - 1 && tl[i].dayBreak) ++i;
+        return tl[i].dayBreak ? null : tl[i];
+    }
 
     // Uniform padding around the whole popup
     readonly property int pad: Math.round(Kirigami.Units.gridUnit * 0.85)
@@ -491,13 +514,13 @@ Item {
                 weatherRoot: full.weatherRoot
                 toolbar: toolbar
                 metrics: full.weatherRoot ? full.weatherRoot.headerMetrics : []
-                selectedDay: full.selectedDay
-                // the hovered card while the pointer is over the strip, else the CURRENT
-                // hour's sample — so with nothing hovered the elements read "now" the way
-                // the cards do (the current-hour forecast), not the slightly different
-                // live block
-                sample: full.hoveredHourSample
-                        || (full.weatherRoot ? full.weatherRoot.currentHourSample : null)
+                // the hovered card's day while the pointer is over the strip, else the
+                // selected one
+                selectedDay: full.hoveredHourSample && full.weatherRoot
+                             ? full.weatherRoot.dayIndexForDate(full.hoveredHourSample.date) : full.selectedDay
+                // the hovered card while the pointer is over the strip, else the active
+                // card (the current hour's until the strip is scrolled)
+                sample: full.hoveredHourSample || full.activeHourSample
                 // what the header can be handed: any hourly card, any day tab
                 readingHours: full.timeline
                 readingDays: dayTabsRep.count

@@ -57,6 +57,10 @@ Kirigami.Icon {
         id: tip
         parent: indicator
         delay: 0   // timing is handled by the timers above
+        // No fades: the timers above already pace it, and a re-show in the middle of
+        // the style's fade-out left the box stuck half transparent.
+        enter: null
+        exit: null
         // The popup sizes itself to the content's IMPLICIT size, so cap the wrapper:
         // width caps the wrap, height caps the box — a long alert scrolls inside the
         // ScrollView (wheel works because the pointer is over the hovered tooltip)

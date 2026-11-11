@@ -13,9 +13,20 @@
          saved locations are plain coordinates, so every one of them works with
          every provider and switching providers never asks for a location twice.
          Must match a key in main.qml's `providers` registry; an unknown value
-         falls back to openmeteo. -->
+         falls back to openmeteo. Open-Meteo by default: hourly all week, and its
+         best match picks a fine regional model for the location; met.no turns to
+         6-hour blocks after about two days. KConfig keeps no value equal to the
+         default, so every widget on met.no (picked or not) followed the old default,
+         and moves to Open-Meteo with it. -->
     <entry name="weatherProvider" type="String">
-      <default>metno</default>
+      <default>openmeteo</default>
+    </entry>
+    <!-- The forecast model Open-Meteo is asked for, by its models= name, from the
+         list in providers/OpenMeteo.qml (Settings → General). best_match is
+         Open-Meteo's own pick for the location; whatever another model leaves out is
+         filled in from it. Only read while Open-Meteo is the provider. -->
+    <entry name="openMeteoModel" type="String">
+      <default>best_match</default>
     </entry>
     <entry name="latitude" type="Double">
       <default>0</default>
@@ -99,14 +110,14 @@
       <default>false</default>
     </entry>
     <!-- up to 4 metrics shown in the DETAILED layout header next to the temperature -->
-    <entry name="headerMetric1" type="String"><default>sun</default></entry>
-    <entry name="headerMetric2" type="String"><default>precipSum</default></entry>
-    <entry name="headerMetric3" type="String"><default>none</default></entry>
+    <entry name="headerMetric1" type="String"><default>date</default></entry>
+    <entry name="headerMetric2" type="String"><default>sun</default></entry>
+    <entry name="headerMetric3" type="String"><default>precipSum</default></entry>
     <entry name="headerMetric4" type="String"><default>none</default></entry>
     <!-- independent header metrics for the SIMPLE layout -->
-    <entry name="simpleHeaderMetric1" type="String"><default>uv</default></entry>
-    <entry name="simpleHeaderMetric2" type="String"><default>precipSum</default></entry>
-    <entry name="simpleHeaderMetric3" type="String"><default>none</default></entry>
+    <entry name="simpleHeaderMetric1" type="String"><default>date</default></entry>
+    <entry name="simpleHeaderMetric2" type="String"><default>uv</default></entry>
+    <entry name="simpleHeaderMetric3" type="String"><default>precipSum</default></entry>
     <entry name="simpleHeaderMetric4" type="String"><default>none</default></entry>
     <entry name="hourlyMetric1" type="String"><default>wind</default></entry>
     <entry name="hourlyMetric2" type="String"><default>precipAmt</default></entry>
@@ -131,9 +142,9 @@
       <default>true</default>
     </entry>
     <!-- minimum alert severity to display (CAP rank): 1 Minor, 2 Moderate,
-         3 Severe, 4 Extreme. Default 2 = Moderate+ (Minor/Unknown filtered) -->
+         3 Severe, 4 Extreme. Default 1 = Minor+ (Minor/Unknown filtered) -->
     <entry name="minAlertSeverity" type="Int">
-      <default>2</default>
+      <default>1</default>
     </entry>
     <!-- send each new alert the widget shows to Plasma's notifications, once -->
     <entry name="alertNotifications" type="Bool">
@@ -141,6 +152,12 @@
     </entry>
     <entry name="keepOpen" type="Bool">
       <default>false</default>
+    </entry>
+    <!-- How see-through the widget's background is, in percent: the popup's on a
+         panel, and on the desktop the frame "Show Background" adds. 0 leaves the
+         theme's background as it is. -->
+    <entry name="backgroundTransparency" type="Int">
+      <default>0</default>
     </entry>
     <entry name="heroIconSize" type="Int">
       <default>64</default>
