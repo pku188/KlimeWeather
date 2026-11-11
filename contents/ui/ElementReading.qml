@@ -33,7 +33,10 @@ Row {
             required property var modelData
             spacing: reading.innerSpacing
             anchors.verticalCenter: parent ? parent.verticalCenter : undefined
+            // a part about the weather itself (the "Weather and temperature" element)
+            readonly property var weather: modelData.weather || null
             ReadingIcon {
+                visible: !part.weather
                 anchors.verticalCenter: parent.verticalCenter
                 weatherRoot: reading.weatherRoot
                 name: part.modelData.icon
@@ -42,6 +45,24 @@ Row {
                 opacity: reading.coloredIcons ? 1 : reading.iconOpacity
                 fontPx: reading.fontPx
                 slotWidth: reading.iconSlot
+            }
+            // …shows the condition in the weather icon pack, in the same slot and, as a
+            // reading icon, taller than the line it overflows
+            Item {
+                visible: !!part.weather
+                anchors.verticalCenter: parent.verticalCenter
+                readonly property int boxSize: Math.round(reading.fontPx * 1.8)
+                implicitWidth: reading.iconSlot > 0 ? reading.iconSlot : boxSize
+                implicitHeight: reading.fontPx
+                ConditionIcon {
+                    anchors.centerIn: parent
+                    width: parent.boxSize
+                    height: width
+                    weatherRoot: reading.weatherRoot
+                    code: part.weather ? part.weather.code : -1
+                    day: part.weather ? part.weather.day : 1
+                    cloud: part.weather ? part.weather.cloud : NaN
+                }
             }
             Text {
                 anchors.verticalCenter: parent.verticalCenter

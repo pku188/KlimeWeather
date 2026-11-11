@@ -9,6 +9,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasmoid
+import "providers"
 
 Kirigami.FormLayout {
     id: page
@@ -26,6 +27,10 @@ Kirigami.FormLayout {
     property int    cfg_clockFormat
     property bool   cfg_use24Hour             // the older checkbox, read only while clockFormat was never chosen
     property int    cfg_detailDayStartHour
+    property string cfg_openMeteoModel
+
+    // Open-Meteo's forecast models, as its provider lists them
+    readonly property OpenMeteo openMeteo: OpenMeteo {}
 
     // What "Follow system" resolves to, shown in its brackets. The same rules as
     // main.qml's units, windUnitApi, pressureUnitApi, precipImperial and use24Hour —
@@ -70,6 +75,7 @@ Kirigami.FormLayout {
     }
     // the lists pick their entry from cfg_ values only when asked
     function syncControls() {
+        modelCombo.sync();
         alertLevelCombo.sync();
         unitCombo.sync();
         windUnitCombo.sync();
@@ -90,6 +96,20 @@ Kirigami.FormLayout {
         from: 1
         to: 180
         stepSize: 5
+    }
+    ConfigComboBox {
+        id: modelCombo
+        Kirigami.FormData.label: i18n("Open-Meteo model:")
+        textRole: "text"
+        model: page.openMeteo.models
+        function sync() {
+            currentIndex = 0;   // Best match, also for a name no longer listed
+            for (var i = 0; i < model.length; ++i)
+                if (model[i].id === page.cfg_openMeteoModel) { currentIndex = i; break; }
+        }
+        Component.onCompleted: sync()
+        onActivated: page.cfg_openMeteoModel = model[currentIndex].id
+        ToolTip.text: i18n("The forecast model Open-Meteo uses. Best match picks the best models for your location. A national weather service's model can be more precise in and around its country. Whatever a model doesn't forecast, such as the UV index, the days beyond its range or places outside its area, is filled in from Best match. Used while Open-Meteo is the weather source.")
     }
     RowLayout {
         Kirigami.FormData.label: i18n("Weather alerts:")
