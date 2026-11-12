@@ -74,13 +74,16 @@ as a custom folder.
 The icons drawn before a reading — the Weather Elements' icon style, the panel's
 readings, the hourly cards' readouts, the graph's sunrise and sunset and the Detailed
 view — and the ones the settings list the elements with, from
-**`@meteocons/svg-static` 0.1.0**, static, in three styles: `flat/<name>.svg` and
-the line set as `line.js`, the Element icon pack's two for "Use colored icons", and
-the monochrome set as `monochrome.js` — `line.js` and `monochrome.js` SVG strings
-drawn in `currentColor` that the widget recolours to the theme's text colour: the
-whole of a monochrome icon, and the neutral greys of a line icon (its near-black
-barometer and "UV", its near-white cloud and wind), which on one theme or the other
-vanished.
+**`@meteocons/svg-static` 0.1.0**, static, in three styles: the flat set as
+`flat/<name>.svg` and `flat.js` and the line set as `line.js`, the Element icon
+pack's two for "Use colored icons", and the monochrome set as `monochrome.js` —
+`flat.js`, `line.js` and `monochrome.js` SVG strings drawn in `currentColor` that the
+widget recolours to the theme's text colour: the whole of a monochrome icon, the
+neutral greys of a line icon (its near-black barometer and "UV", its near-white cloud
+and wind) and the neutral lines of a flat icon (its near-black horizons, "UV", "zz"
+and umbrella handle, its near-white wind and dashed moon outline), which on one theme
+or the other vanished. The `flat/` files are as drawn: the template for a custom
+folder, and what shows when a custom folder lacks an icon.
 Built by `tools/icon-pipeline/meteocons_packs.py --readings`: masks as above, and
 in the monochrome set the artwork painted white (humidity's "%", the umbrella's lit
 panel) cut out of the icon, so it shows the background as any symbolic icon does,

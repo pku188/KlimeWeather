@@ -20,6 +20,7 @@ import "providers"
 import "providers/grid.js" as Grid
 import "../icons/meteocons/readings/monochrome.js" as MonoReadings
 import "../icons/meteocons/readings/line.js" as LineReadings
+import "../icons/meteocons/readings/flat.js" as FlatReadings
 import "panelelements.js" as PanelElements
 import "detailedelements.js" as DetailedElements
 import "moon.js" as Moon
@@ -959,10 +960,17 @@ PlasmoidItem {
         return ["meteocons-flat", "meteocons-line", "custom"].indexOf(p) >= 0 ? p : "meteocons-flat";
     }
     readonly property string readingIconDir: (Plasmoid.configuration.readingIconDir || "").replace(/\/+$/, "")
-    function readingIconFlat(name) { return Qt.resolvedUrl("../icons/meteocons/readings/flat/" + name + ".svg"); }
+    // Meteocons' flat icon `name`, its neutral lines (the horizons, "UV", the wind, …)
+    // in `tint` — drawn as they are, nearly black or nearly white, one theme or the
+    // other lost them (see flat.js) — else the file as drawn.
+    function readingIconFlat(name, tint) {
+        if (FlatReadings.svg[name])
+            return _tintedIcon("flat|" + name + "|", FlatReadings.svg[name], tint || Kirigami.Theme.textColor);
+        return Qt.resolvedUrl("../icons/meteocons/readings/flat/" + name + ".svg");
+    }
     // The icon `name` as an Image source (ReadingImage): in colour the Element icon
-    // pack's — a file, or Meteocons' line style with its greys in `tint` — else the
-    // monochrome one drawn in `tint`. The tinted ones are their SVG with the colour
+    // pack's — a file, or Meteocons' flat or line style with its greys in `tint` — else
+    // the monochrome one drawn in `tint`. The tinted ones are their SVG with the colour
     // swapped in, as a data URL, so every copy at a size shares one rendering (Qt's
     // pixmap cache keys on the URL), built once per icon and colour. `lighter`: the
     // Detailed view's, larger than the rest — the monochrome line icons less bold and
@@ -980,11 +988,11 @@ PlasmoidItem {
         if (!name) return "";
         if (colored) {
             if (readingIconPack === "custom")
-                return readingIconDir ? readingIconDir + "/" + name + ".svg" : readingIconFlat(name);
+                return readingIconDir ? readingIconDir + "/" + name + ".svg" : readingIconFlat(name, tint);
             if (readingIconPack === "meteocons-line" && LineReadings.svg[name])
                 return lighter ? _tintedIcon("line-lighter|" + name + "|", LineReadings.lighter[name], tint)
                                : _tintedIcon("line|" + name + "|", LineReadings.svg[name], tint);
-            return readingIconFlat(name);
+            return readingIconFlat(name, tint);
         }
         var light = !!lighter && !!MonoReadings.lighter[name];
         var svg = light ? MonoReadings.lighter[name] : MonoReadings.svg[name];

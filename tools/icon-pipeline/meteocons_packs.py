@@ -21,6 +21,7 @@ the colour ones ("Use colored icons", from the Element icon pack), and
 monochrome, tinted to the theme's text colour:
 
     contents/icons/meteocons/readings/flat/<name>.svg
+    contents/icons/meteocons/readings/flat.js
     contents/icons/meteocons/readings/line.js
     contents/icons/meteocons/readings/monochrome.js
 
@@ -32,6 +33,15 @@ nearly white — so on a dark or a light theme some of it vanished. Its set
 its colours stay as drawn. Its lines come twice, as the monochrome set's do: a
 little bolder for the small icons (LINE_WEIGHT), and as drawn for the Detailed
 view (`lighter`), whose icons are larger.
+
+The flat style draws a few lines in neutral greys too — the horizon under a rising
+or setting sun or moon, the "UV", the night's "zz" and the umbrella's handle nearly
+black, the wind and the dashed outline of the moon's dark part nearly white — which
+vanished on a dark or a light theme. Its set (flat.js) has those greys (FLAT_INK)
+in currentColor, drawn in the theme's text colour as the line style's are; its
+colours and its solid neutral shapes (the clouds, the barometer's dial) stay as
+drawn. The flat/ files stay as drawn: the template for a custom folder, and what
+shows when a custom folder lacks an icon.
 
 The monochrome set is a JavaScript module of SVG strings drawn in currentColor:
 the widget swaps in the theme's colour and hands Image the result as a data URL,
@@ -125,6 +135,12 @@ READING_STYLES = ("monochrome", "flat", "line")
 # The line style's neutral greys (see the module's docstring): drawn in the theme's
 # text colour (currentColor) instead.
 LINE_INK = {"#1E293B", "#202939", "#475569", "#71717A", "#D6DFE9", "#E2E8F0", "#E6EFFC"}
+# The flat style's neutral lines (see the module's docstring), drawn in the theme's text
+# colour: the horizon lines, "UV", "zz" (#202939), the umbrella's handle (#71717A), the
+# wind and the moon's dashed outline (#E2E8F0). Not its solid shapes in neutral colours,
+# which read on either theme: the clouds (#E6EFFC), the barometer's dial (#334155,
+# #475569, #64748B), the umbrella's lit panel (#F1F5F9).
+FLAT_INK = {"#202939", "#71717A", "#E2E8F0"}
 # How much wider the line style's lines are in its small icons (the header, the hourly
 # cards, the panel, the graph's sunrise and sunset), in units of the 128-unit box: at
 # 2 the humidity drop's "%" and the snowflake's branches began to run together.
@@ -414,9 +430,9 @@ def bolden(root, delta):
             el.set("stroke-linejoin", "round")
 
 
-def ink_to_current(root):
-    """Paint the line style's greys (LINE_INK) in currentColor, outside masks and clip
-    paths, whose colours are geometry."""
+def ink_to_current(root, ink=LINE_INK):
+    """Paint a style's greys (LINE_INK, FLAT_INK) in currentColor, outside masks and
+    clip paths, whose colours are geometry."""
     defined = set()
     for tag in ("mask", "clipPath"):
         for d in root.iter("{%s}%s" % (SVG, tag)):
@@ -425,7 +441,7 @@ def ink_to_current(root):
         if el in defined:
             continue
         for attr in ("fill", "stroke", "stop-color"):
-            if (el.get(attr) or "").upper() in LINE_INK:
+            if (el.get(attr) or "").upper() in ink:
                 el.set(attr, "currentColor")
 
 
@@ -456,7 +472,7 @@ def drop_label(root):
 def build_readings(src_static, out):
     dest = os.path.join(out, "readings")
     os.makedirs(os.path.join(dest, "flat"), exist_ok=True)
-    mono, lighter, line, line_lighter = {}, {}, {}, {}
+    mono, lighter, line, line_lighter, flat = {}, {}, {}, {}, {}
     for style in READING_STYLES:
         for name in READINGS:
             path = os.path.join(src_static, style, name + ".svg")
@@ -466,6 +482,8 @@ def build_readings(src_static, out):
                 drop_label(tree.getroot())
             if style == "flat":
                 tree.write(os.path.join(dest, "flat", name + ".svg"), encoding="unicode")
+                ink_to_current(tree.getroot(), FLAT_INK)
+                flat[name] = ET.tostring(tree.getroot(), encoding="unicode")
             elif style == "line":
                 ink_to_current(tree.getroot())
                 line_lighter[name] = ET.tostring(tree.getroot(), encoding="unicode")
@@ -514,7 +532,21 @@ def build_readings(src_static, out):
         for name in READINGS:
             js.write("    %s: %s,\n" % (json.dumps(name), json.dumps(line_lighter[name])))
         js.write("};\n")
-    print("wrote %d reading icons: flat, line.js and monochrome.js, to %s" % (len(READINGS), dest))
+    write_flat_js(dest, flat)
+    print("wrote %d reading icons: flat, flat.js, line.js and monochrome.js, to %s" % (len(READINGS), dest))
+
+
+def write_flat_js(dest, flat):
+    with open(os.path.join(dest, "flat.js"), "w") as js:
+        js.write(".pragma library\n"
+                 "// Meteocons' flat reading icons (MIT, see ../ATTRIBUTION.md), for the Element\n"
+                 "// icon pack's \"Meteocons (flat)\": their neutral lines in currentColor, which\n"
+                 "// the widget swaps for the theme's text colour, the rest as drawn (flat/).\n"
+                 "// Generated by tools/icon-pipeline/meteocons_packs.py --readings; edit that, not this.\n"
+                 "var svg = {\n")
+        for name in READINGS:
+            js.write("    %s: %s,\n" % (json.dumps(name), json.dumps(flat[name])))
+        js.write("};\n")
 
 
 if __name__ == "__main__":

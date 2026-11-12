@@ -1,7 +1,7 @@
 /*
  * A reading's icon as an Image (main.qml readingIcon): in colour, the Element icon
- * pack's (Appearance → Common) — Meteocons' flat style, its line style with its greys
- * drawn in `tint`, or the user's own folder — else Meteocons' monochrome one drawn in
+ * pack's (Appearance → Common) — Meteocons' flat or line style with its greys drawn
+ * in `tint`, or the user's own folder — else Meteocons' monochrome one drawn in
  * `tint`. An icon the custom folder doesn't have shows Meteocons' flat one instead of
  * nothing.
  * Copyright 2026  pku188 — SPDX-License-Identifier: GPL-2.0-or-later
@@ -24,5 +24,5 @@ Image {
     onStatusChanged: if (status === Image.Error && colored && !_missing) _missing = true
 
     sourceSize: Qt.size(width, height)
-    source: _missing && weatherRoot ? weatherRoot.readingIconFlat(name) : wanted
+    source: _missing && weatherRoot ? weatherRoot.readingIconFlat(name, tint) : wanted
 }
