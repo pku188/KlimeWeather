@@ -86,7 +86,12 @@ Item {
     // Resolution is per HOUR regardless of zoom: samples are hourly even in the
     // day view where only every second hour carries a label, so the hours between
     // labels scrub too.
-    property var hoveredSample: null
+    // Worked out from where the pointer is (hoverX: an x in the graph area, NaN off
+    // it), not set when it moves: the graph also slides under a pointer that holds
+    // still (a wheel notch, a touchpad scroll, a flick's glide), and the hour under it
+    // changes then too.
+    property real hoverX: NaN
+    readonly property var hoveredSample: isNaN(hoverX) ? null : sampleAtX(hoverX)
     function sampleAtX(px) {
         if (!samples.length || plotW <= 0) return null;
         // inverse of hourX(): x = edgeInset + (g - hourPos + 0.5) * colW
@@ -1770,8 +1775,12 @@ Item {
                     startX = m.x;
                     velocity = 0; lastT = Date.now();
                     simple.dragging = true;
+                    simple.hoverX = m.x;
                 }
+                // The hover area above hears nothing while a button is held, so the
+                // pointer's place comes from here during a drag: the hour it holds.
                 onPositionChanged: (m) => {
+                    simple.hoverX = m.x;
                     if (!simple.dragging) return;
                     var now = Date.now(), dt = Math.max(1, now - lastT);
                     var hourW = simple.colW;
@@ -1781,7 +1790,11 @@ Item {
                     simple.hourPos = newH;
                     lastT = now;
                 }
-                onReleased: () => { simple.dragging = false; simple.flickTo(velocity); }
+                onReleased: () => {
+                    simple.dragging = false;
+                    if (!containsMouse) simple.hoverX = NaN;   // let go off the graph
+                    simple.flickTo(velocity);
+                }
                 onCanceled: () => { simple.dragging = false; }
             }
 
@@ -2507,9 +2520,9 @@ Item {
                 anchors.fill: parent
                 acceptedButtons: Qt.NoButton
                 hoverEnabled: true
-                onPositionChanged: (m) => { simple.hoveredSample = simple.sampleAtX(m.x); }
-                onExited: simple.hoveredSample = null
-                onContainsMouseChanged: if (!containsMouse) simple.hoveredSample = null
+                onPositionChanged: (m) => { simple.hoverX = m.x; }
+                onExited: simple.hoverX = NaN
+                onContainsMouseChanged: if (!containsMouse) simple.hoverX = NaN
             }
         }
     }
