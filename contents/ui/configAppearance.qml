@@ -384,7 +384,7 @@ Item {
                                     if (model[i].id === page.cfg_readingIconPack) { currentIndex = i; break; }
                             }
                             onActivated: page.cfg_readingIconPack = model[currentIndex].id
-                            ToolTip.text: i18n("The icons of the Weather Elements wherever they are colored: in the header, on the hourly cards, in the Detailed view, on the panel and at the Weather graph's sunrise and sunset. Each of those has its own \"Use colored icons\"; without it, the icons are monochrome.")
+                            ToolTip.text: i18n("The icons of the Weather Elements wherever they are colored: in the header, on the hourly cards, in the Detailed view, on the panel and at the Weather graph's sunrise and sunset. The \"Weather and temperature\" element takes its weather icons too, and so does the panel's weather icon when the Weather icon pack is monochrome. Each of those has its own \"Use colored icons\"; without it, the icons are monochrome.")
                         }
                         RowLayout {
                             Kirigami.FormData.label: i18n("Custom folder:")
@@ -412,7 +412,7 @@ Item {
                             wrapMode: Text.WordWrap
                             font: Kirigami.Theme.smallFont
                             opacity: 0.7
-                            text: i18n("Folder with SVGs named like the bundled set (thermometer.svg, humidity.svg, wind.svg, …); an icon missing from it shows Meteocons' flat one. Tip: copy contents/icons/meteocons/readings/flat/ as a starting point, then edit.")
+                            text: i18n("Folder with SVGs named like the bundled set (thermometer.svg, humidity.svg, wind.svg, …); an icon missing from it shows Meteocons' flat one. Weather icons named as the Weather icon pack's (wi-day-sunny.svg, …) are optional: without them, the \"Weather and temperature\" element shows the Weather icon pack's, and the panel's weather icon Meteocons' line one. Tip: copy contents/icons/meteocons/readings/flat/ as a starting point, then edit.")
                         }
                         ConfigComboBox {
                             id: animationCombo
@@ -1201,7 +1201,7 @@ Item {
                                 text: i18n("Use colored icons")
                                 enabled: page.panelShowsIcon || page.panelShowsReading
                                 ToolTip.visible: hovered
-                                ToolTip.text: i18n("Colors the weather icon and the icons before the readings.")
+                                ToolTip.text: i18n("Colors the weather icon and the icons before the readings. The weather icon is the Weather icon pack's, or the Element icon pack's when the Weather icon pack is monochrome.")
                             }
                             ConfigSpinBox {
                                 id: panelIconSpin

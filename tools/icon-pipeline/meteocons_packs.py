@@ -9,6 +9,28 @@ monochrome), the few icons the widget uses under its own wi-* stem names:
     contents/icons/meteocons/<style>/static/wi-<stem>.svg
     contents/icons/meteocons/<style>/animated/wi-<stem>.svg
 
+and for the colour styles (fill, flat, line) a second set for light themes, which
+the widget picks when the theme's text is dark:
+
+    contents/icons/meteocons/<style>/light/static/wi-<stem>.svg
+    contents/icons/meteocons/<style>/light/animated/wi-<stem>.svg
+
+Meteocons draws its clouds near-white — fill and flat a white shape, line a white
+ring — and the fog's lines too: made for a dark background, on a light one they all
+but vanished. The light sets outline fill's and flat's white shapes (LIGHT_WHITE)
+in a soft grey, LIGHT_OUTLINE, LIGHT_OUTLINE_WIDTH units wide: a stroked copy of the
+shape drawn just behind it, so the outline lies wholly outside the shape, and moves
+with it — the copy sits in the same group and carries the shape's own animations.
+Line's white rings are drawn in LIGHT_LINE instead (an outline traced both edges of
+a ring and made the cloud a tube), and so are every style's fog lines (LIGHT_FOG):
+a white line outlined read as a hollow bar.
+
+It also writes the still line and monochrome weather icons the widget shows a
+second time, as a JavaScript module of SVG strings, for the panel, which draws them
+bolder than the files (see Weights below; WIDGET_STEMS, WEATHER_JS_STYLES):
+
+    contents/icons/meteocons/weather.js
+
 usage: meteocons_packs.py <svg-package-dir> <svg-static-package-dir> <out-dir>
        meteocons_packs.py --readings <svg-static-package-dir> <out-dir>
        (the package dirs are the extracted tarballs' "package" folders)
@@ -30,31 +52,48 @@ the other — the barometer and the "UV" nearly black, the cloud and the wind
 nearly white — so on a dark or a light theme some of it vanished. Its set
 (line.js, like monochrome.js a module of SVG strings) has those greys
 (LINE_INK) in currentColor, which the widget draws in the theme's text colour;
-its colours stay as drawn. Its lines come twice, as the monochrome set's do: a
-little bolder for the small icons (LINE_WEIGHT), and as drawn for the Detailed
-view (`lighter`), whose icons are larger.
+its colours stay as drawn. Its stroked lines grow with the weight the widget draws
+them at (see Weights below). Its clouds and wind (LINE_AS_WEATHER) are
+drawn as the line weather icons draw them instead, in LINE_WHITE_TOKEN, which the
+widget swaps for LIGHT_LINE on a light theme and LINE_WHITE on a dark one; the
+afternoon's solid cloud becomes the weather icons' ring (LINE_RING units wide).
 
 The flat style draws a few lines in neutral greys too — the horizon under a rising
 or setting sun or moon, the "UV", the night's "zz" and the umbrella's handle nearly
 black, the wind and the dashed outline of the moon's dark part nearly white — which
 vanished on a dark or a light theme. Its set (flat.js) has those greys (FLAT_INK)
-in currentColor, drawn in the theme's text colour as the line style's are; its
-colours and its solid neutral shapes (the clouds, the barometer's dial) stay as
-drawn. The flat/ files stay as drawn: the template for a custom folder, and what
-shows when a custom folder lacks an icon.
+in currentColor, drawn in the theme's text colour as the line style's are, but
+for the wind (FLAT_AS_LINE), drawn in LINE_WHITE_TOKEN as the line style's wind; its
+colours and its solid neutral shapes (the barometer's dial) stay as drawn. Its
+near-white clouds, all but lost on a light theme, get the light sets' outline
+(LIGHT_OUTLINE), drawn in OUTLINE_TOKEN, which the widget swaps for LIGHT_OUTLINE on
+a light theme and "none" on a dark one. The flat/ files stay as drawn: the template for a custom folder, and what shows when
+a custom folder lacks an icon.
 
 The monochrome set is a JavaScript module of SVG strings drawn in currentColor:
 the widget swaps in the theme's colour and hands Image the result as a data URL,
 so every copy of an icon at one size shares one rendering (a tinting effect per
 icon would cost a render pass each, and the hourly cards hold a couple hundred).
 Its artwork painted white — humidity's "%", the umbrella's lit panel — is cut out
-of the icon instead (a luminance mask), or it would stay white over the tint. And
-its line icons are drawn bolder (MONO_WEIGHT, not the solid icons or the
-thermometers): Meteocons' 2–4 unit lines came out under a pixel wide at the
-widget's sizes. The larger Detailed view draws them a little bolder than drawn
-(DETAILED_WEIGHT), a second set in the module.
+of the icon instead (a luminance mask), or it would stay white over the tint. Its
+lines, filled outlines too, grow with the weight (see Weights below), all but those
+of MONO_AS_DRAWN. The afternoon's cloud, solid in this
+set, is drawn as a ring (MONO_RING_CLOUDS, MONO_RING), as the monochrome weather
+icons draw their clouds: solid, it read as a dark blot on a light theme.
 
-The artwork is left as drawn; what changes is how it is written, so that Qt
+The precipitation sum's icon ("raindrops") is redrawn in every style: Meteocons'
+two drops, one behind the other, read as something else entirely, so it is the
+style's own raindrop three times instead — a main drop and two smaller ones beside
+it (THREE_DROPS).
+
+Weights. Meteocons' 2–4 unit lines came out under a pixel wide at the widget's
+sizes, so the widget draws its line and monochrome icons bolder — by how much
+depends on the style and where they show, set in contents/ui/iconweights.js. Each
+icon is written once, its lines that grow marked (mark_weight): a stroke's width
+written "+N", N as drawn, which the widget draws N + the weight wide, and a filled
+shape that grows given a stroke of its own colour "+0" wide.
+
+Otherwise the artwork is left as drawn; what changes is how it is written, so that Qt
 draws it the way a browser does.
 
 Masks (both sets). Meteocons hides a sun, a moon or a back cloud behind the
@@ -83,7 +122,7 @@ ignored). So:
     must move in step with the cloud it follows), re-sampled into evenly spaced
     linear values with the easing and phase built in.
 """
-import json, math, os, sys
+import copy, json, math, os, re, sys
 import xml.etree.ElementTree as ET
 
 SVG = "http://www.w3.org/2000/svg"
@@ -91,6 +130,8 @@ ET.register_namespace("", SVG)
 SHAPES = {"{%s}%s" % (SVG, t) for t in ("path", "rect", "circle", "ellipse", "polygon", "polyline", "line")}
 
 STYLES = ("fill", "flat", "line", "monochrome")
+# the colour styles, which get a set for light themes (see the module's docstring)
+LIGHT_STYLES = ("fill", "flat", "line")
 
 # widget stem → Meteocons icon. Daytime precipitation is sun-free (a sun under
 # a 100 % overcast rain hour reads wrong); night keeps the moon. The wi-day-*
@@ -137,26 +178,71 @@ READING_STYLES = ("monochrome", "flat", "line")
 LINE_INK = {"#1E293B", "#202939", "#475569", "#71717A", "#D6DFE9", "#E2E8F0", "#E6EFFC"}
 # The flat style's neutral lines (see the module's docstring), drawn in the theme's text
 # colour: the horizon lines, "UV", "zz" (#202939), the umbrella's handle (#71717A), the
-# wind and the moon's dashed outline (#E2E8F0). Not its solid shapes in neutral colours,
-# which read on either theme: the clouds (#E6EFFC), the barometer's dial (#334155,
-# #475569, #64748B), the umbrella's lit panel (#F1F5F9).
+# wind (but see FLAT_AS_LINE) and the moon's dashed outline (#E2E8F0). Not its solid
+# shapes in neutral colours:
+# the barometer's dial (#334155, #475569, #64748B) and the umbrella's lit panel (#F1F5F9)
+# read on either theme, and the clouds are outlined instead (LIGHT_OUTLINE).
 FLAT_INK = {"#202939", "#71717A", "#E2E8F0"}
-# How much wider the line style's lines are in its small icons (the header, the hourly
-# cards, the panel, the graph's sunrise and sunset), in units of the 128-unit box: at
-# 2 the humidity drop's "%" and the snowflake's branches began to run together.
-LINE_WEIGHT = 1.5
-# How much bolder the monochrome line icons are drawn, in units of the 128-unit box:
-# every line grows this much wider (a stroke of the same colour around each shape,
-# filled outlines too — the cloud is a thin filled ring). 5 clogged the details.
-# Left as drawn: the solid icons (thickened, the two raindrops merged into one), the
-# thermometers (thickened, the glass, mercury and drop ran into one hard-to-read shape)
-# and the moon's phases (the dashed outline of the dark part outweighed the lit part).
-MONO_WEIGHT = 3
-# The same icons as the Detailed view draws them (monochrome.js `lighter`): larger
-# there, at MONO_WEIGHT their lines looked too heavy.
-DETAILED_WEIGHT = 1
+# Light themes (see the module's docstring). The near-white clouds — a fill style
+# cloud's gradient has only these stops — and the fog's lines.
+LIGHT_WHITE = {"#E6EFFC", "#F3F7FE"}
+LIGHT_FOG = {"#E2E8F0"}
+# fill's and flat's outline: Meteocons' own edge of a grey cloud (the fill style's),
+# 2 units of the 128-unit box outside the shape — a hairline on the small icons, soft on
+# the large ones (3, and darker greys, read as a drawn border rather than an edge).
+LIGHT_OUTLINE = "#94A3B8"
+LIGHT_OUTLINE_WIDTH = 2
+# line's white rings and lines: between the back cloud's #94A3B8 and slate #64748B, so
+# the front cloud stays the strongest, as its white is on a dark theme.
+LIGHT_LINE = "#7C8BA1"
+# The line reading icons drawn as the line weather icons are (see the module's
+# docstring): their clouds and wind, grey on a light theme and white on a dark one.
+LINE_AS_WEATHER = ("cloudy", "partly-cloudy-day", "time-afternoon", "wind")
+LINE_WHITE_TOKEN = "lineWhite"
+LINE_WHITE = "#E6EFFC"   # the line style's cloud, as drawn
+LINE_RING = 4            # its cloud's ring, units of 128 wide
+# The flat reading icons drawn in the line icons' colours rather than the text colour:
+# the wind, its near-white lines (FLAT_INK's #E2E8F0) in LINE_WHITE_TOKEN — grey on a
+# light theme, white on a dark one — as the line style's wind (LINE_AS_WEATHER).
+FLAT_AS_LINE = ("wind",)
+FLAT_AS_LINE_INK = {"#E2E8F0"}
+# The flat reading icons' cloud outline in flat.js: the widget swaps it for
+# LIGHT_OUTLINE on a light theme and "none" on a dark one, where the cloud shows.
+OUTLINE_TOKEN = "cloudOutline"
+# The line and monochrome icons are drawn bolder than Meteocons draws them, by how much
+# depends on the style and where they show — contents/ui/iconweights.js, applied as the
+# widget draws them. The pipeline only marks which lines grow (mark_weight): every line
+# of the monochrome icons (filled outlines too — a cloud is a thin filled ring), the
+# stroked lines of the line reading icons, and every line of the line weather icons.
+# Left as drawn, the monochrome icons that thickened badly: the solid icons (the
+# raindrops ran together), the thermometers (the glass, mercury and drop ran into one
+# hard-to-read shape) and the moon's phases (the dashed outline of the dark part
+# outweighed the lit part).
 MONO_AS_DRAWN = {"humidity", "raindrop", "raindrops", "snowflake",
                  "thermometer", "thermometer-raindrop"} | set(MOON_PHASES)
+# The weather icons the panel draws bolder (weather.js): the still line and monochrome
+# ones, the stems the widget shows (not the wi-day-* precipitation ones, see STEMS).
+# Line's near-white clouds and fog lines in tokens, swapped for LIGHT_LINE on a light
+# theme, as its light set draws them, and back on a dark one.
+WEATHER_JS_STYLES = ("monochrome", "line")
+WIDGET_STEMS = tuple(s for s in STEMS if s not in
+                     ("wi-day-rain", "wi-day-sleet", "wi-day-snow", "wi-day-thunderstorm"))
+LINE_FOG_TOKEN = "lineFog"
+LINE_FOG = "#E2E8F0"     # the line style's fog lines, as drawn
+# The monochrome icons whose cloud is solid, drawn as the monochrome weather icons draw
+# theirs instead: a ring MONO_RING units wide inside the cloud's outline (and the icon's
+# extra weight on top). The afternoon's solid cloud read as a dark blot on a light theme.
+# Its cloud is small: the clouds' usual 4 swallowed its bumps; 3 is its sun's line.
+MONO_RING_CLOUDS = ("time-afternoon",)
+MONO_RING = 3
+# The precipitation sum's icon ("raindrops"). Meteocons draws two drops, one behind
+# the other, which read as something else entirely; the widget draws the style's own
+# raindrop (raindrop.svg, centred on x DROP_ORIGIN[0] with its bottom at y
+# DROP_ORIGIN[1]) three times instead: a main drop a little smaller than drawn, and a
+# medium and a small one up and down beside it — each (centre x, bottom y, scale), the
+# three centred in the box. Only the drop's outline is scaled, not its line's width.
+DROP_ORIGIN = (64.5, 94)
+THREE_DROPS = ((52.5, 95.8, 0.92), (83.5, 65.8, 0.56), (86.5, 95.8, 0.40))
 
 
 def fail(path, msg):
@@ -372,7 +458,14 @@ def build(src_anim, src_static, out):
                     rewrite_animations(tree.getroot(), path)
                 tree.write(os.path.join(dest, stem + ".svg"), encoding="unicode")
                 written += 1
-    print("wrote %d icons to %s" % (written, out))
+                if style in LIGHT_STYLES:
+                    light = os.path.join(out, style, "light", kind)
+                    os.makedirs(light, exist_ok=True)
+                    light_set(tree.getroot(), style)
+                    tree.write(os.path.join(light, stem + ".svg"), encoding="unicode")
+                    written += 1
+    write_weather_js(out)
+    print("wrote %d icons and weather.js to %s" % (written, out))
 
 
 def knockout_white(root, path):
@@ -413,26 +506,34 @@ def knockout_white(root, path):
     root.append(group)
 
 
-def bolden(root, delta):
-    """Draw every line of the icon `delta` units wider (see MONO_WEIGHT)."""
-    defined = set()   # mask and clip shapes are geometry, not artwork
+def mark_weight(root, colours=None, fills=True):
+    """Mark the lines that grow with the weight the widget draws the icon at
+    (contents/ui/iconweights.js, which reads a "+N" stroke width as N + the weight):
+    every stroke's width written "+N", N its width as drawn, and with `fills` every
+    filled shape given a stroke of its own colour "+0" wide, so a filled outline grows
+    as much. Only shapes painted in `colours` (None: any colour, not a gradient); not
+    mask and clip shapes, which are geometry, not artwork."""
+    defined = set()
     for tag in ("mask", "clipPath"):
         for d in root.iter("{%s}%s" % (SVG, tag)):
             defined.update(d.iter())
+    def painted(c):
+        return (c not in (None, "none") and not c.startswith("url(")
+                and (colours is None or c in colours))
     for el in root.iter():
         if el in defined or el.tag not in SHAPES:
             continue
-        if el.get("stroke") == "currentColor":
-            el.set("stroke-width", "%g" % (float(el.get("stroke-width", "1")) + delta))
-        elif el.get("fill") == "currentColor":
-            el.set("stroke", "currentColor")
-            el.set("stroke-width", "%g" % delta)
+        if painted(el.get("stroke")):
+            el.set("stroke-width", "+%g" % float(el.get("stroke-width", "1")))
+        elif fills and painted(el.get("fill")):
+            el.set("stroke", el.get("fill"))
+            el.set("stroke-width", "+0")
             el.set("stroke-linejoin", "round")
 
 
-def ink_to_current(root, ink=LINE_INK):
-    """Paint a style's greys (LINE_INK, FLAT_INK) in currentColor, outside masks and
-    clip paths, whose colours are geometry."""
+def ink_to_current(root, ink=LINE_INK, colour="currentColor"):
+    """Paint a style's greys (LINE_INK, FLAT_INK) in `colour` (currentColor), outside
+    masks and clip paths, whose colours are geometry."""
     defined = set()
     for tag in ("mask", "clipPath"):
         for d in root.iter("{%s}%s" % (SVG, tag)):
@@ -442,22 +543,150 @@ def ink_to_current(root, ink=LINE_INK):
             continue
         for attr in ("fill", "stroke", "stop-color"):
             if (el.get(attr) or "").upper() in ink:
-                el.set(attr, "currentColor")
+                el.set(attr, colour)
 
 
-def thicken_lines(root, delta):
-    """Draw every stroked line of the icon `delta` units wider, whatever its colour
-    (the line style's; bolden() is the monochrome set's, which also outlines its
-    filled shapes)."""
+def _whites(root):
+    """The artwork's near-white shapes (LIGHT_WHITE, a white gradient's too) and
+    near-white lines (LIGHT_FOG), with their parents: [(el, parent, is_line)]. Not
+    the shapes of masks and clip paths, nor the gradients' own definitions."""
     defined = set()
-    for tag in ("mask", "clipPath"):
+    for tag in ("mask", "clipPath", "defs"):
         for d in root.iter("{%s}%s" % (SVG, tag)):
             defined.update(d.iter())
+    white_grads = set()
+    for g in root.iter():
+        if g.tag in ("{%s}linearGradient" % SVG, "{%s}radialGradient" % SVG):
+            stops = {(st.get("stop-color") or "").upper() for st in g}
+            if stops and stops <= LIGHT_WHITE:
+                white_grads.add(g.get("id"))
+    parent = {c: p for p in root.iter() for c in p}
+    found = []
     for el in root.iter():
         if el in defined or el.tag not in SHAPES:
             continue
-        if el.get("stroke") not in (None, "none"):
-            el.set("stroke-width", "%g" % (float(el.get("stroke-width", "1")) + delta))
+        fill = el.get("fill") or ""
+        grad = fill[5:-1] if fill.startswith("url(#") and fill.endswith(")") else None
+        if fill.upper() in LIGHT_WHITE or grad in white_grads:
+            found.append((el, parent[el], False))
+        elif (el.get("stroke") or "").upper() in LIGHT_FOG:
+            found.append((el, parent[el], True))
+    return found
+
+
+def outline_behind(root, colour, width):
+    """Outline the near-white shapes and lines (_whites) in `colour`, `width` units
+    outside them: a copy of each, stroked and drawn just behind it, so the outline
+    shows only outside the shape, and moves with it (same group, same animations).
+    Lines are left alone (see light_set)."""
+    for el, par, is_line in _whites(root):
+        if is_line:
+            continue
+        own = el.get("stroke") not in (None, "none")
+        c = copy.deepcopy(el)
+        c.attrib.pop("id", None)
+        c.set("fill", "none")
+        c.set("stroke", colour)
+        c.set("stroke-width", "%g" % ((float(el.get("stroke-width", "1")) if own else 0) + 2 * width))
+        c.set("stroke-linejoin", "round")
+        par.insert(list(par).index(el), c)
+
+
+def light_set(root, style):
+    """The light theme's form of a colour style's icon (see the module's docstring)."""
+    if style != "line":
+        outline_behind(root, LIGHT_OUTLINE, LIGHT_OUTLINE_WIDTH)
+    for el, _, is_line in _whites(root):
+        if is_line:
+            el.set("stroke", LIGHT_LINE)
+        elif style == "line":
+            el.set("fill", LIGHT_LINE)
+
+
+def ring_solid_clouds(root, colour, width):
+    """Draw a solid cloud in `colour` as a ring `width` units wide, as the line weather
+    icons draw theirs (the line style's afternoon, see LINE_AS_WEATHER)."""
+    for el in root.iter():
+        if (el.tag in SHAPES and el.get("fill") == colour
+                and el.get("fill-rule") != "evenodd"):
+            el.set("fill", "none")
+            el.set("stroke", colour)
+            el.set("stroke-width", "%g" % width)
+            el.set("stroke-linejoin", "round")
+
+
+def ring_inside(root, ring):
+    """Draw each solid cloud of a monochrome icon (MONO_RING_CLOUDS: a currentColor
+    shape whose id starts "Cloud", not already a ring) as a ring `ring` units wide
+    inside its outline, as Meteocons draws its rings, plus the weight its stroke gives
+    it (mark_weight): a stroke twice as wide on the outline, masked by the solid cloud
+    with that stroke."""
+    parent = {c: p for p in root.iter() for c in p}
+    x, y, w, h = (root.get("viewBox") or "0 0 128 128").split()
+    clouds = [el for el in root.iter()
+              if el.tag in SHAPES and el.get("fill") == "currentColor"
+              and el.get("fill-rule") != "evenodd" and (el.get("id") or "").startswith("Cloud")]
+    for n, el in enumerate(clouds):
+        # its stroke's width: "+N" marked to grow with the weight, or as drawn
+        stroke = el.get("stroke-width", "1") if el.get("stroke") == "currentColor" else None
+        marked = stroke is not None and stroke.startswith("+")
+        extra = float(stroke.lstrip("+")) if stroke is not None else 0
+        group = ET.Element("{%s}g" % SVG, {"id": "Cloud ring"})
+        mid = "cloud-ring-%d" % n
+        mask = ET.SubElement(group, "{%s}mask" % SVG, {"id": mid, "maskUnits": "userSpaceOnUse",
+                                                       "x": x, "y": y, "width": w, "height": h})
+        solid = copy.deepcopy(el)
+        solid.attrib.pop("id", None)
+        solid.set("fill", "white")
+        if stroke is not None:
+            solid.set("stroke", "white")
+        mask.append(solid)
+        masked = ET.SubElement(group, "{%s}g" % SVG, {"mask": "url(#%s)" % mid})
+        line = copy.deepcopy(el)
+        line.set("fill", "none")
+        line.set("stroke", "currentColor")
+        line.set("stroke-width", ("+%g" if marked else "%g") % (2 * ring + extra))
+        line.set("stroke-linejoin", "round")
+        masked.append(line)
+        par = parent[el]
+        par.insert(list(par).index(el), group)
+        par.remove(el)
+
+
+def _place_path(d, cx, by, s, path):
+    """Path data `d` (absolute M, L, C and Z only) scaled by `s` about DROP_ORIGIN and
+    moved there to (cx, by)."""
+    out = []
+    for cmd, args in re.findall(r"([A-Za-z])([^A-Za-z]*)", d):
+        if cmd not in "MLCZ":
+            fail(path, "drop path command %r is not handled" % cmd)
+        nums = [float(v) for v in re.findall(r"-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?", args)]
+        pts = ["%s %s" % (_fmt(cx + s * (nums[i] - DROP_ORIGIN[0])),
+                          _fmt(by + s * (nums[i + 1] - DROP_ORIGIN[1])))
+               for i in range(0, len(nums), 2)]
+        out.append(cmd + " ".join(pts))
+    return "".join(out)
+
+
+def three_drops(root, path):
+    """The style's raindrop drawn three times (THREE_DROPS): the precipitation sum's
+    icon."""
+    drops = [el for el in root.iter() if el.tag in SHAPES]
+    if len(drops) != 1 or drops[0].tag != "{%s}path" % SVG:
+        fail(path, "expected the raindrop as one path")
+    drop = drops[0]
+    parent = {c: p for p in root.iter() for c in p}
+    par = parent[drop]
+    at = list(par).index(drop)
+    par.remove(drop)
+    for n, (cx, by, s) in enumerate(THREE_DROPS):
+        c = copy.deepcopy(drop)
+        c.set("id", "Drop_%d" % (n + 1))
+        c.set("d", _place_path(drop.get("d"), cx, by, s, path))
+        par.insert(at + n, c)
+    for g in root.iter("{%s}g" % SVG):
+        if g.get("id") == "raindrop":
+            g.set("id", "raindrops")
 
 
 def drop_label(root):
@@ -472,68 +701,118 @@ def drop_label(root):
 def build_readings(src_static, out):
     dest = os.path.join(out, "readings")
     os.makedirs(os.path.join(dest, "flat"), exist_ok=True)
-    mono, lighter, line, line_lighter, flat = {}, {}, {}, {}, {}
+    mono, line, flat = {}, {}, {}
+    def load(style, name):
+        # the precipitation sum's three drops are drawn from the style's raindrop
+        path = os.path.join(src_static, style, ("raindrop" if name == "raindrops" else name) + ".svg")
+        tree = ET.parse(path)
+        luminance_masks(tree.getroot(), path)
+        if name in TIME_ICONS:
+            drop_label(tree.getroot())
+        if name == "raindrops":
+            three_drops(tree.getroot(), path)
+        return tree, path
+
     for style in READING_STYLES:
         for name in READINGS:
-            path = os.path.join(src_static, style, name + ".svg")
-            tree = ET.parse(path)
-            luminance_masks(tree.getroot(), path)
-            if name in TIME_ICONS:
-                drop_label(tree.getroot())
+            tree, path = load(style, name)
             if style == "flat":
                 tree.write(os.path.join(dest, "flat", name + ".svg"), encoding="unicode")
+                if name in FLAT_AS_LINE:
+                    ink_to_current(tree.getroot(), FLAT_AS_LINE_INK, LINE_WHITE_TOKEN)
                 ink_to_current(tree.getroot(), FLAT_INK)
+                outline_behind(tree.getroot(), OUTLINE_TOKEN, LIGHT_OUTLINE_WIDTH)
                 flat[name] = ET.tostring(tree.getroot(), encoding="unicode")
             elif style == "line":
+                if name in LINE_AS_WEATHER:
+                    ink_to_current(tree.getroot(), LINE_INK, LINE_WHITE_TOKEN)
                 ink_to_current(tree.getroot())
-                line_lighter[name] = ET.tostring(tree.getroot(), encoding="unicode")
-                thicken_lines(tree.getroot(), LINE_WEIGHT)
+                mark_weight(tree.getroot(), fills=False)
+                # the ring after: as wide as the weather icons' at every weight
+                ring_solid_clouds(tree.getroot(), LINE_WHITE_TOKEN, LINE_RING)
                 line[name] = ET.tostring(tree.getroot(), encoding="unicode")
             else:
                 if name not in MONO_AS_DRAWN:
-                    light = ET.parse(path)
-                    luminance_masks(light.getroot(), path)
-                    if name in TIME_ICONS:
-                        drop_label(light.getroot())
-                    bolden(light.getroot(), DETAILED_WEIGHT)
-                    knockout_white(light.getroot(), path)
-                    lighter[name] = ET.tostring(light.getroot(), encoding="unicode")
-                    bolden(tree.getroot(), MONO_WEIGHT)
+                    mark_weight(tree.getroot(), {"currentColor"})
+                    if name in MONO_RING_CLOUDS:
+                        ring_inside(tree.getroot(), MONO_RING)
                 knockout_white(tree.getroot(), path)
                 mono[name] = ET.tostring(tree.getroot(), encoding="unicode")
+    write_mono_js(dest, mono)
+    write_line_js(dest, line)
+    write_flat_js(dest, flat)
+    print("wrote %d reading icons: flat, flat.js, line.js and monochrome.js, to %s" % (len(READINGS), dest))
+
+
+WEIGHT_NOTE = ("// Each icon once: its stroke widths written \"+N\" grow with the weight the widget\n"
+               "// draws it at (contents/ui/iconweights.js, which reads them as N + the weight).\n")
+
+
+def write_mono_js(dest, mono):
     with open(os.path.join(dest, "monochrome.js"), "w") as js:
         js.write(".pragma library\n"
                  "// Meteocons' monochrome reading icons (MIT, see ../ATTRIBUTION.md), drawn in\n"
                  "// currentColor. Generated by tools/icon-pipeline/meteocons_packs.py --readings;\n"
-                 "// edit that, not this.\n"
+                 "// edit that, not this.\n" + WEIGHT_NOTE +
                  "var svg = {\n")
         for name in READINGS:
             js.write("    %s: %s,\n" % (json.dumps(name), json.dumps(mono[name])))
-        js.write("};\n"
-                 "// The bolder ones (svg) with their lines at DETAILED_WEIGHT, for the Detailed view.\n"
-                 "var lighter = {\n")
-        for name in READINGS:
-            if name in lighter:
-                js.write("    %s: %s,\n" % (json.dumps(name), json.dumps(lighter[name])))
         js.write("};\n")
+
+
+def write_line_js(dest, line):
     with open(os.path.join(dest, "line.js"), "w") as js:
         js.write(".pragma library\n"
                  "// Meteocons' line reading icons (MIT, see ../ATTRIBUTION.md), for the Element\n"
                  "// icon pack's \"Meteocons (line)\": their neutral greys in currentColor, which\n"
-                 "// the widget swaps for the theme's text colour, their colours as drawn.\n"
+                 "// the widget swaps for the theme's text colour, their clouds and wind in\n"
+                 "// \"%s\", which it swaps for %s on a light theme and %s on a dark one, as\n"
+                 "// the line weather icons draw them, their colours as drawn.\n"
                  "// Generated by tools/icon-pipeline/meteocons_packs.py --readings; edit that, not this.\n"
-                 "// The small icons, their lines LINE_WEIGHT bolder.\n"
+                 % (LINE_WHITE_TOKEN, LIGHT_LINE, LINE_WHITE) + WEIGHT_NOTE +
                  "var svg = {\n")
         for name in READINGS:
             js.write("    %s: %s,\n" % (json.dumps(name), json.dumps(line[name])))
-        js.write("};\n"
-                 "// The same as drawn, for the Detailed view.\n"
-                 "var lighter = {\n")
-        for name in READINGS:
-            js.write("    %s: %s,\n" % (json.dumps(name), json.dumps(line_lighter[name])))
         js.write("};\n")
-    write_flat_js(dest, flat)
-    print("wrote %d reading icons: flat, flat.js, line.js and monochrome.js, to %s" % (len(READINGS), dest))
+
+
+def write_weather_js(out):
+    """weather.js: the still line and monochrome weather icons the panel draws
+    (WEATHER_JS_STYLES, WIDGET_STEMS), from the files build() wrote, as SVG text, so
+    the widget can draw them bolder than the files (contents/ui/iconweights.js
+    `panel`): their lines marked to grow (mark_weight), and line's near-white clouds
+    and fog lines in LINE_WHITE_TOKEN and LINE_FOG_TOKEN (see the widget's
+    _tintedIcon)."""
+    with open(os.path.join(out, "weather.js"), "w") as js:
+        js.write(".pragma library\n"
+                 "// Meteocons' still line and monochrome weather icons (MIT, see ATTRIBUTION.md), as\n"
+                 "// the panel draws them: the same as line/static/ and monochrome/static/, but as\n"
+                 "// SVG text, so they can be drawn bolder. Monochrome in currentColor, which the\n"
+                 "// widget swaps for the panel's text colour; line's clouds in \"%s\" and fog\n"
+                 "// lines in \"%s\", which it swaps for %s on a light theme, as line/light/\n"
+                 "// draws them, and %s and %s on a dark one.\n"
+                 "// Generated by tools/icon-pipeline/meteocons_packs.py; edit that, not this.\n"
+                 % (LINE_WHITE_TOKEN, LINE_FOG_TOKEN, LIGHT_LINE, LINE_WHITE, LINE_FOG) + WEIGHT_NOTE)
+        for style in WEATHER_JS_STYLES:
+            js.write("var %s = {\n" % style)
+            for stem in WIDGET_STEMS:
+                path = os.path.join(out, style, "static", stem + ".svg")
+                root = ET.parse(path).getroot()
+                if style == "line":
+                    for el, _, is_line in _whites(root):
+                        if is_line:
+                            if el.get("stroke").upper() != LINE_FOG:
+                                fail(path, "unexpected fog colour %s" % el.get("stroke"))
+                            el.set("stroke", LINE_FOG_TOKEN)
+                        else:
+                            if (el.get("fill") or "").upper() != LINE_WHITE:
+                                fail(path, "unexpected cloud paint %s" % el.get("fill"))
+                            el.set("fill", LINE_WHITE_TOKEN)
+                    mark_weight(root)
+                else:
+                    mark_weight(root, {"currentColor"})
+                js.write("    %s: %s,\n" % (json.dumps(stem), json.dumps(ET.tostring(root, encoding="unicode"))))
+            js.write("};\n")
 
 
 def write_flat_js(dest, flat):
@@ -541,9 +820,12 @@ def write_flat_js(dest, flat):
         js.write(".pragma library\n"
                  "// Meteocons' flat reading icons (MIT, see ../ATTRIBUTION.md), for the Element\n"
                  "// icon pack's \"Meteocons (flat)\": their neutral lines in currentColor, which\n"
-                 "// the widget swaps for the theme's text colour, the rest as drawn (flat/).\n"
+                 "// the widget swaps for the theme's text colour, and an outline round their\n"
+                 "// near-white clouds in \"%s\", which it swaps for %s on a light theme\n"
+                 "// and \"none\" on a dark one; the wind in \"%s\", as the line icons' (line.js);\n"
+                 "// the rest as drawn (flat/).\n"
                  "// Generated by tools/icon-pipeline/meteocons_packs.py --readings; edit that, not this.\n"
-                 "var svg = {\n")
+                 "var svg = {\n" % (OUTLINE_TOKEN, LIGHT_OUTLINE, LINE_WHITE_TOKEN))
         for name in READINGS:
             js.write("    %s: %s,\n" % (json.dumps(name), json.dumps(flat[name])))
         js.write("};\n")

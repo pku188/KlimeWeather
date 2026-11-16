@@ -10,6 +10,11 @@
  * nor the VectorImage module, and only the monochrome pack loads the effects
  * module that tints it.
  *
+ * As a Weather Element's icon (elementColored set: the "Weather and temperature"
+ * element), the picture comes from the Element icon pack instead (main.qml
+ * elementWeatherIcon): its Meteocons style in colour, or its custom folder, whose
+ * missing icons show the weather icon pack's; without colour, Meteocons' monochrome.
+ *
  * Static icons are drawn by an Image, not Kirigami.Icon. Image shares one raster
  * per icon and size between every copy (Qt's pixmap cache); in Plasma,
  * Kirigami.Icon re-reads and re-renders the SVG for each of the hundred or so
@@ -36,19 +41,39 @@ Item {
     // Let the animation move; false holds it on its current frame.
     property bool playing: false
 
-    readonly property real zoom: weatherRoot ? weatherRoot.iconZoom(code, day) : 1
-    readonly property string animSource: (animate && weatherRoot)
-        ? weatherRoot.conditionIconAnimated(code, day, cloud) : ""
+    // As a Weather Element's icon: that element's "Use colored icons"; undefined for the
+    // weather icon pack's, as everywhere else.
+    property var elementColored: undefined
+    readonly property bool _asElement: elementColored !== undefined && !!weatherRoot
+    // the Element icon pack's Meteocons style, null for its custom folder
+    readonly property var _elementPack: _asElement ? weatherRoot.elementWeatherPack(elementColored) : null
+    // the custom Element folder's icon, while it has one (else the weather icon pack's)
+    readonly property string _elementWanted: _asElement ? weatherRoot.elementWeatherIcon(code, day, cloud, elementColored) : ""
+    property bool _elementMissing: false
+    on_ElementWantedChanged: _elementMissing = false
+    // a missing local file fails while the source is still being bound: set a turn
+    // later, as at once it is a binding loop (see PanelElement)
+    function _markMissing() { _elementMissing = true; }
+    // drawn from the Element icon pack (see above)
+    readonly property bool _element: _asElement
+        && (_elementPack !== null || (weatherRoot.readingIconDir !== "" && !_elementMissing))
+
+    readonly property real zoom: !weatherRoot ? 1
+        : _element ? weatherRoot.iconZoom(code, day, _elementPack !== null) : weatherRoot.iconZoom(code, day)
+    readonly property string animSource: !(animate && weatherRoot) ? ""
+        : _element ? weatherRoot.elementWeatherIconAnimated(code, day, cloud, elementColored)
+        : weatherRoot.conditionIconAnimated(code, day, cloud)
 
     // ── the static icon ──
-    readonly property string stillSource: weatherRoot ? weatherRoot.conditionIcon(code, day, cloud)
-                                                      : "weather-none-available"
+    readonly property string stillSource: !weatherRoot ? "weather-none-available"
+        : _element ? _elementWanted : weatherRoot.conditionIcon(code, day, cloud)
     // a file (bundled or custom pack) rather than an icon-theme name
     readonly property bool _stillIsFile: stillSource.indexOf("file:") === 0
     // The software renderer can't run shaders: no tint effect, and VectorImage's
     // masks come out missing (an icon's sun or moon would vanish).
     readonly property bool _softwareRendered: icon.GraphicsInfo.api === GraphicsInfo.Software
-    readonly property bool _tinted: weatherRoot ? weatherRoot.iconPackIsMask : false
+    readonly property bool _tinted: !weatherRoot ? false
+        : _element ? (_elementPack !== null && _elementPack.mask === true) : weatherRoot.iconPackIsMask
     readonly property int _px: Math.round(width * zoom)
 
     Image {
@@ -58,6 +83,9 @@ Item {
         sourceSize: Qt.size(width, height)
         visible: !icon._vectorShown
         source: (icon._stillIsFile && !icon._tinted) ? icon.stillSource : ""
+        // the custom Element folder lacks this icon: show the weather icon pack's
+        onStatusChanged: if (status === Image.Error && icon._element && icon._elementPack === null)
+                             Qt.callLater(icon._markMissing)
     }
     Loader {
         id: tintedStill
@@ -68,7 +96,12 @@ Item {
         visible: !icon._vectorShown
         source: active ? "ConditionIconStillTinted.qml" : ""
     }
-    Binding { target: tintedStill.item; property: "source"; value: icon.stillSource; when: tintedStill.item !== null }
+    // Only a file: a theme name (no forecast) unloads the item, but this binding can run
+    // first — before _stillIsFile catches up, so the test is its own — and the name was
+    // opened as a file.
+    Binding { target: tintedStill.item; property: "source"
+              value: icon.stillSource.indexOf("file:") === 0 ? icon.stillSource : ""
+              when: tintedStill.item !== null }
     Binding { target: tintedStill.item; property: "tint"; value: Kirigami.Theme.textColor; when: tintedStill.item !== null }
     // Icon-theme names (the System pack, and "no data yet"), plus the monochrome
     // pack where the tint effect can't run: Kirigami.Icon tints it by itself.

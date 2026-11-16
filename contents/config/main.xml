@@ -256,7 +256,7 @@
       <default>true</default>
     </entry>
     <!-- the graph's markers in colour: the new-day icons in the icon pack's colours
-         (else the panel's solid white set) and sunrise / sunset in Meteocons' flat
+         (else Meteocons' monochrome ones) and sunrise / sunset in Meteocons' flat
          colours with gold times (else monochrome), all in the text colour when off -->
     <entry name="dayMarkerIconColored" type="Bool">
       <default>true</default>

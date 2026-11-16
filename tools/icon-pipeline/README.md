@@ -20,7 +20,11 @@ rewrites two things Qt draws differently from a browser: alpha masks become
 luminance masks (Qt ignores `mask-type`, so suns, moons and back clouds vanished),
 and the animations are rewritten into the SMIL and CSS subset `VectorImage` plays
 correctly (it drops opacity animations and ignores easing, key times and begin
-offsets). See `contents/icons/meteocons/ATTRIBUTION.md`.
+offsets). For the colour styles it also writes a set for light themes
+(`<style>/light/`): the near-white clouds and fog lines outlined (fill, flat) or drawn
+grey (line), `LIGHT_*` in the script. And it writes `weather.js`: the still line and
+monochrome weather icons again, as SVG text, which the panel draws bolder than the
+files (see Weights below). See `contents/icons/meteocons/ATTRIBUTION.md`.
 
 - **Static** icons are drawn by QtSvg (`Kirigami.Icon`), which handles luminance
   masks since Qt 6.7.
@@ -38,10 +42,12 @@ offsets). See `contents/icons/meteocons/ATTRIBUTION.md`.
 The icons before a reading (Weather Elements, panel, hourly cards, the graph's
 sunrise and sunset), the Detailed view's moon and time-of-day icons, and those in the
 settings' lists of elements, from the static package: flat as files (as drawn) and as
-`flat.js` (its neutral lines, `FLAT_INK`, recoloured at run time), line as `line.js`
-(its neutral greys, `LINE_INK`) and monochrome as `monochrome.js` (recoloured whole). The monochrome line icons come twice: `svg`
-drawn bolder for the small sizes (`MONO_WEIGHT`), `lighter` for the larger Detailed view
-(`DETAILED_WEIGHT`):
+`flat.js` (its neutral lines, `FLAT_INK`, recoloured at run time, and its near-white
+clouds outlined as the light sets' are, in `OUTLINE_TOKEN`, swapped at run time; its wind
+in line's colours, `FLAT_AS_LINE`), line as `line.js`
+(its neutral greys, `LINE_INK`) and monochrome as `monochrome.js` (recoloured whole). Two
+icons are redrawn: the precipitation sum's (`raindrops`) is each style's raindrop three
+times (`THREE_DROPS`), and the monochrome afternoon's solid cloud a ring (`MONO_RING`):
 
 ```fish
 python3 meteocons_packs.py --readings static/package ../../contents/icons/meteocons
@@ -50,12 +56,25 @@ python3 meteocons_packs.py --readings static/package ../../contents/icons/meteoc
 They replaced the Weather Icons font and the graph's own sunrise/sunset glyphs
 (`contents/icons/sun-events/`, made by `bake_sun_static.py`, kept for reference).
 
-## Panel white set (older pipeline, still shipped)
+## Weights
 
-`contents/icons/basmilius-white/` (the panel's white icons) was made from
-Meteocons v3.0.0-next.10 with the steps below, when QtSvg could not draw masks at
-all. The WebP heroes these steps also produced (`bake_v3.sh`, `render_frames.py`,
-`pad_lottie.py`, `animate_fog.py`) are retired: the Meteocons packs animate their
+Meteocons' 2–4 unit lines (of the 128-unit box) come out under a pixel wide at the
+widget's sizes, so it draws its line and monochrome icons bolder. How much bolder, by
+style and by place (small reading icons, the Detailed view's, the panel's weather
+icon), is set in `contents/ui/iconweights.js`, not here: each icon in `line.js`,
+`monochrome.js` and `weather.js` is written once, its lines that grow marked by
+`mark_weight` — a stroke's width written `"+N"`, which the widget draws `N` + the
+weight wide, and a filled shape (Meteocons draws its rings so) given a `"+0"` stroke of
+its own colour.
+
+## Older pipeline (retired)
+
+The panel's white icons (`contents/icons/basmilius-white/`, since removed: the panel
+and the "Weather and temperature" element now draw Meteocons' monochrome pack in the
+text colour, or the Element icon pack's style in colour) were made from Meteocons
+v3.0.0-next.10 with the steps below, when QtSvg could not draw masks at all. The
+WebP heroes these steps also produced (`bake_v3.sh`, `render_frames.py`,
+`pad_lottie.py`, `animate_fog.py`) are retired too: the Meteocons packs animate their
 SVGs directly. The scripts stay for reference.
 
 ## Why each step exists
@@ -115,5 +134,4 @@ Edit BOTH the baked webp (re-run the Lottie through `bake_v3.sh`) AND the static
    both: it supports SVG masks and composites optimized GIF frames that Qt does not.
 
 ## Stem ↔ Meteocons name maps
-See `contents/icons/meteocons/ATTRIBUTION.md` (the icon packs) and
-`contents/icons/basmilius-white/ATTRIBUTION.md` (the panel set).
+See `contents/icons/meteocons/ATTRIBUTION.md`.

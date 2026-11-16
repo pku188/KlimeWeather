@@ -65,46 +65,82 @@ Item {
     // to e.g. clouds. Scale it down a touch; every other condition, and the theme
     // and custom packs, are untouched.
     function panelIconScale() {
-        if (!weatherRoot || !weatherRoot.iconPackIsMeteocons) return 1.0;
+        if (!weatherRoot || !(_source === "pack" ? weatherRoot.iconPackIsMeteocons
+                                                 : _source !== "element" || weatherRoot.elementWeatherPack(true) !== null))
+            return 1.0;
         var code = weatherRoot.heroCode, day = weatherRoot.heroDay;
         if ((code === 0 || code === 1) && day !== 0) return 0.85;   // clear sky / sunny (day)
         return 1.0;
     }
-    // Icons drawn in the panel's text colour, so they read on light and dark panels
-    // alike: the monochrome pack's own (one-colour artwork), and without "Use colored
-    // icons" every bundled or custom pack's. The bundled white set is pure white, so the
-    // tint gives exactly the theme's text colour — it used to stay white, and all but
-    // vanished on a light panel. A custom pack's icon becomes a one-colour silhouette.
-    // The system theme's icons follow the colour scheme by themselves.
-    readonly property bool tintedIcon: !!weatherRoot && weatherRoot.hasLocation
-                                       && weatherRoot.heroCode >= 0 && !weatherRoot.iconPackIsTheme
-                                       && (weatherRoot.iconPackIsMask || !weatherRoot.panelColorIcon)
-    // The white set by default (tinted, see tintedIcon); the pack's colored icon when
-    // the panelColorIcon setting is on.
+    // Where the icon comes from:
+    //   "mono"    — without the panel's "Use colored icons": Meteocons' monochrome
+    //               icon in the panel's text colour;
+    //   "pack"    — with it, the Weather icon pack's (the system theme's, the custom
+    //               folder's, or a Meteocons colour style);
+    //   "element" — with it and a monochrome Weather icon pack, which has no colours to
+    //               show: the Element icon pack's weather icon (main.qml
+    //               elementWeatherIcon), Meteocons' flat or line one or the custom
+    //               Element folder's own;
+    //   "line"    — as "element", for a custom Element folder without the icon (or no
+    //               folder): Meteocons' line one.
+    readonly property bool _hasIcon: !!weatherRoot && weatherRoot.hasLocation && weatherRoot.heroCode >= 0
+    readonly property string _source: {
+        if (!_hasIcon) return "";
+        if (!weatherRoot.panelColorIcon) return "mono";
+        if (!weatherRoot.iconPackIsMask) return "pack";
+        if (weatherRoot.elementWeatherPack(true) !== null) return "element";
+        return weatherRoot.readingIconDir !== "" && !_elementMissing ? "element" : "line";
+    }
+    // panel-only: the moon-behind-cloud icon for an overcast night (the popup keeps
+    // its own overcast-night artwork)
+    readonly property string _override: weatherRoot && weatherRoot.heroCode === 3 && weatherRoot.heroDay === 0
+                                        ? "wi-night-alt-partly-cloudy" : ""
+    // the custom Element folder's icon, while it is the one to show
+    readonly property string _elementSource: _hasIcon && weatherRoot.panelColorIcon && weatherRoot.iconPackIsMask
+        ? weatherRoot.elementWeatherIcon(weatherRoot.heroCode, weatherRoot.heroDay, weatherRoot.heroCloud,
+                                         true, _override || undefined) : ""
+    // the custom Element folder lacks the icon (see the Image below)
+    property bool _elementMissing: false
+    on_ElementSourceChanged: _elementMissing = false
+    // A missing local file fails while the Image's source is still being bound, so the
+    // switch to the line icon waits a turn — at once, it is a binding loop and the icon
+    // stayed empty.
+    function _markMissing() { _elementMissing = true; }
+    // Meteocons' line and monochrome icons are drawn bolder on the panel than the files
+    // (main.qml boldWeatherIcon, iconweights.js `panel`): their thin lines read faint at
+    // a panel's size. The style to draw so — "monochrome", in the panel's text colour,
+    // or "line", its clouds grey on a light panel — or "" for a file or a theme's icon.
+    readonly property string _boldStyle: {
+        switch (_source) {
+        case "mono":    return "monochrome";
+        case "line":    return "line";
+        case "pack":    return weatherRoot.iconPackId === "meteocons-line" ? "line" : "";
+        case "element": return weatherRoot.readingIconPack === "meteocons-line" ? "line" : "";
+        }
+        return "";
+    }
     function panelIconSource() {
         if (!weatherRoot) return "";
         if (!weatherRoot.hasLocation) return "mark-location";   // no location set → pin, not fake weather
-        var code = weatherRoot.heroCode, day = weatherRoot.heroDay;
-        // panel-only: show the moon-behind-cloud icon for overcast night (the
-        // popup keeps its own overcast-night artwork).
-        var override = (code === 3 && day === 0) ? "wi-night-alt-partly-cloudy" : undefined;
-        return weatherRoot.panelColorIcon
-            ? weatherRoot.conditionIcon(code, day, weatherRoot.heroCloud, override)
-            : weatherRoot.conditionIconWhite(code, day, weatherRoot.heroCloud, override);
+        var code = weatherRoot.heroCode, day = weatherRoot.heroDay, cloud = weatherRoot.heroCloud;
+        if (_boldStyle)
+            return weatherRoot.boldWeatherIcon(_boldStyle, _override || weatherRoot.conditionStem(code, day, cloud),
+                                               Kirigami.Theme.textColor);
+        if (_source === "pack") return weatherRoot.conditionIcon(code, day, cloud, _override || undefined);
+        if (_source === "element") return _elementSource;
+        return weatherRoot.conditionIcon(-1, 1, NaN);
     }
     Component {
         id: iconComponent
         // A pack's colored icons render flat via a plain Image (no icon-engine
-        // recolouring); theme packs need Kirigami.Icon to resolve "weather-*"
-        // names, so the two swap by visibility. With no forecast yet every pack falls
-        // back to the theme's "weather-none-available" name, which only the
-        // Kirigami.Icon can load; so does the "mark-location" pin of a widget with no
-        // location. Tinted icons (tintedIcon) go through Kirigami.Icon as well, which
-        // draws them in the panel's text colour.
+        // recolouring), and so do the bold ones, already in the panel's colours; theme
+        // packs need Kirigami.Icon to resolve "weather-*" names, so the two swap by
+        // visibility. With no forecast yet every pack falls back to the theme's
+        // "weather-none-available" name, which only the Kirigami.Icon can load; so does
+        // the "mark-location" pin of a widget with no location.
         Item {
-            readonly property bool flat: !!element.weatherRoot && element.weatherRoot.hasLocation
-                                         && !element.weatherRoot.iconPackIsTheme
-                                         && element.weatherRoot.heroCode >= 0 && !element.tintedIcon
+            readonly property bool flat: element._hasIcon
+                                         && !(element._source === "pack" && element.weatherRoot.iconPackIsTheme)
             implicitWidth: flat ? icon.width : themeIcon.width
             implicitHeight: implicitWidth
             Image {
@@ -118,15 +154,17 @@ Item {
                 fillMode: Image.PreserveAspectFit
                 smooth: true
                 source: visible ? element.panelIconSource() : ""
+                // the custom Element folder lacks the icon: Meteocons' line one instead
+                onStatusChanged: if (status === Image.Error && element._source === "element"
+                                     && element.weatherRoot.elementWeatherPack(true) === null)
+                                     Qt.callLater(element._markMissing)
             }
             Kirigami.Icon {
                 id: themeIcon
                 visible: !parent.flat
                 anchors.centerIn: parent
-                height: Math.round(element.iconPx * (element.tintedIcon ? element.panelIconScale() : 1))
+                height: element.iconPx
                 width: height
-                roundToIconSize: !element.tintedIcon
-                isMask: element.tintedIcon
                 color: Kirigami.Theme.textColor
                 source: visible ? element.panelIconSource() : ""
             }

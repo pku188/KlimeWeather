@@ -21,6 +21,8 @@ import "providers/grid.js" as Grid
 import "../icons/meteocons/readings/monochrome.js" as MonoReadings
 import "../icons/meteocons/readings/line.js" as LineReadings
 import "../icons/meteocons/readings/flat.js" as FlatReadings
+import "../icons/meteocons/weather.js" as WeatherIcons
+import "iconweights.js" as IconWeights
 import "panelelements.js" as PanelElements
 import "detailedelements.js" as DetailedElements
 import "moon.js" as Moon
@@ -962,7 +964,8 @@ PlasmoidItem {
     readonly property string readingIconDir: (Plasmoid.configuration.readingIconDir || "").replace(/\/+$/, "")
     // Meteocons' flat icon `name`, its neutral lines (the horizons, "UV", the wind, …)
     // in `tint` — drawn as they are, nearly black or nearly white, one theme or the
-    // other lost them (see flat.js) — else the file as drawn.
+    // other lost them — and its near-white cloud outlined where `tint` is dark (see
+    // flat.js and _tintedIcon); else the file as drawn.
     function readingIconFlat(name, tint) {
         if (FlatReadings.svg[name])
             return _tintedIcon("flat|" + name + "|", FlatReadings.svg[name], tint || Kirigami.Theme.textColor);
@@ -972,38 +975,64 @@ PlasmoidItem {
     // pack's — a file, or Meteocons' flat or line style with its greys in `tint` — else
     // the monochrome one drawn in `tint`. The tinted ones are their SVG with the colour
     // swapped in, as a data URL, so every copy at a size shares one rendering (Qt's
-    // pixmap cache keys on the URL), built once per icon and colour. `lighter`: the
-    // Detailed view's, larger than the rest — the monochrome line icons less bold and
-    // the line style's as drawn (see monochrome.js and line.js).
+    // pixmap cache keys on the URL), built once per icon, size and colour. `lighter`:
+    // the Detailed view's, larger than the rest, so its line and monochrome icons are
+    // drawn less bold (iconweights.js `detailed`, else `small`).
     property var _monoUrls: ({})
-    function _tintedIcon(key, svg, tint) {
+    // `svg` as a data URL: drawn in `tint`, at `weight` when given (iconweights.js),
+    // cached under `key` (which names the icon and its weight) and the tint
+    function _tintedIcon(key, svg, tint, weight) {
         var hex = "" + tint, url = _monoUrls[key + hex];
         if (!url) {
-            url = "data:image/svg+xml;utf8," + encodeURIComponent(svg.replace(/currentColor/g, hex));
+            var drawn = (weight === undefined ? svg : IconWeights.weighted(svg, weight))
+                        .replace(/currentColor/g, hex);
+            // the flat clouds' outline (flat.js "cloudOutline"): shown with dark text — a
+            // light theme, where the white cloud fades into the background — as the
+            // weather icons' light sets show theirs; on a dark theme the cloud shows
+            if (drawn.indexOf("cloudOutline") >= 0)
+                drawn = drawn.replace(/cloudOutline/g, _isDark(tint) ? lightCloudOutline : "none");
+            // the line clouds and wind (line.js and weather.js "lineWhite") and fog lines
+            // (weather.js "lineFog"), as the line weather icons draw them: their white on
+            // a dark theme, grey on a light one
+            if (drawn.indexOf("lineWhite") >= 0)
+                drawn = drawn.replace(/lineWhite/g, _isDark(tint) ? lightLineColor : "#E6EFFC");
+            if (drawn.indexOf("lineFog") >= 0)
+                drawn = drawn.replace(/lineFog/g, _isDark(tint) ? lightLineColor : "#E2E8F0");
+            url = "data:image/svg+xml;utf8," + encodeURIComponent(drawn);
             _monoUrls[key + hex] = url;
         }
         return url;
     }
     function readingIcon(name, colored, tint, lighter) {
         if (!name) return "";
+        var size = lighter ? "detailed" : "small";
         if (colored) {
             if (readingIconPack === "custom")
                 return readingIconDir ? readingIconDir + "/" + name + ".svg" : readingIconFlat(name, tint);
             if (readingIconPack === "meteocons-line" && LineReadings.svg[name])
-                return lighter ? _tintedIcon("line-lighter|" + name + "|", LineReadings.lighter[name], tint)
-                               : _tintedIcon("line|" + name + "|", LineReadings.svg[name], tint);
+                return _tintedIcon("line-" + size + "|" + name + "|", LineReadings.svg[name], tint,
+                                   IconWeights.weight.line[size]);
             return readingIconFlat(name, tint);
         }
-        var light = !!lighter && !!MonoReadings.lighter[name];
-        var svg = light ? MonoReadings.lighter[name] : MonoReadings.svg[name];
-        return svg ? _tintedIcon((light ? "lighter|" : "mono|") + name + "|", svg, tint) : "";
+        var svg = MonoReadings.svg[name];
+        return svg ? _tintedIcon("mono-" + size + "|" + name + "|", svg, tint, IconWeights.weight.monochrome[size])
+                   : "";
+    }
+    // The still weather icon `stem` in Meteocons' line or monochrome `style` as the
+    // panel draws it (weather.js): bolder than the files (iconweights.js `panel`), the
+    // monochrome one in `tint`, line's clouds and fog grey where `tint` is dark (a light
+    // theme), as its light set draws them. "" for a stem it lacks.
+    function boldWeatherIcon(style, stem, tint) {
+        var set = style === "line" ? WeatherIcons.line : WeatherIcons.monochrome;
+        if (!set[stem]) return "";
+        return _tintedIcon("weather-" + style + "|" + stem + "|", set[stem], tint, IconWeights.weight[style].panel);
     }
     // How wide each icon's artwork is across its box (the value follows the artwork,
     // not the box's empty sides), and a size correction for those that fill their box
     // more than the rest — measured from the artwork.
     readonly property var _readingArt: ({
         "thermometer": [0.22, 1],    "humidity": [0.30, 1],   "uv-index": [0.75, 0.72],
-        "raindrop":    [0.30, 1],    "raindrops": [0.46, 1],  "umbrella": [0.56, 0.95],
+        "raindrop":    [0.30, 1],    "raindrops": [0.47, 1],  "umbrella": [0.56, 0.95],
         "snowflake":   [0.42, 1],    "cloudy": [0.62, 1.05],  "barometer": [0.62, 0.82],
         "wind":        [0.66, 1],    "sunrise": [0.75, 1],    "sunset": [0.75, 1],
         "thermometer-raindrop": [0.31, 1],
@@ -2092,15 +2121,18 @@ PlasmoidItem {
     // Each entry says how to turn a WMO code into an icon source:
     //   dir        → a bundled Meteocons style, with the wi-* stem names below
     //                in <dir>static/ and their SMIL-animated twins in <dir>animated/
+    //   light:true → the same again in <dir>light/ for a light theme (lightTheme):
+    //                the near-white clouds and fog outlined, or in line's case drawn
+    //                grey, else all but lost on a light background (meteocons_packs.py)
     //   mask:true  → one-colour artwork, drawn in the theme's text colour
     //   theme:true → freedesktop "weather-*" names from the user's icon theme
     //                (no bundled files; follows the desktop theme)
     //   custom     → the user's own folder of wi-*.svg files
     // Adding a pack = one entry here (+ its files under contents/icons/).
     readonly property var iconPacks: ({
-        "meteocons-fill":       { dir: "../icons/meteocons/fill/",       animated: true },
-        "meteocons-flat":       { dir: "../icons/meteocons/flat/",       animated: true },
-        "meteocons-line":       { dir: "../icons/meteocons/line/",       animated: true },
+        "meteocons-fill":       { dir: "../icons/meteocons/fill/",       animated: true, light: true },
+        "meteocons-flat":       { dir: "../icons/meteocons/flat/",       animated: true, light: true },
+        "meteocons-line":       { dir: "../icons/meteocons/line/",       animated: true, light: true },
         "meteocons-monochrome": { dir: "../icons/meteocons/monochrome/", animated: true, mask: true },
         "system":               { theme: true, animated: false },
         "custom":               { custom: true, ext: ".svg", animated: false }
@@ -2110,16 +2142,57 @@ PlasmoidItem {
     readonly property string iconPackId: iconPacks[Plasmoid.configuration.iconPack]
                                          ? Plasmoid.configuration.iconPack : "meteocons-fill"
     readonly property var _pack: iconPacks[iconPackId]
+    // A light theme: dark text. The colour packs show their light sets (iconPacks), and
+    // the flat Element icons' cloud its outline (_tintedIcon).
+    readonly property bool lightTheme: _isDark(Kirigami.Theme.textColor)
+    function _isDark(c) {
+        return Kirigami.ColorUtils.brightnessForColor(c) === Kirigami.ColorUtils.Dark;
+    }
+    // the outline round a white cloud on a light theme: Meteocons' own edge of a grey
+    // cloud (LIGHT_OUTLINE in tools/icon-pipeline/meteocons_packs.py)
+    readonly property color lightCloudOutline: "#94A3B8"
+    // the line style's white clouds and fog on a light theme (LIGHT_LINE, ibid.)
+    readonly property color lightLineColor: "#7C8BA1"
+    // A bundled pack's folder, its light set's on a light theme.
+    function _packDir(pack) {
+        return Qt.resolvedUrl(pack.dir) + (pack.light && lightTheme ? "light/" : "");
+    }
     // true when the active pack uses theme names (needs Kirigami.Icon, not Image)
     readonly property bool iconPackIsTheme: _pack.theme === true
     // one of the bundled Meteocons styles (their proportions drive iconZoom & co.)
     readonly property bool iconPackIsMeteocons: _pack.dir !== undefined
     // one-colour artwork that views tint with the theme's text colour
     readonly property bool iconPackIsMask: _pack.mask === true
-    // The panel's default icon is a white silhouette of the Meteocons artwork,
-    // whichever pack the popup uses — outline styles are too fine to read at
-    // panel size.
-    readonly property string panelWhiteDir: "../icons/basmilius-white/32/"
+    // The weather as a Weather Element shows it — the "Weather and temperature" element
+    // — chosen by that place's "Use colored icons": in colour the Element icon pack's
+    // own style (Meteocons' flat or line weather icons, or the custom Element folder's
+    // wi-*.svg), without it Meteocons' monochrome icons in the text colour. The pack to
+    // draw from, or null for the custom Element folder, whose missing icons — and a
+    // custom pack with no folder — show the Weather icon pack's instead (conditionIcon).
+    // The panel's weather icon takes it only where the Weather icon pack is monochrome
+    // (PanelElement).
+    function elementWeatherPack(colored) {
+        if (!colored) return iconPacks["meteocons-monochrome"];
+        if (readingIconPack === "meteocons-line") return iconPacks["meteocons-line"];
+        if (readingIconPack === "custom") return null;
+        return iconPacks["meteocons-flat"];
+    }
+    function elementWeatherIcon(code, day, cloudCover, colored, stemOverride) {
+        if (code < 0) return "weather-none-available";
+        var stem = stemOverride || conditionStem(code, day, cloudCover);
+        var pack = elementWeatherPack(colored);
+        if (pack) return _packDir(pack) + "static/" + stem + ".svg";
+        if (!readingIconDir) return conditionIcon(code, day, cloudCover, stemOverride);
+        // a file URL (the settings store one; a hand-written path becomes one), which
+        // ConditionIcon tells from an icon-theme name
+        return (readingIconDir.charAt(0) === "/" ? "file://" : "") + readingIconDir + "/" + stem + ".svg";
+    }
+    // its animated twin, "" for the custom Element folder (no animations)
+    function elementWeatherIconAnimated(code, day, cloudCover, colored) {
+        var pack = elementWeatherPack(colored);
+        if (code < 0 || !pack) return "";
+        return _packDir(pack) + "animated/" + conditionStem(code, day, cloudCover) + ".svg";
+    }
     // The popup's shared animated icons (AnimatedIconCache), set by the full
     // representation it lives in; null until then, and in the panel.
     property var iconCache: null
@@ -2284,24 +2357,24 @@ PlasmoidItem {
         if (_pack.custom && Plasmoid.configuration.customIconDir)
             return Plasmoid.configuration.customIconDir + "/" + stem + _pack.ext;
         // bundled pack (or custom with no folder chosen → fall back to the fill style)
-        var dir = _pack.dir || iconPacks["meteocons-fill"].dir;
-        return Qt.resolvedUrl(dir) + "static/" + stem + ".svg";
+        return _packDir(_pack.dir ? _pack : iconPacks["meteocons-fill"]) + "static/" + stem + ".svg";
     }
     // The animated twin of conditionIcon, or "" when the pack has none. Only
     // ConditionIcon asks for it, and only where a view animates icons.
     function conditionIconAnimated(code, day, cloudCover) {
         if (code < 0 || !_pack.animated) return "";
-        return Qt.resolvedUrl(_pack.dir) + "animated/" + conditionStem(code, day, cloudCover) + ".svg";
+        return _packDir(_pack) + "animated/" + conditionStem(code, day, cloudCover) + ".svg";
     }
-    // White (monochrome) variant — the panel's icon without its colours, and the
-    // graph's day markers without theirs; both tint it to the text colour.
-    function conditionIconWhite(code, day, cloudCover, stemOverride) {
+    // One-colour variant — the graph's day markers without their colours, which tint
+    // it to the text colour: Meteocons' monochrome icon, or the system theme's or the
+    // custom folder's own.
+    function conditionIconMono(code, day, cloudCover, stemOverride) {
         if (code < 0) return "weather-none-available";
         if (_pack.theme) return conditionStemFreedesktop(code, day);
         var stem = stemOverride || conditionStem(code, day, cloudCover);
         if (_pack.custom && Plasmoid.configuration.customIconDir)
             return Plasmoid.configuration.customIconDir + "/" + stem + _pack.ext;
-        return Qt.resolvedUrl(panelWhiteDir) + stem + ".svg";
+        return Qt.resolvedUrl(iconPacks["meteocons-monochrome"].dir) + "static/" + stem + ".svg";
     }
 
     // The clear-night moon artwork (wi-night-clear) packs more visual mass into its
@@ -2325,8 +2398,9 @@ PlasmoidItem {
     // Per-condition because the glyphs fill their box by very different amounts: the
     // clear-DAY sun already fills ~75 % (rays spread wide), so the full 1.45× makes it
     // overflow and read large — it needs much less zoom than the ~50 %-fill moon.
-    function iconZoom(code, day) {
-        if (!iconPackIsMeteocons) return 1.0;
+    function iconZoom(code, day, meteocons) {
+        // the active pack's proportions, or the Meteocons icon shown regardless (`meteocons`)
+        if (!(meteocons === undefined ? iconPackIsMeteocons : meteocons)) return 1.0;
         if (day !== 0 && (code === 0 || code === 1)) return 1.20;   // sunny: lands at ~0.90 of the box
         if (code === 45 || code === 48) return (232 / 160) * 1.15;  // fog: a touch larger (sun/moon cut at the fog bank reads small)
         return 232 / 160;                                           // others: ~1.45× to fill the empty box

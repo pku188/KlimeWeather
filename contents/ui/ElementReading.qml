@@ -46,8 +46,9 @@ Row {
                 fontPx: reading.fontPx
                 slotWidth: reading.iconSlot
             }
-            // …shows the condition in the weather icon pack, in the same slot and, as a
-            // reading icon, taller than the line it overflows
+            // …shows the condition, in the same slot and, as a reading icon, taller than
+            // the line it overflows: from the Element icon pack in colour, else in
+            // Meteocons' monochrome (see ConditionIcon elementColored)
             Item {
                 visible: !!part.weather
                 anchors.verticalCenter: parent.verticalCenter
@@ -62,6 +63,8 @@ Row {
                     code: part.weather ? part.weather.code : -1
                     day: part.weather ? part.weather.day : 1
                     cloud: part.weather ? part.weather.cloud : NaN
+                    elementColored: reading.coloredIcons
+                    opacity: reading.coloredIcons ? 1 : reading.iconOpacity
                 }
             }
             Text {

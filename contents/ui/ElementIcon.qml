@@ -10,6 +10,7 @@
 import QtQuick
 import org.kde.kirigami as Kirigami
 import "../icons/meteocons/readings/monochrome.js" as MonoReadings
+import "iconweights.js" as IconWeights
 
 Item {
     id: elementIcon
@@ -23,11 +24,13 @@ Item {
         weather: "partly-cloudy-day"
     })
     readonly property string reading: readings[elementId] || ""
-    // the monochrome icon in the text colour, as a data URL (as main.qml readingIcon)
+    // the monochrome icon in the text colour, as small icons are drawn, as a data URL
+    // (as main.qml readingIcon)
     readonly property string readingUrl: {
         var svg = reading ? MonoReadings.svg[reading] : "";
-        return svg ? "data:image/svg+xml;utf8,"
-                     + encodeURIComponent(svg.replace(/currentColor/g, "" + Kirigami.Theme.textColor)) : "";
+        return svg ? "data:image/svg+xml;utf8," + encodeURIComponent(
+                         IconWeights.weighted(svg, IconWeights.weight.monochrome.small)
+                             .replace(/currentColor/g, "" + Kirigami.Theme.textColor)) : "";
     }
 
     implicitWidth: Kirigami.Units.iconSizes.smallMedium

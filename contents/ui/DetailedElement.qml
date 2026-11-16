@@ -7,7 +7,7 @@
  *  - the moon: its phase's name over an arc like the sun's, between the rise and the
  *    set of the pass across the sky the hour falls in, with the moon on it drawn in its
  *    phase, and how long until it next sets or rises;
- *  - the hour's weather: its condition icon (the icon pack's, as the header's), and
+ *  - the hour's weather: its condition icon (as the header's Weather Elements draw it), and
  *    beside it the condition over the temperature, as a reading's name and value.
  * The date is a reading too: the hour's time of day, the hour and its date.
  * Names and values read as the Weather Elements' text style prints them; the icons and
@@ -232,6 +232,8 @@ Item {
                     code: weatherBlock.code
                     day: weatherBlock.dayFlag
                     cloud: weatherBlock.now ? el.weatherRoot.heroCloud : weatherBlock.hour ? weatherBlock.hour.cloud : NaN
+                    // the Element icon pack's in colour, else monochrome (see ConditionIcon)
+                    elementColored: el.coloredIcons
                     // it moves with the hourly cards (Appearance → Common → Weather icon animation)
                     animate: el.weatherRoot ? el.weatherRoot.animatedHourlyIcons : false
                     canBuild: el.iconCanBuild

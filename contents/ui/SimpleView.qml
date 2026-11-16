@@ -2315,16 +2315,16 @@ Item {
                                     height: width
                                     roundToIconSize: false   // render at the exact size; don't snap to 22/32
                                     anchors.verticalCenter: parent.verticalCenter
-                                    // in the pack's colours, or without them the panel's solid
-                                    // white set in the theme's text colour (Appearance → Graph →
-                                    // Day markers); the monochrome pack is drawn in the text
-                                    // colour either way
+                                    // in the pack's colours, or without them its one-colour
+                                    // icon (Meteocons' monochrome, conditionIconMono) in the
+                                    // theme's text colour (Appearance → Graph → Day markers);
+                                    // the monochrome pack is drawn in the text colour either way
                                     readonly property bool colored: weatherRoot ? weatherRoot.dayMarkerIconColored : true
                                     isMask: weatherRoot ? (weatherRoot.iconPackIsMask || !colored) : false
                                     color: Kirigami.Theme.textColor
                                     source: (weatherRoot && dayMarker.dayEntry)
                                             ? (colored ? weatherRoot.conditionIcon(dayMarker.dayEntry.code, 1)
-                                                       : weatherRoot.conditionIconWhite(dayMarker.dayEntry.code, 1))
+                                                       : weatherRoot.conditionIconMono(dayMarker.dayEntry.code, 1))
                                             : "weather-clear-night"
                                 }
                                 Label {
