@@ -25,7 +25,7 @@ This is a fork of the [Bare Weather](https://github.com/bvlthvzvr/BareWeather), 
 
 ### Readouts you pick
 
-- Up to **7 days** of forecast with variety of **Weather Elements** available: air pressure, cloud cover, dew point, feels like, high/low temperature, humidity, hourly or daily precipitation, snowfall,
+- Up to **10 days** of forecast with variety of **Weather Elements** available: air pressure, cloud cover, dew point, feels like, high/low temperature, humidity, hourly or daily precipitation, snowfall,
 sunrise/sunset, UV, wind (with a direction arrow), the date and the moon's phase.
 - Show any of the Weather Elements on the **panel**, in the order you drag them into. On a vertical panel, they automatically wrap onto multiple lines.
 - Customizable unit types and time format which follow your system's locale settings by default.

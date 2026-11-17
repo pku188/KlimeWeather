@@ -210,6 +210,7 @@ Item {
                 scrollAnim.stop();
                 hourlyFlick.contentX = 0;   // always reopen on today's tab
                 full.chosenDay = -1;
+                dayTabsBox.keepSelectedShown(false);   // today's tab in view at once
                 full.redeal();
             }
         }
@@ -557,31 +558,100 @@ Item {
             }
         }
 
-        // ── Daily tabs (count limited by the dailyDays setting) ───────────
-        // wrapped in a plain Item so the sliding highlight can live OUTSIDE the
-        // RowLayout — a RowLayout manages every child item, so a highlight
-        // inside it would be grabbed as a layout cell and lose its x/width
+        // ── Daily tabs (count limited by the Forecast days setting) ───────────
+        // The tabs share the row equally, but never so narrow that one's contents
+        // would run into the next one's: the days that don't fit are left out from
+        // the end, and a dim arrow at either side says days are left out there (a
+        // click on it picks the nearest of them). The tabs shown follow the selected
+        // day, moving only as far as it takes — a wheel notch over them brings in one
+        // tab — and slide there as the hourly cards do (Appearance → Daily forecast →
+        // Scroll animation). So stepping onto a day left out (the wheel over the tabs,
+        // or scrolling the cards into it) brings it in, and a wider popup shows more.
         Item {
+            id: dayTabsBox
             Layout.row: content.cardsFirst ? 2 : 1
             Layout.fillWidth: true
             Layout.topMargin: content.cardsFirst ? content.betweenRows : content.underHeader
-            implicitHeight: dayTabsRow.implicitHeight
+            implicitHeight: dayTabsRow.height
 
-            // single selection highlight that SLIDES between tabs (drawn under
-            // the RowLayout; same coordinate space since the row fills this Item)
-            Rectangle {
-                readonly property Item sel: dayTabsRep.count > full.selectedDay
-                                            ? dayTabsRep.itemAt(full.selectedDay) : null
-                visible: sel !== null
-                x: sel ? sel.x : 0
-                y: sel ? sel.y : 0
-                width: sel ? sel.width : 0
-                height: sel ? sel.height : 0
-                radius: 8
-                color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g,
-                               Kirigami.Theme.textColor.b, 0.10)
-                Behavior on x     { NumberAnimation { duration: 250; easing.type: Easing.InOutQuad } }
-                Behavior on width { NumberAnimation { duration: 250; easing.type: Easing.InOutQuad } }
+            readonly property int spacing: Kirigami.Units.smallSpacing
+            // The widest contents of any tab (not only the ones shown, so how many fit
+            // doesn't change as they move), and the room a tab needs for them: a
+            // little air on either side, so neighbours never touch.
+            property real tabContentWidth: 0
+            readonly property real tabMinWidth: tabContentWidth + Kirigami.Units.largeSpacing
+            function _fitIn(w) { return Math.floor((w + spacing) / (tabMinWidth + spacing)); }
+            // Whether days are left out. The arrows then get room at both sides, even
+            // where none is shown, so how many tabs fit doesn't change as they move.
+            readonly property bool overflow: tabContentWidth > 0 && width > 0 && _fitIn(width) < dayTabsRep.count
+            readonly property int arrowRoom: overflow ? Kirigami.Units.iconSizes.small : 0
+            // how many tabs fit, how wide each is (whole pixels, so their text stays
+            // sharp), from one tab's start to the next one's, and the pixels left
+            // over, split between the two ends
+            readonly property int tabsFit: overflow ? Math.max(1, _fitIn(width - 2 * arrowRoom)) : dayTabsRep.count
+            readonly property int tabWidth: tabsFit > 0 ? Math.floor((tabsViewport.width - (tabsFit - 1) * spacing) / tabsFit) : 0
+            readonly property int pitch: tabWidth + spacing
+            readonly property int inset: tabsFit > 0 ? Math.floor((tabsViewport.width - tabsFit * pitch + spacing) / 2) : 0
+            // The first tab shown, and the same as the strip slides there (in tabs).
+            property int firstTab: 0
+            property real shownFirst: 0
+            NumberAnimation {
+                id: tabsSlide
+                target: dayTabsBox
+                property: "shownFirst"
+                easing.type: Easing.OutCubic      // as the hourly cards' scroll (scrollAnim)
+            }
+            function measureTabs() {
+                var w = 0;
+                for (var i = 0; i < dayTabsRep.count; ++i) {
+                    var t = dayTabsRep.itemAt(i);
+                    if (t) w = Math.max(w, t.contentWidth);
+                }
+                tabContentWidth = w;
+            }
+            // Moves the tabs shown as little as it takes to bring the selected day in,
+            // and keeps them a full row at the end. With `slide`, the strip glides
+            // there for the user's Scroll animation; otherwise (a resize, a new
+            // forecast, the popup opening) it is there at once.
+            function keepSelectedShown(slide) {
+                var n = dayTabsRep.count, fit = tabsFit, sel = full.selectedDay;
+                var first = Math.max(0, Math.min(firstTab, n - fit));
+                if (sel >= 0 && sel < n) {
+                    if (sel < first) first = sel;
+                    else if (sel >= first + fit) first = sel - fit + 1;
+                }
+                firstTab = first;
+                var ms = full.weatherRoot ? full.weatherRoot.cardSlideMs : 0;
+                if (slide && ms > 0) {
+                    if (tabsSlide.running && tabsSlide.to === first) return;
+                    tabsSlide.stop();
+                    if (shownFirst === first) return;
+                    // from where the strip is, so rapid notches stack smoothly
+                    tabsSlide.from = shownFirst;
+                    tabsSlide.to = first;
+                    tabsSlide.duration = ms;
+                    tabsSlide.start();
+                } else {
+                    tabsSlide.stop();
+                    shownFirst = first;
+                }
+            }
+            onTabsFitChanged: keepSelectedShown(false)
+            Connections {
+                target: full
+                function onSelectedDayChanged() { dayTabsBox.keepSelectedShown(true); }
+            }
+            // The name is measured in bold, as the selected tab shows it, so selecting
+            // one doesn't change what fits.
+            Label {
+                id: tabNameProbe
+                visible: false
+                font.pixelSize: weatherRoot ? weatherRoot.dailyNameFontSize : 16
+                font.bold: true
+            }
+            FontMetrics {
+                id: tabNameBold
+                font: tabNameProbe.font
             }
 
             // Wheel over the day tabs steps whole days: down = later, up = earlier,
@@ -600,86 +670,196 @@ Item {
                 }
             }
 
-            RowLayout {
-            id: dayTabsRow
-            anchors.fill: parent
-            spacing: Kirigami.Units.smallSpacing
+            // Where the tabs show, between the arrows; the strip of all of them slides
+            // inside it.
+            Item {
+                id: tabsViewport
+                x: dayTabsBox.arrowRoom
+                width: dayTabsBox.width - 2 * dayTabsBox.arrowRoom
+                height: dayTabsBox.height
+                clip: dayTabsBox.overflow
 
-            Repeater {
-                id: dayTabsRep
-                model: weatherRoot ? weatherRoot.dailyData.slice(0, weatherRoot.dailyDays) : []
-                delegate: Rectangle {
-                    id: dayTab
-                    required property int index
-                    required property var modelData
-
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 1
-                    Layout.preferredHeight: dayCol.implicitHeight + Kirigami.Units.largeSpacing * 2
+                // Single selection highlight that SLIDES between tabs, under them. It
+                // goes where the selected tab comes to rest, not where the sliding
+                // strip has it on the way: when the tabs move along under a selection
+                // at the edge, the highlight stays put rather than wobbling with them.
+                Rectangle {
+                    readonly property Item sel: dayTabsRep.count > full.selectedDay
+                                                ? dayTabsRep.itemAt(full.selectedDay) : null
+                    visible: sel !== null
+                    x: sel ? dayTabsBox.inset - dayTabsBox.firstTab * dayTabsBox.pitch + sel.x : 0
+                    y: sel ? sel.y : 0
+                    width: sel ? sel.width : 0
+                    height: sel ? sel.height : 0
                     radius: 8
-                    readonly property bool selected: index === full.selectedDay
-                    // selection is drawn by the sliding highlight; tabs only
-                    // paint their hover state
-                    color: tabHover.hovered ? Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g,
-                                  Kirigami.Theme.textColor.b, 0.06) : "transparent"
-                    Behavior on color { ColorAnimation { duration: 200 } }
+                    color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g,
+                                   Kirigami.Theme.textColor.b, 0.10)
+                    Behavior on x     { NumberAnimation { duration: 250; easing.type: Easing.InOutQuad } }
+                    Behavior on width { NumberAnimation { duration: 250; easing.type: Easing.InOutQuad } }
+                }
 
-                    HoverHandler { id: tabHover }
-                    TapHandler {
-                        onTapped: {
-                            full.chosenDay = dayTab.index;
-                            full.scrollToDay(dayTab.index);
-                        }
-                    }
+                Row {
+                    id: dayTabsRow
+                    x: Math.round(dayTabsBox.inset - dayTabsBox.shownFirst * dayTabsBox.pitch)
+                    spacing: dayTabsBox.spacing
 
-                    ColumnLayout {
-                        id: dayCol
-                        anchors.centerIn: parent
-                        width: parent.width
-                        spacing: Kirigami.Units.smallSpacing
-                        Label {
-                            Layout.alignment: Qt.AlignHCenter
-                            text: weatherRoot ? weatherRoot.dayName(dayTab.index, true) : ""
-                            font.pixelSize: weatherRoot ? weatherRoot.dailyNameFontSize : 16
-                            font.bold: dayTab.selected
-                        }
-                        // the date under the name, in the system's date format (no year)
-                        Label {
-                            Layout.alignment: Qt.AlignHCenter
-                            Layout.topMargin: -Math.round(Kirigami.Units.smallSpacing / 2)
-                            visible: weatherRoot ? weatherRoot.showDayDate : true
-                            text: weatherRoot ? weatherRoot.dailyDate(dayTab.index) : ""
-                            // follows the day name, a step smaller
-                            font.pixelSize: Math.round((weatherRoot ? weatherRoot.dailyNameFontSize : 16) * 5 / 6)
-                            font.bold: dayTab.index === 0   // today's date stands out; stays dimmed
-                            opacity: 0.55
-                        }
-                        ConditionIcon {
-                            Layout.alignment: Qt.AlignHCenter
-                            Layout.preferredWidth:  weatherRoot ? weatherRoot.dailyIconSize : 24
-                            Layout.preferredHeight: weatherRoot ? weatherRoot.dailyIconSize : 24
-                            weatherRoot: full.weatherRoot
-                            // daily tabs always show the day variant
-                            code: dayTab.modelData ? dayTab.modelData.code : -1
-                            day: 1
-                            animate: weatherRoot ? weatherRoot.animatedDailyIcons : false
-                            canBuild: full.iconsLive
-                            playing: full.onScreen
-                        }
-                        Label {
-                            Layout.alignment: Qt.AlignHCenter
-                            textFormat: Text.StyledText
-                            font.pixelSize: weatherRoot ? weatherRoot.dailyTempFontSize : 15
-                            // "↑ high  ↓ low", high in orange and low in blue — or both in
-                            // the theme's text colour (Appearance → Daily forecast → Daily
-                            // tabs → Use colored H/L)
-                            text: weatherRoot
-                                ? "<b>" + weatherRoot._hiLoText(dayTab.modelData.hi, dayTab.modelData.lo, weatherRoot.dailyHiLoColored)
-                                  + "</b>" : ""
+                    Repeater {
+                        id: dayTabsRep
+                        model: weatherRoot ? weatherRoot.dailyData.slice(0, weatherRoot.dailyDays) : []
+                        onCountChanged: Qt.callLater(dayTabsBox.keepSelectedShown, false)
+                        delegate: Rectangle {
+                            id: dayTab
+                            required property int index
+                            required property var modelData
+
+                            // the widest of its contents (see dayTabsBox.tabContentWidth)
+                            readonly property real contentWidth: Math.max(
+                                Math.ceil(tabNameBold.advanceWidth(tabName.text)),
+                                !weatherRoot || weatherRoot.showDayDate ? tabDate.implicitWidth : 0,
+                                weatherRoot ? weatherRoot.dailyIconSize : 24,
+                                tabHiLo.implicitWidth)
+                            onContentWidthChanged: Qt.callLater(dayTabsBox.measureTabs)
+                            Component.onCompleted: Qt.callLater(dayTabsBox.measureTabs)
+                            // in view, or partly while the strip slides: its icon may play
+                            readonly property bool inView: index > dayTabsBox.shownFirst - 1
+                                                           && index < dayTabsBox.shownFirst + dayTabsBox.tabsFit
+
+                            width: dayTabsBox.tabWidth
+                            height: dayCol.implicitHeight + Kirigami.Units.largeSpacing * 2
+                            radius: 8
+                            readonly property bool selected: index === full.selectedDay
+                            // selection is drawn by the sliding highlight; tabs only
+                            // paint their hover state
+                            color: tabHover.hovered ? Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g,
+                                          Kirigami.Theme.textColor.b, 0.06) : "transparent"
+                            Behavior on color { ColorAnimation { duration: 200 } }
+
+                            HoverHandler { id: tabHover }
+                            TapHandler {
+                                onTapped: {
+                                    full.chosenDay = dayTab.index;
+                                    full.scrollToDay(dayTab.index);
+                                }
+                            }
+
+                            ColumnLayout {
+                                id: dayCol
+                                anchors.centerIn: parent
+                                width: parent.width
+                                spacing: Kirigami.Units.smallSpacing
+                                Label {
+                                    id: tabName
+                                    Layout.alignment: Qt.AlignHCenter
+                                    text: weatherRoot ? weatherRoot.dayName(dayTab.index, true) : ""
+                                    font.pixelSize: weatherRoot ? weatherRoot.dailyNameFontSize : 16
+                                    font.bold: dayTab.selected
+                                }
+                                // the date under the name, in the system's date format (no year)
+                                Label {
+                                    id: tabDate
+                                    Layout.alignment: Qt.AlignHCenter
+                                    Layout.topMargin: -Math.round(Kirigami.Units.smallSpacing / 2)
+                                    visible: weatherRoot ? weatherRoot.showDayDate : true
+                                    text: weatherRoot ? weatherRoot.dailyDate(dayTab.index) : ""
+                                    // follows the day name, a step smaller
+                                    font.pixelSize: Math.round((weatherRoot ? weatherRoot.dailyNameFontSize : 16) * 5 / 6)
+                                    font.bold: dayTab.index === 0   // today's date stands out; stays dimmed
+                                    opacity: 0.55
+                                }
+                                ConditionIcon {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    Layout.preferredWidth:  weatherRoot ? weatherRoot.dailyIconSize : 24
+                                    Layout.preferredHeight: weatherRoot ? weatherRoot.dailyIconSize : 24
+                                    weatherRoot: full.weatherRoot
+                                    // daily tabs always show the day variant
+                                    code: dayTab.modelData ? dayTab.modelData.code : -1
+                                    day: 1
+                                    animate: weatherRoot ? weatherRoot.animatedDailyIcons : false
+                                    canBuild: full.iconsLive
+                                    playing: full.onScreen && dayTab.inView
+                                }
+                                Label {
+                                    id: tabHiLo
+                                    Layout.alignment: Qt.AlignHCenter
+                                    textFormat: Text.StyledText
+                                    font.pixelSize: weatherRoot ? weatherRoot.dailyTempFontSize : 15
+                                    // "↑ high  ↓ low", high in orange and low in blue — or both in
+                                    // the theme's text colour (Appearance → Daily forecast → Daily
+                                    // tabs → Use colored H/L)
+                                    text: weatherRoot
+                                        ? "<b>" + weatherRoot._hiLoText(dayTab.modelData.hi, dayTab.modelData.lo, weatherRoot.dailyHiLoColored)
+                                          + "</b>" : ""
+                                }
+                            }
                         }
                     }
                 }
             }
+
+            // The hint that days are left out: an arrow in the room at that side, drawn
+            // as the day buttons' arrows are (PillRow), with their plate under the
+            // pointer. A click picks the nearest day left out there, as a click on its
+            // tab would. It answers over its room and the popup's padding beyond it, a
+            // wider target than the arrow alone.
+            Repeater {
+                id: tabsArrows
+                model: [-1, 1]
+                delegate: Item {
+                    id: tabsArrow
+                    required property int modelData
+                    // the nearest day left out on this side
+                    readonly property int day: modelData < 0 ? dayTabsBox.firstTab - 1
+                                                             : dayTabsBox.firstTab + dayTabsBox.tabsFit
+                    readonly property bool shown: dayTabsBox.overflow && day >= 0 && day < dayTabsRep.count
+                    // the padding it reaches into, out to the popup's edge
+                    readonly property real reach: full.pad
+                    // how far the arrow sits out from the middle of its room, towards the
+                    // edge
+                    readonly property int nudge: Math.round(Kirigami.Units.smallSpacing * 0.75)
+                    x: modelData < 0 ? -reach : dayTabsBox.width - dayTabsBox.arrowRoom
+                    width: dayTabsBox.arrowRoom + reach
+                    height: dayTabsBox.height
+                    visible: arrowIcon.opacity > 0
+                    // the plate under the pointer, round-ended and upright like the day
+                    // buttons' arrows on their two-line row: as wide as reaches the tab
+                    // beside it, and no further
+                    Rectangle {
+                        anchors.centerIn: arrowIcon
+                        width: dayTabsBox.arrowRoom + 2 * tabsArrow.nudge
+                        height: Math.round(width * 1.5)
+                        radius: width / 2
+                        color: arrowHover.hovered && tabsArrow.shown
+                               ? Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g,
+                                         Kirigami.Theme.textColor.b, 0.08) : "transparent"
+                        Behavior on color { ColorAnimation { duration: 150 } }
+                    }
+                    Kirigami.Icon {
+                        id: arrowIcon
+                        // centred in its room, then nudged a little out towards the edge
+                        x: (tabsArrow.modelData < 0 ? tabsArrow.reach : 0)
+                           + Math.round((dayTabsBox.arrowRoom - width) / 2) + tabsArrow.modelData * tabsArrow.nudge
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Kirigami.Units.iconSizes.small
+                        height: width
+                        source: tabsArrow.modelData < 0 ? "arrow-left" : "arrow-right"
+                        isMask: true
+                        color: Kirigami.Theme.textColor
+                        opacity: tabsArrow.shown ? 1 : 0
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                    }
+                    HoverHandler { id: arrowHover }
+                    function pick() {
+                        // Read before picking it: the pick moves the tabs shown, and
+                        // `day` with them, to the next day left out.
+                        var to = day;
+                        full.chosenDay = to;
+                        full.scrollToDay(to);
+                    }
+                    TapHandler {
+                        enabled: tabsArrow.shown
+                        onTapped: tabsArrow.pick()
+                    }
+                }
             }
         }
 

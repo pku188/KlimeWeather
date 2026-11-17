@@ -14,11 +14,9 @@ var readings = ["hiLo", "precipRate", "wind", "feelsLike", "humidity", "precipSu
 // condition's, and the readings.
 var all = ["icon", "temp", "location", "condition"].concat(readings);
 
-// The stored list, without unknown or repeated ids. Never edited (empty): what the
-// older "Panel display" showed — `display` its mode (-1 never chosen: `detailed`, the
-// older checkbox, decides) and `secondLine` the detailed view's reading. The icon and
-// the temperature stay in the list where that display left one out, only hidden.
-function parse(json, display, detailed, secondLine) {
+// The stored list, without unknown or repeated ids. Never edited (empty): the weather
+// icon and the temperature.
+function parse(json) {
     if (json) {
         var list;
         try { list = JSON.parse(json); } catch (e) { list = null; }
@@ -33,6 +31,16 @@ function parse(json, display, detailed, secondLine) {
             return out;
         }
     }
+    return fromOlderDisplay(-1, false, 0);
+}
+
+// What the older "Panel display" showed, as a list: `display` its mode (-1 never
+// chosen: `detailed`, the older checkbox, decides) and `secondLine` the detailed
+// view's reading. The icon and the temperature stay in the list where that display
+// left one out, only hidden. Never chosen at all, the icon and the temperature.
+// Deprecated: only main.qml's one-time carry-over reads the older settings, to be
+// removed with it.
+function fromOlderDisplay(display, detailed, secondLine) {
     var m = display >= 0 ? Math.min(4, display) : (detailed ? 3 : 0);
     var legacy = [{ id: "icon", shown: m !== 2 }, { id: "temp", shown: m !== 1 }];
     if (m === 3) legacy.push({ id: readings[secondLine] || "hiLo", shown: true });

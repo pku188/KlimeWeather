@@ -11,12 +11,14 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasmoid
 import "providers"
 
-Kirigami.FormLayout {
+ScrollView {
     id: page
+    // a scroll view holding the form, as on the Location page: a page taller than
+    // the settings window scrolls rather than cutting off its last settings
+    contentWidth: availableWidth
 
     // cfg_* properties are auto-bound to the config keys by Plasma.
     property string cfg_temperatureUnit
-    property bool   cfg_unitConfigured        // set once the unit is chosen (here or auto-picked)
     property alias  cfg_refreshInterval: refreshSpin.value
     property alias  cfg_showAlerts: alertsCheck.checked
     property int    cfg_minAlertSeverity
@@ -24,10 +26,10 @@ Kirigami.FormLayout {
     property string cfg_windUnit
     property string cfg_pressureUnit
     property string cfg_precipUnit
-    property int    cfg_clockFormat
-    property bool   cfg_use24Hour             // the older checkbox, read only while clockFormat was never chosen
+    property int    cfg_clockFormat           // -1 never chosen: the system's
     property int    cfg_detailDayStartHour
     property string cfg_openMeteoModel
+    property alias  cfg_forecastDays: forecastDaysSpin.value
 
     // Open-Meteo's forecast models, as its provider lists them
     readonly property OpenMeteo openMeteo: OpenMeteo {}
@@ -56,7 +58,7 @@ Kirigami.FormLayout {
     // reset would run an old migration again.
     readonly property var keptOnReset: ["latitude", "longitude", "locationName", "locationTimezone",
                                         "locationConfigured", "savedLocations",
-                                        "locationFontsSplit", "simpleHourly", "unitConfigured"]
+                                        "simpleHourly"]
     function resetAllSettings() {
         var c = Plasmoid.configuration, keys = c.keys(), has = {}, i, k;
         for (i = 0; i < keys.length; ++i) has[keys[i]] = true;
@@ -85,229 +87,241 @@ Kirigami.FormLayout {
         dayStartCombo.sync();
     }
 
-    // two sections, titled as on the Location page
-    Kirigami.Separator {
-        Kirigami.FormData.label: i18n("Weather data")
-        Kirigami.FormData.isSection: true
-    }
-    ConfigSpinBox {
-        id: refreshSpin
-        Kirigami.FormData.label: i18n("Refresh interval (minutes):")
-        from: 1
-        to: 180
-        stepSize: 5
-    }
-    ConfigComboBox {
-        id: modelCombo
-        Kirigami.FormData.label: i18n("Open-Meteo model:")
-        textRole: "text"
-        model: page.openMeteo.models
-        function sync() {
-            currentIndex = 0;   // Best match, also for a name no longer listed
-            for (var i = 0; i < model.length; ++i)
-                if (model[i].id === page.cfg_openMeteoModel) { currentIndex = i; break; }
-        }
-        Component.onCompleted: sync()
-        onActivated: page.cfg_openMeteoModel = model[currentIndex].id
-        ToolTip.text: i18n("The forecast model Open-Meteo uses. Best match picks the best models for your location. A national weather service's model can be more precise in and around its country. Whatever a model doesn't forecast, such as the UV index, the days beyond its range or places outside its area, is filled in from Best match. Used while Open-Meteo is the weather source.")
-    }
-    RowLayout {
-        Kirigami.FormData.label: i18n("Weather alerts:")
-        CheckBox {
-            id: alertsCheck
-            text: i18n("Show weather alerts")
-        }
-        Kirigami.Icon {
-            source: "dialog-information"
-            implicitWidth: Kirigami.Units.iconSizes.small
-            implicitHeight: Kirigami.Units.iconSizes.small
-            opacity: alertInfoHov.hovered ? 1.0 : 0.7
-            HoverHandler { id: alertInfoHov }
-            ToolTip.visible: alertInfoHov.hovered
-            ToolTip.text: i18n("Weather alerts come from KDE Public Alert Server. It collects official weather warnings from agencies around the world so you get worldwide alerts without contacting, or exposing yourself to each individual agency.")
-        }
-    }
-    ConfigComboBox {
-        id: alertLevelCombo
-        Kirigami.FormData.label: i18n("Show alerts at or above:")
-        enabled: alertsCheck.checked   // only meaningful when alerts are on
-        textRole: "text"
-        // CAP severity ranks (see alertRank in main.qml): the floor for display
-        model: [
-            { text: i18n("Minor"),    value: 1 },
-            { text: i18n("Moderate"), value: 2 },
-            { text: i18n("Severe"),   value: 3 },
-            { text: i18n("Extreme"),  value: 4 }
-        ]
-        function sync() {
-            for (var i = 0; i < model.length; ++i)
-                if (model[i].value === page.cfg_minAlertSeverity) { currentIndex = i; break; }
-        }
-        Component.onCompleted: sync()
-        onActivated: page.cfg_minAlertSeverity = model[currentIndex].value
-    }
-    CheckBox {
-        id: alertNotifyCheck
-        Kirigami.FormData.label: i18n("Alert notifications:")
-        text: i18n("Notify about new alerts")
-        enabled: alertsCheck.checked
-        ToolTip.visible: hovered
-        ToolTip.text: i18n("Sends each new alert at or above the level above to the system's notifications, once. A click on it opens the widget.")
-    }
-    Kirigami.Separator {
-        Kirigami.FormData.label: i18n("Units")
-        Kirigami.FormData.isSection: true
-    }
-    ConfigComboBox {
-        id: unitCombo
-        Kirigami.FormData.label: i18n("Temperature unit:")
-        textRole: "text"
-        model: {
-            var opts = [
-                { text: i18n("Celsius (°C)"),    value: "celsius"    },
-                { text: i18n("Fahrenheit (°F)"), value: "fahrenheit" }
-            ];
-            // °F only where the locale is US imperial
-            var sys = page.localeMeasurement === Locale.ImperialUSSystem ? "fahrenheit" : "celsius";
-            return [{ text: page.followSystem(opts, sys), value: "system" }].concat(opts);
-        }
-        function sync() {
-            for (var i = 0; i < model.length; ++i)
-                if (model[i].value === page.cfg_temperatureUnit) { currentIndex = i; break; }
-        }
-        Component.onCompleted: sync()
-        onActivated: { page.cfg_temperatureUnit = model[currentIndex].value; page.cfg_unitConfigured = true; }
-    }
-    ConfigComboBox {
-        id: windUnitCombo
-        Kirigami.FormData.label: i18n("Wind speed unit:")
-        textRole: "text"
-        model: {
-            var opts = [
-                { text: i18n("Kilometers per hour (km/h)"), value: "kmh" },
-                { text: i18n("Miles per hour (mph)"),       value: "mph" },
-                { text: i18n("Meters per second (m/s)"),    value: "ms"  },
-                { text: i18n("Knots (kn)"),                 value: "kn"  },
-                { text: i18n("Beaufort scale (bft)"),       value: "bft" }
-            ];
-            // mph wherever the locale is imperial (the UK's too)
-            var sys = page.localeMeasurement === Locale.MetricSystem ? "kmh" : "mph";
-            return [{ text: page.followSystem(opts, sys), value: "auto" }].concat(opts);
-        }
-        function sync() {
-            for (var i = 0; i < model.length; ++i)
-                if (model[i].value === page.cfg_windUnit) { currentIndex = i; break; }
-        }
-        Component.onCompleted: sync()
-        onActivated: page.cfg_windUnit = model[currentIndex].value
-    }
-    ConfigComboBox {
-        id: pressureUnitCombo
-        Kirigami.FormData.label: i18n("Air pressure unit:")
-        textRole: "text"
-        model: {
-            var opts = [
-                { text: i18n("Hectopascals (hPa)"),            value: "hPa"  },
-                { text: i18n("Inches of mercury (inHg)"),      value: "inHg" },
-                { text: i18n("Millimeters of mercury (mmHg)"), value: "mmHg" }
-            ];
-            // inHg where the locale is US imperial
-            var sys = page.localeMeasurement === Locale.ImperialUSSystem ? "inHg" : "hPa";
-            return [{ text: page.followSystem(opts, sys), value: "auto" }].concat(opts);
-        }
-        function sync() {
-            for (var i = 0; i < model.length; ++i)
-                if (model[i].value === page.cfg_pressureUnit) { currentIndex = i; break; }
-        }
-        Component.onCompleted: sync()
-        onActivated: page.cfg_pressureUnit = model[currentIndex].value
-    }
-    ConfigComboBox {
-        id: precipUnitCombo
-        Kirigami.FormData.label: i18n("Precipitation unit:")
-        textRole: "text"
-        model: {
-            var opts = [
-                { text: i18n("Millimeters (mm)"), value: "mm" },
-                { text: i18n("Inches (in)"),      value: "in" }
-            ];
-            // inches where the locale is US imperial (the UK measures rain in mm)
-            var sys = page.localeMeasurement === Locale.ImperialUSSystem ? "in" : "mm";
-            return [{ text: page.followSystem(opts, sys), value: "auto" }].concat(opts);
-        }
-        function sync() {
-            for (var i = 0; i < model.length; ++i)
-                if (model[i].value === page.cfg_precipUnit) { currentIndex = i; break; }
-        }
-        Component.onCompleted: sync()
-        onActivated: page.cfg_precipUnit = model[currentIndex].value
-        ToolTip.text: i18n("Snowfall follows it: centimeters with millimeters, inches with inches.")
-    }
-    ConfigComboBox {
-        id: clockFormatCombo
-        Kirigami.FormData.label: i18n("Clock format:")
-        textRole: "text"
-        // value is the stored mode (main.qml clockFormat), not the index
-        model: [
-            { text: i18n("Follow system (%1)", page.localeUses12Hour ? i18nc("short for 12-hour time", "12h")
-                                                                     : i18nc("short for 24-hour time", "24h")),
-              value: 0 },
-            { text: i18n("12-hour time"),          value: 1 },
-            { text: i18n("24-hour time"),          value: 2 }
-        ]
-        // never chosen: what main.qml derives from the older checkbox
-        function sync() {
-            var m = page.cfg_clockFormat >= 0 ? page.cfg_clockFormat : (page.cfg_use24Hour ? 0 : 1);
-            for (var i = 0; i < model.length; ++i)
-                if (model[i].value === m) { currentIndex = i; break; }
-        }
-        Component.onCompleted: sync()
-        onActivated: page.cfg_clockFormat = model[currentIndex].value
-    }
+    Kirigami.FormLayout {
+        width: page.availableWidth
 
-    Kirigami.Separator {
-        Kirigami.FormData.label: i18n("Miscellaneous")
-        Kirigami.FormData.isSection: true
-    }
-    ConfigComboBox {
-        id: dayStartCombo
-        Kirigami.FormData.label: i18n("Day starts at:")
-        textRole: "text"
-        // the hour a day other than today opens at (detailDayStartHour), in the Daily
-        // forecast and the Detailed view: 6 AM skips the night, Midnight opens at 00:00
-        model: [
-            { text: i18n("6 AM"),     value: 6 },
-            { text: i18n("Midnight"), value: 0 }
-        ]
-        function sync() {
-            for (var i = 0; i < model.length; ++i)
-                if (model[i].value === page.cfg_detailDayStartHour) { currentIndex = i; break; }
+        // two sections, titled as on the Location page
+        Kirigami.Separator {
+            Kirigami.FormData.label: i18n("Weather data")
+            Kirigami.FormData.isSection: true
         }
-        Component.onCompleted: sync()
-        onActivated: page.cfg_detailDayStartHour = model[currentIndex].value
-        ToolTip.text: i18n("The hour a day opens at when you pick it, in the Daily forecast and the Detailed view. Today always opens at the current hour.")
-    }
-    Button {
-        text: i18n("Reset All Settings…")
-        icon.name: "edit-reset"
-        onClicked: resetPrompt.open()
-    }
-    Kirigami.PromptDialog {
-        id: resetPrompt
-        title: i18n("Reset all settings?")
-        subtitle: i18n("Every setting of this widget goes back to its default. Your location and saved locations are kept.")
-        standardButtons: Kirigami.Dialog.NoButton
-        customFooterActions: [
-            Kirigami.Action {
-                text: i18n("Reset")
-                icon.name: "edit-reset"
-                onTriggered: { page.resetAllSettings(); resetPrompt.close(); }
-            },
-            Kirigami.Action {
-                text: i18n("Cancel")
-                icon.name: "dialog-cancel"
-                onTriggered: resetPrompt.close()
+        ConfigSpinBox {
+            id: forecastDaysSpin
+            Kirigami.FormData.label: i18n("Forecast days:")
+            from: 1
+            to: 10
+            ToolTip.visible: hovered
+            ToolTip.text: i18n("How many days the forecast shows, today included, in every layout: the Daily forecast's day tabs and the day buttons of the Weather graph and the Detailed view. The graph always shows at least three.")
+        }
+        ConfigSpinBox {
+            id: refreshSpin
+            Kirigami.FormData.label: i18n("Refresh interval (minutes):")
+            from: 1
+            to: 180
+            stepSize: 5
+        }
+        ConfigComboBox {
+            id: modelCombo
+            Kirigami.FormData.label: i18n("Open-Meteo model:")
+            textRole: "text"
+            model: page.openMeteo.models
+            function sync() {
+                currentIndex = 0;   // Best match, also for a name no longer listed
+                for (var i = 0; i < model.length; ++i)
+                    if (model[i].id === page.cfg_openMeteoModel) { currentIndex = i; break; }
             }
-        ]
+            Component.onCompleted: sync()
+            onActivated: page.cfg_openMeteoModel = model[currentIndex].id
+            ToolTip.text: i18n("The forecast model Open-Meteo uses. Best match picks the best models for your location. A national weather service's model can be more precise in and around its country. Whatever a model doesn't forecast, such as the UV index, the days beyond its range or places outside its area, is filled in from Best match. Used while Open-Meteo is the weather source.")
+        }
+        RowLayout {
+            Kirigami.FormData.label: i18n("Weather alerts:")
+            CheckBox {
+                id: alertsCheck
+                text: i18n("Show weather alerts")
+            }
+            Kirigami.Icon {
+                source: "dialog-information"
+                implicitWidth: Kirigami.Units.iconSizes.small
+                implicitHeight: Kirigami.Units.iconSizes.small
+                opacity: alertInfoHov.hovered ? 1.0 : 0.7
+                HoverHandler { id: alertInfoHov }
+                ToolTip.visible: alertInfoHov.hovered
+                ToolTip.text: i18n("Weather alerts come from KDE Public Alert Server. It collects official weather warnings from agencies around the world so you get worldwide alerts without contacting, or exposing yourself to each individual agency.")
+            }
+        }
+        ConfigComboBox {
+            id: alertLevelCombo
+            Kirigami.FormData.label: i18n("Show alerts at or above:")
+            enabled: alertsCheck.checked   // only meaningful when alerts are on
+            textRole: "text"
+            // CAP severity ranks (see alertRank in main.qml): the floor for display
+            model: [
+                { text: i18n("Minor"),    value: 1 },
+                { text: i18n("Moderate"), value: 2 },
+                { text: i18n("Severe"),   value: 3 },
+                { text: i18n("Extreme"),  value: 4 }
+            ]
+            function sync() {
+                for (var i = 0; i < model.length; ++i)
+                    if (model[i].value === page.cfg_minAlertSeverity) { currentIndex = i; break; }
+            }
+            Component.onCompleted: sync()
+            onActivated: page.cfg_minAlertSeverity = model[currentIndex].value
+        }
+        CheckBox {
+            id: alertNotifyCheck
+            Kirigami.FormData.label: i18n("Alert notifications:")
+            text: i18n("Notify about new alerts")
+            enabled: alertsCheck.checked
+            ToolTip.visible: hovered
+            ToolTip.text: i18n("Sends each new alert at or above the level above to the system's notifications, once. A click on it opens the widget.")
+        }
+        Kirigami.Separator {
+            Kirigami.FormData.label: i18n("Units")
+            Kirigami.FormData.isSection: true
+        }
+        ConfigComboBox {
+            id: unitCombo
+            Kirigami.FormData.label: i18n("Temperature unit:")
+            textRole: "text"
+            model: {
+                var opts = [
+                    { text: i18n("Celsius (°C)"),    value: "celsius"    },
+                    { text: i18n("Fahrenheit (°F)"), value: "fahrenheit" }
+                ];
+                // °F only where the locale is US imperial
+                var sys = page.localeMeasurement === Locale.ImperialUSSystem ? "fahrenheit" : "celsius";
+                return [{ text: page.followSystem(opts, sys), value: "system" }].concat(opts);
+            }
+            function sync() {
+                for (var i = 0; i < model.length; ++i)
+                    if (model[i].value === page.cfg_temperatureUnit) { currentIndex = i; break; }
+            }
+            Component.onCompleted: sync()
+            onActivated: page.cfg_temperatureUnit = model[currentIndex].value
+        }
+        ConfigComboBox {
+            id: windUnitCombo
+            Kirigami.FormData.label: i18n("Wind speed unit:")
+            textRole: "text"
+            model: {
+                var opts = [
+                    { text: i18n("Kilometers per hour (km/h)"), value: "kmh" },
+                    { text: i18n("Miles per hour (mph)"),       value: "mph" },
+                    { text: i18n("Meters per second (m/s)"),    value: "ms"  },
+                    { text: i18n("Knots (kn)"),                 value: "kn"  },
+                    { text: i18n("Beaufort scale (bft)"),       value: "bft" }
+                ];
+                // mph wherever the locale is imperial (the UK's too)
+                var sys = page.localeMeasurement === Locale.MetricSystem ? "kmh" : "mph";
+                return [{ text: page.followSystem(opts, sys), value: "auto" }].concat(opts);
+            }
+            function sync() {
+                for (var i = 0; i < model.length; ++i)
+                    if (model[i].value === page.cfg_windUnit) { currentIndex = i; break; }
+            }
+            Component.onCompleted: sync()
+            onActivated: page.cfg_windUnit = model[currentIndex].value
+        }
+        ConfigComboBox {
+            id: pressureUnitCombo
+            Kirigami.FormData.label: i18n("Air pressure unit:")
+            textRole: "text"
+            model: {
+                var opts = [
+                    { text: i18n("Hectopascals (hPa)"),            value: "hPa"  },
+                    { text: i18n("Inches of mercury (inHg)"),      value: "inHg" },
+                    { text: i18n("Millimeters of mercury (mmHg)"), value: "mmHg" }
+                ];
+                // inHg where the locale is US imperial
+                var sys = page.localeMeasurement === Locale.ImperialUSSystem ? "inHg" : "hPa";
+                return [{ text: page.followSystem(opts, sys), value: "auto" }].concat(opts);
+            }
+            function sync() {
+                for (var i = 0; i < model.length; ++i)
+                    if (model[i].value === page.cfg_pressureUnit) { currentIndex = i; break; }
+            }
+            Component.onCompleted: sync()
+            onActivated: page.cfg_pressureUnit = model[currentIndex].value
+        }
+        ConfigComboBox {
+            id: precipUnitCombo
+            Kirigami.FormData.label: i18n("Precipitation unit:")
+            textRole: "text"
+            model: {
+                var opts = [
+                    { text: i18n("Millimeters (mm)"), value: "mm" },
+                    { text: i18n("Inches (in)"),      value: "in" }
+                ];
+                // inches where the locale is US imperial (the UK measures rain in mm)
+                var sys = page.localeMeasurement === Locale.ImperialUSSystem ? "in" : "mm";
+                return [{ text: page.followSystem(opts, sys), value: "auto" }].concat(opts);
+            }
+            function sync() {
+                for (var i = 0; i < model.length; ++i)
+                    if (model[i].value === page.cfg_precipUnit) { currentIndex = i; break; }
+            }
+            Component.onCompleted: sync()
+            onActivated: page.cfg_precipUnit = model[currentIndex].value
+            ToolTip.text: i18n("Snowfall follows it: centimeters with millimeters, inches with inches.")
+        }
+        ConfigComboBox {
+            id: clockFormatCombo
+            Kirigami.FormData.label: i18n("Clock format:")
+            textRole: "text"
+            // value is the stored mode (main.qml clockFormat), not the index
+            model: [
+                { text: i18n("Follow system (%1)", page.localeUses12Hour ? i18nc("short for 12-hour time", "12h")
+                                                                         : i18nc("short for 24-hour time", "24h")),
+                  value: 0 },
+                { text: i18n("12-hour time"),          value: 1 },
+                { text: i18n("24-hour time"),          value: 2 }
+            ]
+            // never chosen: what main.qml derives from the older checkbox
+            function sync() {
+                var m = page.cfg_clockFormat >= 0 ? page.cfg_clockFormat : 0;
+                for (var i = 0; i < model.length; ++i)
+                    if (model[i].value === m) { currentIndex = i; break; }
+            }
+            Component.onCompleted: sync()
+            onActivated: page.cfg_clockFormat = model[currentIndex].value
+        }
+
+        Kirigami.Separator {
+            Kirigami.FormData.label: i18n("Miscellaneous")
+            Kirigami.FormData.isSection: true
+        }
+        ConfigComboBox {
+            id: dayStartCombo
+            Kirigami.FormData.label: i18n("Day starts at:")
+            textRole: "text"
+            // the hour a day other than today opens at (detailDayStartHour), in the Daily
+            // forecast and the Detailed view: 6 AM skips the night, Midnight opens at 00:00
+            model: [
+                { text: i18n("6 AM"),     value: 6 },
+                { text: i18n("Midnight"), value: 0 }
+            ]
+            function sync() {
+                for (var i = 0; i < model.length; ++i)
+                    if (model[i].value === page.cfg_detailDayStartHour) { currentIndex = i; break; }
+            }
+            Component.onCompleted: sync()
+            onActivated: page.cfg_detailDayStartHour = model[currentIndex].value
+            ToolTip.text: i18n("The hour a day opens at when you pick it, in the Daily forecast and the Detailed view. Today always opens at the current hour.")
+        }
+        Button {
+            text: i18n("Reset All Settings…")
+            icon.name: "edit-reset"
+            onClicked: resetPrompt.open()
+        }
+        Kirigami.PromptDialog {
+            id: resetPrompt
+            title: i18n("Reset all settings?")
+            subtitle: i18n("Every setting of this widget goes back to its default. Your location and saved locations are kept.")
+            standardButtons: Kirigami.Dialog.NoButton
+            customFooterActions: [
+                Kirigami.Action {
+                    text: i18n("Reset")
+                    icon.name: "edit-reset"
+                    onTriggered: { page.resetAllSettings(); resetPrompt.close(); }
+                },
+                Kirigami.Action {
+                    text: i18n("Cancel")
+                    icon.name: "dialog-cancel"
+                    onTriggered: resetPrompt.close()
+                }
+            ]
+        }
     }
 }

@@ -31,8 +31,7 @@ Item {
     property string cfg_readingIconPack
     property string cfg_readingIconDir
     property alias cfg_backgroundTransparency: backgroundTransparencySpin.value
-    // Detailed layout (forecast days moved here from the General page)
-    property alias cfg_dailyDays:          dailyDaysSpin.value
+    // Detailed layout (its forecast days are one setting for every layout, General)
     property alias cfg_heroIconSize:       heroSpin.value
     property alias cfg_tempFontSize:       tempSpin.value
     property alias cfg_dailyNameFontSize:  dailyNameSpin.value
@@ -52,15 +51,11 @@ Item {
     property alias cfg_layoutButtonFontSize: layoutButtonSpin.value
     property alias cfg_dayPillFontSize:      dayPillSpin.value
     // Detailed view
-    property alias cfg_detailedViewDays:     detailedDaysSpin.value
     property alias cfg_detailedViewFontSize: detailedFontSpin.value
     property int   cfg_detailedViewFontWeight
     property alias cfg_detailedEntrancePercent: detailedEntranceSpin.value
     property string cfg_detailedViewElements
     property int   cfg_cardAnimation
-    // the older per-part switches, read only while cardAnimation was never chosen
-    property bool  cfg_animatedDailyIcons
-    property bool  cfg_animatedHourlyIcons
     property string cfg_headerMetric1
     property string cfg_headerMetric2
     property string cfg_headerMetric3
@@ -77,7 +72,6 @@ Item {
     property alias cfg_simpleHourFontSize:     simpleHourSpin.value
     property alias cfg_simpleGraphTempFontSize: simpleGraphTempSpin.value
     property alias cfg_simpleDayMarkerFontSize: simpleDayMarkerSpin.value
-    property alias cfg_simpleDailyDays:         graphDaysSpin.value
     property alias cfg_graphScrollHoursDay:     graphScrollDaySpin.value
     property alias cfg_graphScrollHoursDetail:  graphScrollDetailSpin.value
     property alias cfg_graphScrollHoursWide:    graphScrollWideSpin.value
@@ -103,10 +97,6 @@ Item {
     property alias cfg_panelFontPercent:   panelFontSpin.value
     property alias cfg_panelColorIcon:     panelColorCheck.checked
     property string cfg_panelElements
-    // the older "Panel display", read only while the Panel Elements were never edited
-    property int   cfg_panelDisplay
-    property bool  cfg_panelDetailed
-    property int   cfg_panelSecondLine
     property int   cfg_panelTempFontWeight
     property int   cfg_panelSecondLineFontWeight
     property alias cfg_panelElementSpacing: panelSpacingSpin.value
@@ -203,9 +193,7 @@ Item {
     ElementsModel {
         id: panelEdit
         allIds: PanelElements.all
-        parse: function (json) {
-            return PanelElements.parse(json, page.cfg_panelDisplay, page.cfg_panelDetailed, page.cfg_panelSecondLine);
-        }
+        parse: PanelElements.parse
         stringify: PanelElements.stringify
         nameOf: page.panelElementName
         json: page.cfg_panelElements
@@ -425,10 +413,7 @@ Item {
                                 { text: i18n("Header and daily tab icons"), value: 2 },
                                 { text: i18n("Full layout"),                value: 3 }
                             ]
-                            // never chosen: what main.qml derives from the older switches
-                            Component.onCompleted: currentIndex = page.cfg_cardAnimation >= 0
-                                ? Math.min(3, page.cfg_cardAnimation)
-                                : (page.cfg_animatedHourlyIcons ? 3 : page.cfg_animatedDailyIcons ? 2 : 0)
+                            Component.onCompleted: currentIndex = Math.max(0, Math.min(3, page.cfg_cardAnimation))
                             onActivated: page.cfg_cardAnimation = model[currentIndex].value
                             ToolTip.text: i18n("Which icons move, in every layout: the header's, then the Daily forecast's daily tabs, then the hourly cards and the Weather graph's hour icons.")
                         }
@@ -607,12 +592,6 @@ Item {
                     Kirigami.FormLayout {
                         Layout.alignment: Qt.AlignTop
                         ConfigSpinBox {
-                            id: dailyDaysSpin
-                            Kirigami.FormData.label: i18n("Forecast days:")
-                            from: 1
-                            to: 7
-                        }
-                        ConfigSpinBox {
                             id: cardScrollSpin
                             Kirigami.FormData.label: i18n("Cards per scroll:")
                             from: 1
@@ -628,7 +607,7 @@ Item {
                             textFromValue: (value, locale) => i18n("%1 ms", value)
                             valueFromText: (text, locale) => parseInt(text.replace(/[^0-9]/g, "") || "0", 10)
                             ToolTip.visible: hovered
-                            ToolTip.text: i18n("How long the cards take to glide to their new place after one scroll notch. More cards per scroll covers more ground, so it wants a longer glide to feel the same. 0 jumps straight there.")
+                            ToolTip.text: i18n("How long the cards take to glide to their new place after one scroll notch, and the day tabs to bring in a day left out. More cards per scroll covers more ground, so it wants a longer glide to feel the same. 0 jumps straight there.")
                         }
                         ConfigSpinBox {
                             id: dailyNameSpin
@@ -848,14 +827,6 @@ Item {
                     // one. Typed-in values are still accepted; the arrows just keep to the
                     // steps that stay smooth.
                     ConfigSpinBox {
-                        id: graphDaysSpin
-                        Kirigami.FormData.label: i18n("Forecast days:")
-                        // the day pills grow to the left, on their own row under the
-                        // source button (see HeaderRightBlock)
-                        from: 3
-                        to: 7
-                    }
-                    ConfigSpinBox {
                         id: graphScrollDetailSpin
                         Kirigami.FormData.label: i18n("Scroll step, 12-hour view (hours):")
                         from: 1
@@ -998,7 +969,7 @@ Item {
                     CheckBox {
                         id: dayMarkerDateCheck
                         Kirigami.FormData.label: i18n("Day markers:")
-                        text: i18n("Show the date next to each day")
+                        text: i18n("Show the date under the weekday")
                     }
                     CheckBox {
                         id: dayMarkerColorCheck
@@ -1072,14 +1043,6 @@ Item {
                         Kirigami.FormLayout {
                             Layout.alignment: Qt.AlignTop
                             Layout.fillWidth: false
-                            ConfigSpinBox {
-                                id: detailedDaysSpin
-                                Kirigami.FormData.label: i18n("Forecast days:")
-                                from: 1
-                                to: 7
-                                ToolTip.visible: hovered
-                                ToolTip.text: i18n("The day buttons, and how far the view scrolls.")
-                            }
                             ConfigSpinBox {
                                 id: detailedFontSpin
                                 Kirigami.FormData.label: i18n("Element font:")
