@@ -12,6 +12,9 @@
  * Used for providers that publish no sun times or day/night flag (met.no), and
  * by the hourly grid to re-derive day/night for hours expanded out of a 6-hour
  * block. Open-Meteo reports both itself, and those are used as published.
+ *
+ * Also the sun's height at a moment (cosZenith), and the clear-sky UV index that
+ * follows from it (clearSkyUv), for the hours met.no publishes no UV for.
  */
 .pragma library
 
@@ -73,6 +76,60 @@ function sunTimes(lat, lon, dateStr, utcOffsetSeconds) {
         polarDay: false,
         polarNight: false
     };
+}
+
+/*
+ * Cosine of the sun's zenith angle at `ms` (UTC epoch) and this coordinate: 1 with
+ * the sun overhead, 0 on the horizon, below 0 at night. The same low-precision solar
+ * model as sunTimes, for the sun's height at one moment rather than its crossings.
+ */
+function cosZenith(lat, lon, ms) {
+    var n = _jdFromMs(ms) - 2451545.0;
+    var M = (357.5291 + 0.98560028 * n) % 360;                           // solar mean anomaly
+    var C = 1.9148 * Math.sin(M * _RAD)                                  // equation of the centre
+          + 0.0200 * Math.sin(2 * M * _RAD)
+          + 0.0003 * Math.sin(3 * M * _RAD);
+    var lambda = ((M + C + 180 + 102.9372) % 360) * _RAD;                // ecliptic longitude
+    var eps = 23.4397 * _RAD;                                            // obliquity of the ecliptic
+    var dec = Math.asin(Math.sin(lambda) * Math.sin(eps));               // declination
+    var ra = Math.atan2(Math.cos(eps) * Math.sin(lambda), Math.cos(lambda));   // right ascension
+    var gmst = (280.46061837 + 360.98564736629 * n) % 360;               // sidereal time, degrees
+    var ha = (gmst + lon) * _RAD - ra;                                   // hour angle
+    return Math.sin(lat * _RAD) * Math.sin(dec) + Math.cos(lat * _RAD) * Math.cos(dec) * Math.cos(ha);
+}
+
+/*
+ * Clear-sky UV index — the UV a cloudless sky lets through — at a sun height of
+ * `cosZ` (cosZenith): it follows the sun's height almost alone, as
+ * scale · cos(zenith)^2.42 (Madronich's fit), `scale` carrying the ozone and the
+ * altitude. 0 with the sun down.
+ */
+var UV_POWER = 2.42;
+var UV_SCALE = 12.5;   // sea level, average ozone
+function clearSkyUv(cosZ, scale) {
+    return cosZ > 0 ? scale * Math.pow(cosZ, UV_POWER) : 0;
+}
+
+/*
+ * The scale (see clearSkyUv) that best fits the clear-sky UV a forecast publishes —
+ * `pairs` of [cosZ, uv], by least squares over the daytime ones — so an estimate
+ * carries on from the published values: the location's ozone and altitude are in it.
+ * Measured against met.no's own values it was 12 to 19, and the fit came within 0.05
+ * UV on average. UV_SCALE when there is too little daylight in them to tell (polar
+ * night).
+ */
+function clearSkyUvScale(pairs) {
+    var sxy = 0, sxx = 0, n = 0;
+    for (var i = 0; i < pairs.length; ++i) {
+        var cz = pairs[i][0], uv = pairs[i][1];
+        if (!(cz > 0.02) || isNaN(uv)) continue;   // the sun over ~1°: below, UV is all noise
+        var f = Math.pow(cz, UV_POWER);
+        sxy += uv * f;
+        sxx += f * f;
+        ++n;
+    }
+    if (n < 3 || !(sxx > 0)) return UV_SCALE;
+    return Math.max(5, Math.min(30, sxy / sxx));
 }
 
 /*

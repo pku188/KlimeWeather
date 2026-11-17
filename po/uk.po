@@ -487,11 +487,6 @@ msgstr ""
 "Розфарбовує значення елементів погоди в шапці — синім опади, від зеленого до "
 "червоного індекс УФ тощо. Вимкнені — слідують за вашою темою."
 
-#: contents/ui/configAppearance.qml:611 contents/ui/configAppearance.qml:852
-#: contents/ui/configAppearance.qml:1077
-msgid "Forecast days:"
-msgstr "Кількість днів прогнозу:"
-
 #: contents/ui/configAppearance.qml:617
 msgid "Cards per scroll:"
 msgstr "Карток за прокручування:"
@@ -507,13 +502,15 @@ msgstr "%1 мс"
 
 #: contents/ui/configAppearance.qml:631
 msgid ""
-"How long the cards take to glide to their new place after one scroll notch. "
-"More cards per scroll covers more ground, so it wants a longer glide to feel "
-"the same. 0 jumps straight there."
+"How long the cards take to glide to their new place after one scroll notch, "
+"and the day tabs to bring in a day left out. More cards per scroll covers "
+"more ground, so it wants a longer glide to feel the same. 0 jumps straight "
+"there."
 msgstr ""
-"Скільки часу картки ковзають на нове місце після одного кроку прокручування. "
-"Більше карток за прокручування — більша відстань, тож потрібне довше "
-"ковзання, щоб відчуття було таким самим. 0 — перехід одразу."
+"Скільки часу картки ковзають на нове місце після одного кроку прокручування, "
+"а вкладки днів — щоб показати пропущений день. Більше карток за "
+"прокручування — більша відстань, тож потрібне довше ковзання, щоб відчуття "
+"було таким самим. 0 — перехід одразу."
 
 #: contents/ui/configAppearance.qml:635
 msgid "Daily tab name font:"
@@ -751,8 +748,8 @@ msgid "Day markers:"
 msgstr "Позначки днів:"
 
 #: contents/ui/configAppearance.qml:1001
-msgid "Show the date next to each day"
-msgstr "Показувати дату біля кожного дня"
+msgid "Show the date under the weekday"
+msgstr "Показувати дату під днем тижня"
 
 #: contents/ui/configAppearance.qml:1005
 msgid "Use colored day markers"
@@ -765,10 +762,6 @@ msgid ""
 msgstr ""
 "Розфарбовує позначки днів на графіку, а також його значки, час і сяйво сходу "
 "й заходу сонця."
-
-#: contents/ui/configAppearance.qml:1081
-msgid "The day buttons, and how far the view scrolls."
-msgstr "Кнопки днів і те, як далеко прокручується перегляд."
 
 #: contents/ui/configAppearance.qml:1085
 msgid "Element font:"
@@ -939,6 +932,20 @@ msgstr "Як у системі (%1)"
 #: contents/ui/configGeneral.qml:90 contents/ui/configSources.qml:38
 msgid "Weather data"
 msgstr "Погодні дані"
+
+#: contents/ui/configGeneral.qml:114
+msgid "Forecast days:"
+msgstr "Кількість днів прогнозу:"
+
+#: contents/ui/configGeneral.qml:120
+msgid ""
+"How many days the forecast shows, today included, in every layout: the Daily "
+"forecast's day tabs and the day buttons of the Weather graph and the "
+"Detailed view. The graph always shows at least three."
+msgstr ""
+"Скільки днів показує прогноз, включно з сьогоднішнім, в усіх режимах: "
+"вкладки днів Щоденного прогнозу та кнопки днів Графіка погоди й детального "
+"перегляду. Графік завжди показує щонайменше три."
 
 #: contents/ui/configGeneral.qml:95
 msgid "Refresh interval (minutes):"

@@ -18,7 +18,8 @@
  * come through unchanged. Precipitation
  * and snowfall AMOUNTS are split evenly across the block's hours: they are totals
  * for the whole block, and holding a total on every hour counted it once per hour —
- * a 12 mm block read as 12 mm on six consecutive hours, 72 mm in all. Everything
+ * a 12 mm block read as 12 mm on six consecutive hours, 72 mm in all. The UV index
+ * takes each hour's own where the provider gives one per hour (uvHours). Everything
  * else — code, precip chance, cloud, wind — is HELD across the block: a chance or a
  * condition is not divisible, and inventing intermediate values would fabricate
  * detail the forecast does not have. Each expanded point keeps the spanHours it
@@ -175,6 +176,10 @@ function build(allHourly, dailyData, days, nowMs) {
                 if (!isNaN(s.dew) && !isNaN(nxt.dew))
                     pt.dew = hermite(s.dew, nxt.dew, dewSlope[i], dewSlope[i + 1], gap, k / gap);
             }
+            // the hour's own UV, where the provider gives one per hour (met.no's
+            // clear-sky UV worked out from the sun), not the block's highest
+            if (s.uvHours && k < s.uvHours.length) pt.uv = s.uvHours[k];
+            delete pt.uvHours;
             if (span > 1) {
                 // block totals → per-hour share, so the hours sum back to the block
                 if (!isNaN(s.precipAmt)) pt.precipAmt = s.precipAmt / span;

@@ -60,12 +60,6 @@
     <entry name="temperatureUnit" type="String">
       <default>system</default>
     </entry>
-    <!-- whether the temperature unit has been decided — by the user, or auto-picked
-         from the first location's country during setup. Gates the auto-pick so it
-         never overrides a deliberate choice. -->
-    <entry name="unitConfigured" type="Bool">
-      <default>true</default>
-    </entry>
     <!-- wind speed unit: auto (follows the system locale's measurement system), kmh,
          mph, ms, kn or bft (the Beaufort scale) -->
     <entry name="windUnit" type="String">
@@ -82,21 +76,30 @@
       <default>auto</default>
     </entry>
     <!-- Clock format: 0 follows the system default (the locale's own time format),
-         1 = 12-hour, 2 = 24-hour. -1 = never chosen: derived from use24Hour below,
-         the older checkbox, so an upgrade keeps a deliberate 12-hour choice. -->
+         1 = 12-hour, 2 = 24-hour. -1 = never chosen, as the system's: start-up stores
+         a choice, carried over from use24Hour below so an upgrade keeps a deliberate
+         12-hour one (main.qml). -->
     <entry name="clockFormat" type="Int">
       <default>-1</default>
     </entry>
-    <!-- older "Use 24-hour time" checkbox, now only read to derive clockFormat -->
+    <!-- Deprecated: the "Use 24-hour time" checkbox clockFormat replaced. Read once at
+         startup to carry a cleared box over, then cleared; to be removed, with that
+         carry-over, a release or two on. -->
     <entry name="use24Hour" type="Bool">
       <default>true</default>
     </entry>
+    <!-- Days the forecast shows, today included, in every layout (General →
+         Forecast days): 1 to 10, the graph at least 3. -->
+    <entry name="forecastDays" type="Int">
+      <default>5</default>
+    </entry>
+    <!-- Deprecated: the per-layout day counts forecastDays replaced, the card
+         layout's, the graph's and (further down) the Detailed view's. Read once at
+         startup to carry a count that was set over, then cleared (main.qml); to be
+         removed, with that carry-over, a release or two on. -->
     <entry name="dailyDays" type="Int">
       <default>5</default>
     </entry>
-    <!-- Days the graph layout spans, today included (independent of dailyDays).
-         3 to 7: three is what both providers can draw as a real hourly curve; past
-         56 hours, MET Norway's days are built from stretched 6-hour blocks. -->
     <entry name="simpleDailyDays" type="Int">
       <default>5</default>
     </entry>
@@ -268,20 +271,22 @@
     </entry>
     <!-- the popup's layout, picked with the buttons under the day buttons: "details"
          the Detailed view, "cards" the card layout, "graph" the graph layout. Empty =
-         never picked: derived from simpleLayout below, so an upgrade keeps the
-         layout it had. -->
+         never picked, as the card layout: start-up stores a layout, carried over from
+         simpleLayout below so an upgrade keeps the layout it had (main.qml). -->
     <entry name="popupLayout" type="String">
       <default></default>
     </entry>
-    <!-- older switch between the two first layouts, now only read to derive
-         popupLayout: false = the card layout, true = the graph layout -->
+    <!-- Deprecated: the switch between the two first layouts popupLayout replaced,
+         false = the card layout, true = the graph layout. Read once at startup to
+         carry it over, then cleared; to be removed, with that carry-over, a release
+         or two on. -->
     <entry name="simpleLayout" type="Bool">
       <default>false</default>
     </entry>
-    <!-- The Detailed view (Appearance → Detailed view): its forecast days (its day
-         buttons, and how far it scrolls), its elements in order — a JSON list of
-         {"id", "shown"}, see contents/ui/detailedelements.js; empty = all of them in
-         the default order — and their font: size in pixels, weight 400 / 600 / 700. -->
+    <!-- The Detailed view (Appearance → Detailed view): its deprecated day count (see
+         dailyDays), its elements in order — a JSON list of {"id", "shown"}, see
+         contents/ui/detailedelements.js; empty = all of them in the default order —
+         and their font: size in pixels, weight 400 / 600 / 700. -->
     <entry name="detailedViewDays" type="Int">
       <default>5</default>
     </entry>
@@ -379,26 +384,6 @@
     <entry name="simpleHourlyIconSize" type="Int">
       <default>34</default>
     </entry>
-    <!-- Which icons animate in the graph layout: 0 none, 1 the header icon, 2 the
-         full layout. -1 = never chosen: derived from simpleAnimatedIcons and
-         simpleHeaderAnim below, the older per-part switches, so an upgrade keeps
-         what was set. -->
-    <entry name="graphAnimation" type="Int">
-      <default>1</default>
-    </entry>
-    <!-- older graph switches, now only read to derive graphAnimation -->
-    <entry name="simpleAnimatedIcons" type="Bool">
-      <default>true</default>
-    </entry>
-    <entry name="simpleHeaderAnim" type="Bool">
-      <default>true</default>
-    </entry>
-    <!-- Internal, set once at startup: the location fonts used to follow the condition
-         fonts, so on the first run after the split they are copied from them, keeping
-         the size a user had set. After that the two are independent. -->
-    <entry name="locationFontsSplit" type="Bool">
-      <default>true</default>
-    </entry>
     <!-- Weather Elements (the metric lines beside the temperature): font size and
          weight, shared by both layouts. Weight is 400 Regular, 600 SemiBold or 700
          Bold; a font without a SemiBold draws the nearest face, normally its Bold. -->
@@ -447,19 +432,11 @@
     <entry name="showDayMarkerDate" type="Bool">
       <default>true</default>
     </entry>
-    <!-- Which icons animate in the card layout: 0 none, 1 the header icon, 2 the
-         header and daily tab icons, 3 the full layout. -1 = never chosen: derived
-         from animatedDailyIcons and animatedHourlyIcons below, the older per-part
-         switches, so an upgrade keeps what was set. -->
+    <!-- Which icons animate, in every layout (Appearance → Common → Weather icon
+         animation): 0 none, 1 the header icon, 2 the header and the Daily forecast's
+         day tabs, 3 the full layout. -->
     <entry name="cardAnimation" type="Int">
       <default>1</default>
-    </entry>
-    <!-- older card switches, now only read to derive cardAnimation -->
-    <entry name="animatedDailyIcons" type="Bool">
-      <default>true</default>
-    </entry>
-    <entry name="animatedHourlyIcons" type="Bool">
-      <default>true</default>
     </entry>
     <entry name="panelIconPercent" type="Int">
       <default>130</default>
@@ -476,23 +453,26 @@
          of {"id", "shown"}. The ids: "icon", "temp", "location", "condition", and the
          readings "hiLo", "precipRate", "wind", "feelsLike", "humidity", "precipSum",
          "uv", "pressure", "sun", "dewPoint", "snowSum", "cloud" (see
-         contents/ui/panelelements.js). Empty = never edited: derived from the older
-         panelDisplay and panelSecondLine below, so an upgrade keeps what was set. -->
+         contents/ui/panelelements.js). Empty = never edited: the weather icon and the
+         temperature. An upgrade gets what the older panelDisplay below showed,
+         carried over once at startup (main.qml). -->
     <entry name="panelElements" type="String">
       <default></default>
     </entry>
-    <!-- older "Panel display", now only read to derive panelElements: 0 the weather
-         icon and temperature, 1 the icon alone, 2 the temperature alone, 3 the
-         detailed view (icon, temperature and the panelSecondLine reading), 4 the icon,
-         temperature and condition; -1 = never chosen, derived from panelDetailed -->
+    <!-- Deprecated: the "Panel display" panelElements replaced, with the two below.
+         Read once at startup to carry it over, then cleared; to be removed, with that
+         carry-over, a release or two on. 0 the weather icon and temperature, 1 the
+         icon alone, 2 the temperature alone, 3 the detailed view (icon, temperature
+         and the panelSecondLine reading), 4 the icon, temperature and condition;
+         -1 = never chosen, panelDetailed decides -->
     <entry name="panelDisplay" type="Int">
       <default>-1</default>
     </entry>
-    <!-- older "Detailed View" checkbox, now only read to derive panelElements -->
+    <!-- Deprecated: the older "Detailed View" checkbox (see panelDisplay) -->
     <entry name="panelDetailed" type="Bool">
       <default>false</default>
     </entry>
-    <!-- older detailed-view reading, now only read to derive panelElements: 0 high /
+    <!-- Deprecated: the older detailed view's reading (see panelDisplay): 0 high /
          low temperature, 1 this hour's precipitation, 2 wind, 3 feels like, 4 humidity,
          5 precipitation sum, 6 UV index, 7 air pressure, 8 sunrise / sunset, 9 dew
          point, 10 snowfall, 11 cloud cover -->

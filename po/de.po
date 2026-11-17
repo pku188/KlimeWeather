@@ -482,11 +482,6 @@ msgstr ""
 "Färbt die Werte der Wetterelemente in der Kopfzeile — Blau für Niederschlag, "
 "Grün bis Rot für den UV-Index usw. Ausgeschaltet folgen sie Ihrem Farbschema."
 
-#: contents/ui/configAppearance.qml:611 contents/ui/configAppearance.qml:852
-#: contents/ui/configAppearance.qml:1077
-msgid "Forecast days:"
-msgstr "Prognosetage:"
-
 #: contents/ui/configAppearance.qml:617
 msgid "Cards per scroll:"
 msgstr "Karten pro Scrollschritt:"
@@ -502,12 +497,14 @@ msgstr "%1 ms"
 
 #: contents/ui/configAppearance.qml:631
 msgid ""
-"How long the cards take to glide to their new place after one scroll notch. "
-"More cards per scroll covers more ground, so it wants a longer glide to feel "
-"the same. 0 jumps straight there."
+"How long the cards take to glide to their new place after one scroll notch, "
+"and the day tabs to bring in a day left out. More cards per scroll covers "
+"more ground, so it wants a longer glide to feel the same. 0 jumps straight "
+"there."
 msgstr ""
 "Wie lange die Karten brauchen, um nach einem Scrollschritt an ihren neuen "
-"Platz zu gleiten. Mehr Karten pro Scrollschritt legen mehr Weg zurück und "
+"Platz zu gleiten, und die Tagesreiter, um einen ausgelassenen Tag "
+"hereinzuholen. Mehr Karten pro Scrollschritt legen mehr Weg zurück und "
 "brauchen daher ein längeres Gleiten, damit es gleich wirkt. 0 springt direkt."
 
 #: contents/ui/configAppearance.qml:635
@@ -748,8 +745,8 @@ msgid "Day markers:"
 msgstr "Tagesmarken:"
 
 #: contents/ui/configAppearance.qml:1001
-msgid "Show the date next to each day"
-msgstr "Datum neben jedem Tag anzeigen"
+msgid "Show the date under the weekday"
+msgstr "Datum unter dem Wochentag anzeigen"
 
 #: contents/ui/configAppearance.qml:1005
 msgid "Use colored day markers"
@@ -762,10 +759,6 @@ msgid ""
 msgstr ""
 "Färbt die Tagesmarkierungen im Diagramm sowie seine Sonnenauf- und "
 "-untergangssymbole, -zeiten und den Schein."
-
-#: contents/ui/configAppearance.qml:1081
-msgid "The day buttons, and how far the view scrolls."
-msgstr "Die Tagesschaltflächen und wie weit die Ansicht blättert."
 
 #: contents/ui/configAppearance.qml:1085
 msgid "Element font:"
@@ -938,6 +931,21 @@ msgstr "Wie im System (%1)"
 #: contents/ui/configGeneral.qml:90 contents/ui/configSources.qml:38
 msgid "Weather data"
 msgstr "Wetterdaten"
+
+#: contents/ui/configGeneral.qml:114
+msgid "Forecast days:"
+msgstr "Prognosetage:"
+
+#: contents/ui/configGeneral.qml:120
+msgid ""
+"How many days the forecast shows, today included, in every layout: the Daily "
+"forecast's day tabs and the day buttons of the Weather graph and the "
+"Detailed view. The graph always shows at least three."
+msgstr ""
+"Wie viele Tage die Vorhersage zeigt, heute eingeschlossen, in jedem Layout: "
+"die Tagesreiter der Tagesvorhersage und die Tagesschaltflächen des "
+"Wetterdiagramms und der Detailansicht. Das Diagramm zeigt immer mindestens "
+"drei."
 
 #: contents/ui/configGeneral.qml:95
 msgid "Refresh interval (minutes):"

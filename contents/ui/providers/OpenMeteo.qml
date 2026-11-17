@@ -44,7 +44,9 @@
  * and parse times in the location's wall clock via locNow().
  * `spanHours` is how many hours a sample covers — 1 for a true hourly forecast,
  * 6 for the coarse blocks met.no falls back to past ~54 h. The views read it to
- * decide whether to draw an hour or a block.
+ * decide whether to draw an hour or a block. A block may also carry `uvHours`, its
+ * hours' UV index one by one (its `uv` is the highest), which the graph spreads it
+ * over (grid.js) — met.no's, worked out from the sun.
  * A sample covers the hours that START at its `time`: its amounts (precipAmt, snow),
  * chance (precip), gust, UV index and condition (code) are over those hours, the
  * rest are readings at `time`. isCurrentSample and the graph's rain curve read it

@@ -195,8 +195,9 @@ Item {
     }
 
     // The day pills move under the header when the room beside the date line would
-    // take more than two rows of them (as in the graph layout).
-    readonly property bool pillsUnderHeader: rightBlock.pillRows > 2
+    // take more than two rows of them, or past five days doesn't fit their sliding
+    // window on one (as in the graph layout).
+    readonly property bool pillsUnderHeader: !rightBlock.pillsFit
 
     implicitWidth:  Math.max(Kirigami.Units.gridUnit * 34, content.implicitWidth + pad * 2)
     implicitHeight: content.implicitHeight + pad + Math.round(pad * 1.0)

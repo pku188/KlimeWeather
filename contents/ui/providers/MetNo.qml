@@ -208,7 +208,8 @@ QtObject {
                 day:       Solar.isDayAt(ctx.lat, ctx.lon, ms, off),
                 humidity:  rh,
                 dew:       _temp(_n(det.dew_point_temperature)),
-                uv:        _n(det.ultraviolet_index_clear_sky),   // clear-sky, as MET publishes it
+                // clear-sky, as MET publishes it; worked out below where it doesn't
+                uv:        _n(det.ultraviolet_index_clear_sky),
                 precip:    _n(bd.probability_of_precipitation),
                 precipAmt: amt,
                 // Derived snowfall: on a snow-coded block the precipitation is
@@ -225,8 +226,37 @@ QtObject {
                 // 6-hour blocks publish their own extremes — better than the
                 // instant reading when folding the day up below.
                 _blockHi:  _temp(_n(bd.air_temperature_max)),
-                _blockLo:  _temp(_n(bd.air_temperature_min))
+                _blockLo:  _temp(_n(bd.air_temperature_min)),
+                _ms:       ms   // its UTC time, for the UV below
             });
+        }
+
+        // ── UV past the hourly part ──────────────────────────────────────
+        // MET publishes its clear-sky UV only while the forecast is hourly (~54 h);
+        // the 6-hour blocks after it have none, but for the first one's first hour.
+        // Clear-sky UV follows the sun's height almost alone, so the blocks' hours get
+        // it from the sun (solar.js clearSkyUv), scaled to carry on from MET's own
+        // values. A block's UV is the highest of its hours, as a block's values are
+        // over its hours; uvHours keeps each hour's, for the graph, which spreads a
+        // block over its hours (grid.js).
+        var uvFit = [];
+        for (var f = 0; f < out.hourly.length; ++f) {
+            var fs = out.hourly[f];
+            if (!isNaN(fs.uv)) uvFit.push([Solar.cosZenith(ctx.lat, ctx.lon, fs._ms), fs.uv]);
+        }
+        var uvScale = Solar.clearSkyUvScale(uvFit);
+        for (var u = 0; u < out.hourly.length; ++u) {
+            var us = out.hourly[u];
+            if (us.spanHours <= 1 && !isNaN(us.uv)) continue;
+            var hoursUv = [];
+            for (var hu = 0; hu < us.spanHours; ++hu) {
+                if (hu === 0 && !isNaN(us.uv)) { hoursUv.push(us.uv); continue; }   // MET's own
+                var cz = Solar.cosZenith(ctx.lat, ctx.lon, us._ms + hu * 3600000);
+                // to a tenth, as MET publishes its own
+                hoursUv.push(Math.round(Solar.clearSkyUv(cz, uvScale) * 10) / 10);
+            }
+            us.uv = Math.max.apply(null, hoursUv);
+            if (us.spanHours > 1) us.uvHours = hoursUv;
         }
 
         // ── daily ────────────────────────────────────────────────────────
@@ -271,11 +301,12 @@ QtObject {
             out.daily.push(day);
         }
 
-        // The block extremes were scratch space for the fold above — drop them so
-        // what leaves here is exactly the documented model.
+        // The block extremes and times were scratch space for the folds above — drop
+        // them so what leaves here is exactly the documented model.
         for (var t = 0; t < out.hourly.length; ++t) {
             delete out.hourly[t]._blockHi;
             delete out.hourly[t]._blockLo;
+            delete out.hourly[t]._ms;
         }
 
         // Trim hourly to the days we kept, so the two arrays can't disagree about

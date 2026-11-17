@@ -23,10 +23,6 @@ ScrollView {
     // latches true the first time a location is set (any method); drives the
     // first-run "set your location" hint in the popup (see main.qml)
     property bool   cfg_locationConfigured
-    // temperature unit + whether it's been decided — so first-time setup can pick
-    // °F/°C from the location's country without overriding a deliberate choice
-    property string cfg_temperatureUnit
-    property bool   cfg_unitConfigured
 
     // shared width of the Manual input fields (name / lat / lon) and the action row,
     // so the fields are comfortably long and the Save button can centre under them.
@@ -51,30 +47,6 @@ ScrollView {
         if (name && name.length > 0) { nameField.text = name; cfg_locationName = name; }
         cfg_locationTimezone = tz || "";
         cfg_locationConfigured = true;   // dismisses the first-run hint
-    }
-
-    // First-time-setup convenience: the handful of Fahrenheit countries (US +
-    // territories and a few others) → °F, everywhere else → °C, based on the
-    // location the user picks. Runs only until the unit is decided
-    // (cfg_unitConfigured) — a manual choice in General, or the first auto-pick,
-    // locks it, so changing location later never flips the unit. Accepts an ISO-2
-    // code OR a country name, since auto-detect and geocoding report it differently.
-    readonly property var _fahrenheitPlaces: ({
-        "US": 1, "USA": 1, "UNITED STATES": 1, "UNITED STATES OF AMERICA": 1,
-        "BS": 1, "BZ": 1, "KY": 1, "LR": 1, "PW": 1, "FM": 1, "MH": 1,
-        "PR": 1, "GU": 1, "VI": 1, "AS": 1, "MP": 1
-    })
-    // Call BEFORE _setLocation (which flips locationConfigured): only the very first
-    // location set, with the unit not yet decided, auto-picks — so an already-set-up
-    // widget that changes location is never flipped. A unit following the system
-    // locale (the default) is left alone: the locale says what the user reads, the
-    // place only what they look up — a US user checking Paris still wants °F.
-    function _autoUnitFor(country) {
-        if (cfg_unitConfigured || cfg_locationConfigured || !country
-                || cfg_temperatureUnit === "system") return;
-        cfg_temperatureUnit = _fahrenheitPlaces[("" + country).trim().toUpperCase()]
-                            ? "fahrenheit" : "celsius";
-        cfg_unitConfigured = true;
     }
 
     // Geocoding is Open-Meteo only (forward search below) — no reverse lookup,
@@ -195,7 +167,6 @@ ScrollView {
         searchResults = [];
         resultsPopup.close();
         searchDebounce.stop();
-        _autoUnitFor(r.cc);                   // first-setup: °F/°C from the result's country (before _setLocation)
         _setLocation(r.name, r.lat, r.lon, r.tz);
         searchStatus = i18n("Set to: %1", r.name);
     }
@@ -271,7 +242,6 @@ ScrollView {
                     var lat = parseFloat(d.latitude), lon = parseFloat(d.longitude);
                     if (!isNaN(lat) && !isNaN(lon)) {
                         var name = d.city && d.city.length ? d.city : "";
-                        page._autoUnitFor(d.country_code || d.country);   // first-setup: °F/°C from country (before _setLocation)
                         page._setLocation(name, lat, lon, "");   // IP geolocation gives no zone
                         page.detectStatus = "";   // coords now shown in the Manual fields below
                         return;

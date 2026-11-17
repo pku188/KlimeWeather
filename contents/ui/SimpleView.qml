@@ -933,18 +933,29 @@ Item {
     readonly property real markerRamp:     Kirigami.Units.gridUnit       // how far out a marker starts easing over a readout
     // A new-day marker is icon + date WIDE — several columns at 48 hours — and it
     // is centred on its midnight line, so it reaches well past its own column.
-    // Measured once from a representative date: every marker reads
-    // "<short weekday>, <date>" (or the weekday alone, per the option), and
+    // Measured once from a representative date: every marker reads the short weekday
+    // with the date under it (or the weekday alone, per the option), and
     // markerClearGap absorbs the few pixels one weekday name differs from another.
+    // The date is a step smaller and dimmed, as under the Daily forecast's tab names
+    // and the day buttons', and pulled up under the weekday as there.
+    readonly property int dayMarkerDateFontPx: Math.round((weatherRoot ? weatherRoot.simpleDayMarkerFontSize : 12) * 5 / 6)
+    readonly property int dayMarkerDatePull: Math.round(Kirigami.Units.smallSpacing / 2)
+    readonly property bool dayMarkerShowsDate: weatherRoot ? weatherRoot.showDayMarkerDate : true
     TextMetrics {
-        id: dayMarkerMetrics
+        id: dayMarkerDayMetrics
         font.bold: true
         font.pixelSize: weatherRoot ? weatherRoot.simpleDayMarkerFontSize : 12
-        text: (weatherRoot && samples.length) ? weatherRoot.dayMarkerText(samples[0].date) : ""
+        text: (weatherRoot && samples.length) ? weatherRoot.weekdayText(samples[0].date) : ""
+    }
+    TextMetrics {
+        id: dayMarkerDateMetrics
+        font.pixelSize: simple.dayMarkerDateFontPx
+        text: (weatherRoot && samples.length) ? weatherRoot.monthDayText(samples[0].date) : ""
     }
     readonly property real dayMarkerHalfW: {
         var iconW = weatherRoot ? Math.round(weatherRoot.simpleDayMarkerFontSize * 2.25) : 27;
-        return (iconW + Kirigami.Units.smallSpacing + dayMarkerMetrics.width) / 2;
+        var textW = Math.max(dayMarkerDayMetrics.width, dayMarkerShowsDate ? dayMarkerDateMetrics.width : 0);
+        return (iconW + Kirigami.Units.smallSpacing + textW) / 2;
     }
     // Where a new-day marker `w` wide sits for a line at `lx`: centred on it, but
     // held dayMarkerEdge inside the plot for as long as the line is, so the edge
@@ -1400,10 +1411,11 @@ Item {
     // decoding frames for a window nobody can see.
     readonly property bool onScreen: Window.visibility !== Window.Hidden
     // The room beside the Weather Elements (the header row past the hero, which holds
-    // a steady width) is too narrow for the day pills even on two rows: they move under
-    // the header. Counted at that room whether or not the pills are shown there, so
-    // where they are shown never changes the answer.
-    readonly property bool pillsUnderHeader: rightBlock.pillRows > 2
+    // a steady width) is too narrow for the day pills even on two rows — or, past five
+    // days, for their sliding window on one: they move under the header. Counted at
+    // that room whether or not the pills are shown there, so where they are shown never
+    // changes the answer.
+    readonly property bool pillsUnderHeader: !rightBlock.pillsFit
     // How far wrapped day pills reach below the hero, which the header row then grows
     // by. The plot gives it back, as it does for the row under the header.
     readonly property real pillsBelowHero:
@@ -2327,14 +2339,27 @@ Item {
                                                        : weatherRoot.conditionIconMono(dayMarker.dayEntry.code, 1))
                                             : "weather-clear-night"
                                 }
-                                Label {
+                                // the weekday, and under it the day and month in the
+                                // system's date format, a step smaller and dimmed (or the
+                                // weekday alone); the two centred on each other, as on
+                                // the day buttons and the Daily forecast's tabs
+                                Column {
                                     anchors.verticalCenter: parent.verticalCenter
-                                    // weekday + day and month in the system's date format,
-                                    // or the weekday alone
-                                    text: (weatherRoot && dayMarker.sample) ? weatherRoot.dayMarkerText(dayMarker.sample.date) : ""
-                                    font.bold: true
-                                    opacity: 0.8
-                                    font.pixelSize: weatherRoot ? weatherRoot.simpleDayMarkerFontSize : 12
+                                    spacing: -simple.dayMarkerDatePull
+                                    Label {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        text: (weatherRoot && dayMarker.sample) ? weatherRoot.weekdayText(dayMarker.sample.date) : ""
+                                        font.bold: true
+                                        opacity: 0.8
+                                        font.pixelSize: weatherRoot ? weatherRoot.simpleDayMarkerFontSize : 12
+                                    }
+                                    Label {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        visible: simple.dayMarkerShowsDate
+                                        text: (weatherRoot && dayMarker.sample) ? weatherRoot.monthDayText(dayMarker.sample.date) : ""
+                                        font.pixelSize: simple.dayMarkerDateFontPx
+                                        opacity: 0.55
+                                    }
                                 }
                             }
                             // The dashed line, from the marker's own bottom edge down to

@@ -18,8 +18,9 @@
  * names on purpose ("Forecast", "Graph", "Details"; the settings' tabs have the long
  * ones), are on the same line in every layout. The Daily
  * forecast has no day pills (pillsShown: false); the Weather graph and the Detailed
- * view take them out too (pillsInBlock: false) when even two rows are not enough,
- * and show them on a row of their own under the header instead.
+ * view take them out too (pillsInBlock: false) when even two rows are not enough —
+ * or, past five days, when their sliding window doesn't fit on one — and show them on
+ * a row of their own under the header instead.
  * Copyright 2026  pku188 — SPDX-License-Identifier: GPL-2.0-or-later
  */
 import QtQuick
@@ -54,9 +55,10 @@ ColumnLayout {
     // row of pills under the header ends this far past the block, level with the
     // pills in it.
     readonly property real pillsOverhang: plateEnd - nameEnd
-    // How many rows the pills take beside the Weather Elements (2 = wrapped once). The
-    // Weather graph and the Detailed view move them under the header past two.
-    readonly property int pillRows: pills.rows
+    // Whether the day pills fit beside the Weather Elements: on at most two rows, or
+    // past five days on one (see DayPills). The Weather graph and the Detailed view
+    // move them under the header where they don't.
+    readonly property bool pillsFit: pills.fitsBeside
 
     // The block's left edge in the view's coordinates. Everything in it is placed by
     // hand from the view and may extend past that edge, so nothing widens the block.
@@ -159,7 +161,9 @@ ColumnLayout {
             selectedIndex: root ? root.popupLayouts.indexOf(root.popupLayout) : -1
             fontPx: root ? root.layoutButtonFontSize : Kirigami.Theme.defaultFont.pixelSize
             onPicked: (index) => { if (root) root.setLayout(root.popupLayouts[index]); }
-            onStepped: (delta) => { if (root) root.stepLayout(delta); }
+            // and the wheel keeps switching them until the pointer moves (main.qml
+            // layoutWheelHeld)
+            onStepped: (delta) => { if (root) { root.layoutWheelHeld = true; root.stepLayout(delta); } }
         }
     }
 

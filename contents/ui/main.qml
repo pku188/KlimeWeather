@@ -16,6 +16,7 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasma5support as P5Support
 import org.kde.kirigami as Kirigami
 import org.kde.notification
+import "wheel.js" as Wheel
 import "providers"
 import "providers/grid.js" as Grid
 import "../icons/meteocons/readings/monochrome.js" as MonoReadings
@@ -34,13 +35,12 @@ PlasmoidItem {
     function setKeepOpen(v) { Plasmoid.configuration.keepOpen = v; }
     // The popup's layout, picked with the buttons under the location, in this order:
     // "cards" the Daily forecast, "graph" the Weather graph, "details" the Detailed
-    // view. Never picked: the older switch between the card and graph layouts
-    // (simpleLayout) decides.
+    // view. Never picked, the Daily forecast (start-up stores it, see
+    // Component.onCompleted).
     readonly property var popupLayouts: ["cards", "graph", "details"]
     readonly property string popupLayout: {
         var l = Plasmoid.configuration.popupLayout || "";
-        if (popupLayouts.indexOf(l) >= 0) return l;
-        return Plasmoid.configuration.simpleLayout ? "graph" : "cards";
+        return popupLayouts.indexOf(l) >= 0 ? l : "cards";
     }
     readonly property bool simpleLayout:   popupLayout === "graph"
     readonly property bool detailedLayout: popupLayout === "details"
@@ -50,11 +50,16 @@ PlasmoidItem {
         var i = Math.max(0, Math.min(popupLayouts.length - 1, popupLayouts.indexOf(popupLayout) + delta));
         setLayout(popupLayouts[i]);
     }
+    // Set by a wheel notch over the layout buttons, until the pointer moves: the wheel
+    // keeps switching layouts meanwhile, wherever the popup thinks the pointer is (see
+    // the catcher at the end of fullRepresentation).
+    property bool layoutWheelHeld: false
     // The hour the Detailed view shows, as its sample's time; "" the current hour. Back
     // to the current hour whenever the view is left (DetailedView) and the popup opens;
     // a click on an hourly card sets it before it opens the view.
     property string detailedFocusTime: ""
     onExpandedChanged: function () {
+        root.layoutWheelHeld = false;
         if (!root.expanded) return;
         root.detailedFocusTime = "";
         root.tickClock();
@@ -152,19 +157,27 @@ PlasmoidItem {
     readonly property string units: temperatureUnitSetting === "system"
         ? (localeMeasurement === Locale.ImperialUSSystem ? "fahrenheit" : "celsius")
         : temperatureUnitSetting
-    readonly property int    dailyDays:      Plasmoid.configuration.dailyDays      || 5
-    // Days the graph spans, today included: 3 to 7 (Appearance → Graph). Three is
-    // what BOTH providers can draw at hourly resolution — met.no's hourly data runs out
-    // around hour 54 and only 6-hour blocks follow, so its later days are stretched
-    // blocks (a smooth curve through them, see grid.js, and readable once identical
-    // readouts merge, see SimpleView's readoutPlan). Open-Meteo stays hourly the whole
-    // way. The CARD layout keeps its own day count (dailyDays); it renders blocks as
-    // blocks.
-    readonly property int    graphDays: Math.max(3, Math.min(7, Plasmoid.configuration.simpleDailyDays || 3))
+    // Days the forecast shows, today included, in every layout (General → Forecast
+    // days): 1 to 10.
+    readonly property int    forecastDays: Math.max(1, Math.min(10, Plasmoid.configuration.forecastDays || 5))
+    // Days to ask the provider for: the days shown and the one after (the graph's last
+    // day closes on its first hour, see grid.js), and at least a week and a day, as
+    // before the days went past a week. A new count is a new request.
+    readonly property int fetchDays: Math.max(8, forecastDays + 1)
+    onFetchDaysChanged: Qt.callLater(fetchWeather)
+    // the card layout's daily tabs
+    readonly property int    dailyDays: forecastDays
+    // Days the graph spans: at least 3. Three is what BOTH providers can draw at hourly
+    // resolution — met.no's hourly data runs out around hour 54 and only 6-hour blocks
+    // follow, so its later days are stretched blocks (a smooth curve through them, see
+    // grid.js, and readable once identical readouts merge, see SimpleView's
+    // readoutPlan). Open-Meteo stays hourly the whole way. The CARD layout renders
+    // blocks as blocks.
+    readonly property int    graphDays: Math.max(3, forecastDays)
     readonly property int    graphZoom:       Math.max(0, Math.min(2, Plasmoid.configuration.graphZoom ?? 1))
     // The Detailed view (Appearance → Detailed view): its days, its elements in order
     // (each { id, shown }, see detailedelements.js) and their font.
-    readonly property int    detailedDays: Math.max(1, Math.min(7, Plasmoid.configuration.detailedViewDays || 5))
+    readonly property int    detailedDays: forecastDays
     readonly property var    detailedElements: DetailedElements.parse(Plasmoid.configuration.detailedViewElements)
     readonly property int    detailedFontSize: Plasmoid.configuration.detailedViewFontSize || 15
     readonly property int    detailedFontWeight: Plasmoid.configuration.detailedViewFontWeight || 600
@@ -214,17 +227,8 @@ PlasmoidItem {
     // Which icons animate, in every layout (Appearance → Common → Weather icon animation): 0 none,
     // 1 the header icon, 2 the header and the Daily forecast's day tabs, 3 the full
     // layout — the hourly cards and the Weather graph's hour icons too. The Detailed
-    // view has only the header's to animate. A setting never chosen (-1) is derived
-    // from the older per-part switches, so an upgrade keeps what the user had: the old
-    // "Daily tab icons" becomes header and tabs, and any old choice that animated the
-    // hourly icons becomes the full layout. (graphAnimation, the Weather graph's own
-    // setting until 2026-10, is no longer read.)
-    readonly property int cardAnimation: {
-        var m = Plasmoid.configuration.cardAnimation ?? -1;
-        if (m >= 0) return Math.min(3, m);
-        if (Plasmoid.configuration.animatedHourlyIcons ?? true) return 3;
-        return (Plasmoid.configuration.animatedDailyIcons ?? true) ? 2 : 0;
-    }
+    // view has only the header's to animate.
+    readonly property int cardAnimation: Math.max(0, Math.min(3, Plasmoid.configuration.cardAnimation ?? 1))
     readonly property bool   fullHeaderAnim:      cardAnimation >= 1
     readonly property bool   animatedDailyIcons:  cardAnimation >= 2
     readonly property bool   animatedHourlyIcons: cardAnimation >= 3
@@ -238,12 +242,9 @@ PlasmoidItem {
     readonly property int    panelFontPercent:   Plasmoid.configuration.panelFontPercent   || 48
     readonly property bool   panelColorIcon:     Plasmoid.configuration.panelColorIcon === true
     // What the panel shows, in order (Appearance → Panel → Panel Elements): each
-    // { id, shown } (see panelelements.js). Never edited: what the older "Panel
-    // display" showed.
-    readonly property var    panelElements: PanelElements.parse(Plasmoid.configuration.panelElements,
-                                                                Plasmoid.configuration.panelDisplay ?? -1,
-                                                                Plasmoid.configuration.panelDetailed === true,
-                                                                Plasmoid.configuration.panelSecondLine ?? 0)
+    // { id, shown } (see panelelements.js). Never edited: the weather icon and the
+    // temperature.
+    readonly property var    panelElements: PanelElements.parse(Plasmoid.configuration.panelElements)
     // A vertical panel: the elements wrap onto lines as wide as the panel.
     readonly property bool   panelVertical: Plasmoid.formFactor === PlasmaCore.Types.Vertical
     readonly property int    panelTempFontWeight: Plasmoid.configuration.panelTempFontWeight || 400
@@ -432,14 +433,8 @@ PlasmoidItem {
     // 12-hour, 2 is 24-hour. The system default is the locale's own time format —
     // LC_TIME, which Plasma's Region & Language sets — and it is 12-hour where that
     // format carries an AM/PM marker ("h:mm AP" in en_US, "HH:mm" in en_GB). Never
-    // chosen (-1): the older "Use 24-hour time" checkbox decides. It was on by
-    // default, so only a cleared box can have been a choice — that one stays
-    // 12-hour, everything else follows the system.
-    readonly property int clockFormat: {
-        var m = Plasmoid.configuration.clockFormat ?? -1;
-        if (m >= 0) return Math.min(2, m);
-        return Plasmoid.configuration.use24Hour === false ? 1 : 0;
-    }
+    // chosen (-1), the system's (start-up stores a choice, see Component.onCompleted).
+    readonly property int clockFormat: Math.max(0, Math.min(2, Plasmoid.configuration.clockFormat ?? 0))
     // quoted text in a format is literal, so an "a" in it is no AM/PM marker
     readonly property bool localeUses12Hour:
         /[aA]/.test(Qt.locale().timeFormat(Locale.ShortFormat).replace(/'[^']*'/g, ""))
@@ -671,29 +666,29 @@ PlasmoidItem {
     // dayIdx (optional) selects the day for the daily-total metrics (snowSum /
     // precipSum) so a scrolling view shows the day in focus. hourSample (optional)
     // is the focused hour's data, letting an instantaneous metric (humidity) sync
-    // to the scrolled hour; without it, it falls back to current conditions.
-    // Defaults to today / now.
+    // to the scrolled hour, and only that hour's (see _at); without it, current
+    // conditions. Defaults to today / now.
     function metricText(id, dayIdx, hourSample) {
         var day = (dayIdx !== undefined && dayIdx >= 0 && dayIdx < dailyData.length) ? dailyData[dayIdx] : null;
         // word for the daily-total labels: "today" for day 0 / unset, else the
         // focused day's name (so a scrolled view reads e.g. "Snowfall (Sun): …")
         var whenWord = (dayIdx !== undefined && dayIdx > 0) ? dayName(dayIdx) : i18n("Today");
         if (id === "feelsLike") {
-            var ft = (hourSample && !isNaN(hourSample.feels)) ? hourSample.feels : apparentTemp;
+            var ft = _at(hourSample, "feels", apparentTemp);
             return isNaN(ft) ? "" : i18n("Feels like: %1",
                 _tint(tempStr(ft), feelsColor(ft), weatherSpecificColors));
         }
         if (id === "humidity") {
-            var hum = (hourSample && !isNaN(hourSample.humidity)) ? hourSample.humidity : humidity;
+            var hum = _at(hourSample, "humidity", humidity);
             return isNaN(hum) ? "" : i18n("Humidity: %1",
                 _tint(Math.round(hum) + "%", humidityColor(hum), weatherSpecificColors));
         }
         if (id === "uv") {
-            var uv = (hourSample && !isNaN(hourSample.uv)) ? hourSample.uv : uvIndex;
+            var uv = _at(hourSample, "uv", uvIndex);
             return isNaN(uv) ? "" : i18n("UV Index: %1", uvIndexText(uv, weatherSpecificColors));
         }
         if (id === "dewPoint") {
-            var dp = (hourSample && !isNaN(hourSample.dew)) ? hourSample.dew : dewPoint;
+            var dp = _at(hourSample, "dew", dewPoint);
             return isNaN(dp) ? "" : i18n("Dew point: %1",
                 _tint(tempStr(dp), dewColor(dp), weatherSpecificColors));
         }
@@ -705,7 +700,7 @@ PlasmoidItem {
         }
         // the hour's amount, and its chance after a slash: "Precip.: 0.2 mm / 40%"
         if (id === "precipRate") {
-            var pr = (hourSample && !isNaN(hourSample.precipAmt)) ? hourSample.precipAmt : precipRate;
+            var pr = _at(hourSample, "precipAmt", precipRate);
             if (isNaN(pr)) return "";
             var pc = _hourChance(hourSample);
             var amt = _precipAmount(pr, weatherSpecificColors);
@@ -720,12 +715,12 @@ PlasmoidItem {
                 _precipAmount(ps, weatherSpecificColors));
         }
         if (id === "wind") {
-            var ws = (hourSample && !isNaN(hourSample.wind)) ? hourSample.wind : windSpeed;
+            var ws = _at(hourSample, "wind", windSpeed);
             if (isNaN(ws)) return "";
             // show the gust whenever it rounds higher than the sustained wind — the SAME
             // rule as the hourly cards, so header and cards never disagree (no "5G10" on a
             // card while the header hides it). Skips a redundant "5 G5" on calm hours.
-            var gs = (hourSample && !isNaN(hourSample.gust)) ? hourSample.gust : windGust;
+            var gs = _at(hourSample, "gust", windGust);
             // Sustained wind with its unit, then the gust in brackets: "11.2 km/h (G24)".
             // The gust is a peak, so it is rounded; keeping it outside the unit also
             // stops it reading as a second measurement of the same thing. Whether to
@@ -737,11 +732,11 @@ PlasmoidItem {
             return i18n("Wind: %1", windBody);
         }
         if (id === "cloud") {
-            var cc = (hourSample && !isNaN(hourSample.cloud)) ? hourSample.cloud : cloudCover;
+            var cc = _at(hourSample, "cloud", cloudCover);
             return isNaN(cc) ? "" : i18n("Cloud cover: %1", Math.round(cc) + "%");
         }
         if (id === "pressure") {
-            var pr = (hourSample && !isNaN(hourSample.pressure)) ? hourSample.pressure : pressure;
+            var pr = _at(hourSample, "pressure", pressure);
             return isNaN(pr) ? "" : i18n("Pressure: %1", pressureStr(pr));
         }
         if (id === "snowSum") {
@@ -847,9 +842,7 @@ PlasmoidItem {
     }
     function metricValue(id, dayIdx, hourSample, colored) {
         var day = (dayIdx !== undefined && dayIdx >= 0 && dayIdx < dailyData.length) ? dailyData[dayIdx] : null;
-        function hourly(field, fallback) {
-            return (hourSample && !isNaN(hourSample[field])) ? hourSample[field] : fallback;
-        }
+        function hourly(field, fallback) { return _at(hourSample, field, fallback); }
         switch (id) {
         case "feelsLike": {
             var ft = hourly("feels", apparentTemp);
@@ -1073,8 +1066,16 @@ PlasmoidItem {
     }
     // the chance of precipitation for `hourSample`, or for the current hour
     function _hourChance(hourSample) {
-        if (hourSample && !isNaN(hourSample.precip)) return hourSample.precip;
-        return currentHourSample ? currentHourSample.precip : NaN;
+        return _at(hourSample, "precip", currentHourSample ? currentHourSample.precip : NaN);
+    }
+    // A Weather Element's reading `field` for the chosen hour, or `now` (the current
+    // conditions) when no hour is chosen. A chosen hour shows only its own: one it
+    // lacks shows nothing rather than now's — met.no's 6-hour blocks have no gust,
+    // and outside the Nordic countries no chance of precipitation.
+    function _at(hourSample, field, now) {
+        if (!hourSample) return now;
+        var v = hourSample[field];
+        return (v === undefined || v === null) ? NaN : v;
     }
     // a value in its colour when `colored`, plain otherwise (styled text)
     function _tint(text, color, colored) {
@@ -1089,19 +1090,19 @@ PlasmoidItem {
         var whenWord = (dayIdx !== undefined && dayIdx > 0) ? dayName(dayIdx) : i18n("Today");
         switch (id) {
         case "feelsLike": {
-            var ft = (hourSample && !isNaN(hourSample.feels)) ? hourSample.feels : apparentTemp;
+            var ft = _at(hourSample, "feels", apparentTemp);
             return isNaN(ft) ? [] : [_part("thermometer", _tint(tempStr(ft), feelsColor(ft), colored))];
         }
         case "humidity": {
-            var hum = (hourSample && !isNaN(hourSample.humidity)) ? hourSample.humidity : humidity;
+            var hum = _at(hourSample, "humidity", humidity);
             return isNaN(hum) ? [] : [_part("humidity", _tint(Math.round(hum) + "%", humidityColor(hum), colored))];
         }
         case "uv": {
-            var uv = (hourSample && !isNaN(hourSample.uv)) ? hourSample.uv : uvIndex;
+            var uv = _at(hourSample, "uv", uvIndex);
             return isNaN(uv) ? [] : [_part("uv-index", uvIndexText(uv, colored))];
         }
         case "dewPoint": {
-            var dp = (hourSample && !isNaN(hourSample.dew)) ? hourSample.dew : dewPoint;
+            var dp = _at(hourSample, "dew", dewPoint);
             return isNaN(dp) ? [] : [_part("thermometer-raindrop", _tint(tempStr(dp), dewColor(dp), colored))];
         }
         case "hiLo": {
@@ -1111,7 +1112,7 @@ PlasmoidItem {
         }
         // the hour's amount, then its chance: "0.2 mm  40%" (no chance from MET Norway)
         case "precipRate": {
-            var pr = (hourSample && !isNaN(hourSample.precipAmt)) ? hourSample.precipAmt : precipRate;
+            var pr = _at(hourSample, "precipAmt", precipRate);
             if (isNaN(pr)) return [];
             var parts = [_part("raindrop", _precipAmount(pr, colored))];
             var pc = _hourChance(hourSample);
@@ -1129,18 +1130,18 @@ PlasmoidItem {
                                                           + " (" + whenWord + ")")];
         }
         case "wind": {
-            var ws = (hourSample && !isNaN(hourSample.wind)) ? hourSample.wind : windSpeed;
+            var ws = _at(hourSample, "wind", windSpeed);
             if (isNaN(ws)) return [];
-            var gs = (hourSample && !isNaN(hourSample.gust)) ? hourSample.gust : windGust;
+            var gs = _at(hourSample, "gust", windGust);
             return [_part("wind", (!isNaN(gs) && Math.round(gs) > Math.round(ws))
                                     ? (windLabel(ws) + " (G" + Math.round(gs) + ")") : windLabel(ws))];
         }
         case "cloud": {
-            var cc = (hourSample && !isNaN(hourSample.cloud)) ? hourSample.cloud : cloudCover;
+            var cc = _at(hourSample, "cloud", cloudCover);
             return isNaN(cc) ? [] : [_part("cloudy", Math.round(cc) + "%")];
         }
         case "pressure": {
-            var pa = (hourSample && !isNaN(hourSample.pressure)) ? hourSample.pressure : pressure;
+            var pa = _at(hourSample, "pressure", pressure);
             return isNaN(pa) ? [] : [_part("barometer", pressureStr(pa))];
         }
         case "sun": case "sunrise": case "sunset": {
@@ -1288,9 +1289,9 @@ PlasmoidItem {
         if (idx < 0 || idx >= dailyData.length) return "";
         return monthDayText(dailyData[idx].date);
     }
-    // Day and month of a "YYYY-MM-DD" date in that format, and the same with the short
-    // weekday in front ("Fri, 18/09") for the graph's new-day marker — or the weekday
-    // alone when the marker is set not to show the date.
+    // Day and month of a "YYYY-MM-DD" date in that format, its short weekday, and the
+    // two together ("Fri, 18/09") for the Date element. The graph's new-day marker
+    // shows the two apart, the date dimmed (SimpleView).
     function monthDayText(date) {
         return new Date(date + "T12:00").toLocaleDateString(Qt.locale(), monthDayFormat);
     }
@@ -1299,9 +1300,6 @@ PlasmoidItem {
     }
     function weekdayDateText(date) {
         return weekdayText(date) + ", " + monthDayText(date);
-    }
-    function dayMarkerText(date) {
-        return showDayMarkerDate ? weekdayDateText(date) : weekdayText(date);
     }
     readonly property string monthDayFormat: withoutYear(Qt.locale().dateFormat(Locale.ShortFormat))
     // Qt has no "day and month" format of its own, so the year is taken out of the
@@ -1617,15 +1615,18 @@ PlasmoidItem {
         var ctx = {
             lat: coarseCoord(lat),
             lon: coarseCoord(lon),
-            // a week, and the day after it: the graph's last day closes on that day's
-            // first hour (see grid.js), or its final window comes up an hour short
-            forecastDays: 8,
+            // the days shown and the day after (see fetchDays)
+            forecastDays: root.fetchDays,
             // Providers that report their own offset ignore this; the ones that
             // can't (met.no) render everything in the location's clock with it.
             utcOffsetSeconds: resolvedOffsetSeconds
         };
         var url = p.buildUrl(ctx);
-        return { provider: p, ctx: ctx, url: url, cacheKey: p.providerId + "|" + url };
+        // The days are in the key even where the URL lacks them (met.no's): parsed
+        // for another count, the data held is not this request's, so it must not be
+        // revalidated into a 304 that keeps it.
+        return { provider: p, ctx: ctx, url: url,
+                 cacheKey: p.providerId + "|" + url + "|" + ctx.forecastDays + "d" };
     }
 
     function fetchWeather() {
@@ -2465,19 +2466,54 @@ PlasmoidItem {
     // button (Mullvad, no-logging). No startup detection: boot uses the stored
     // coordinates, so the widget never pings a geolocation service unprompted.
     Component.onCompleted: {
-        // One-time carry-over: the condition font setting used to size the location
-        // too, so start each layout's new location font at its condition font. Only a
-        // location font still at its default is taken over; one already set is kept.
-        if (!Plasmoid.configuration.locationFontsSplit) {
-            if (Plasmoid.configuration.locationFontSize === 28)
-                Plasmoid.configuration.locationFontSize = conditionFontSize;
-            Plasmoid.configuration.locationFontsSplit = true;
-        }
         // The graph zoom used to be a two-way switch; carry a 12-hour choice over to
         // the three-level setting, and clear the old key so this happens only once.
         if (Plasmoid.configuration.simpleHourly) {
             Plasmoid.configuration.graphZoom = 0;
             Plasmoid.configuration.simpleHourly = false;
+        }
+        // The settings that replaced older ones, carried over once from what those
+        // held, which are then cleared so this happens only once (see main.xml for
+        // each). The ones that shipped in a release keep a "never chosen" default for
+        // this: a stored value can't be told apart from a choice of the new default.
+        // Remove each with its older settings a release or two on.
+        var c = Plasmoid.configuration;
+        // The layout: the older switch between the first two layouts decides.
+        if (!c.popupLayout)
+            c.popupLayout = c.simpleLayout ? "graph" : "cards";
+        if (c.simpleLayout !== c.simpleLayoutDefault)
+            c.simpleLayout = c.simpleLayoutDefault;
+        // The clock: the older "Use 24-hour time" checkbox was on by default, so only
+        // a cleared box can have been a choice — that one stays 12-hour, everything
+        // else follows the system.
+        if (c.clockFormat < 0)
+            c.clockFormat = c.use24Hour === false ? 1 : 0;
+        if (c.use24Hour !== c.use24HourDefault)
+            c.use24Hour = c.use24HourDefault;
+        // The Panel Elements, never edited: what the older "Panel display" showed,
+        // stored where it differs from the default list.
+        if (!c.panelElements) {
+            var olderPanel = PanelElements.stringify(PanelElements.fromOlderDisplay(
+                c.panelDisplay ?? -1, c.panelDetailed === true, c.panelSecondLine ?? 0));
+            if (olderPanel !== PanelElements.stringify(PanelElements.parse("")))
+                c.panelElements = olderPanel;
+        }
+        if (c.panelDisplay !== c.panelDisplayDefault) c.panelDisplay = c.panelDisplayDefault;
+        if (c.panelDetailed !== c.panelDetailedDefault) c.panelDetailed = c.panelDetailedDefault;
+        if (c.panelSecondLine !== c.panelSecondLineDefault) c.panelSecondLine = c.panelSecondLineDefault;
+        // Each layout used to keep its own day count. When any was set, carry the
+        // count of the layout in use over to Forecast days, unless that was already
+        // set (it is then left as it is). Forecast days never shipped with another
+        // default, so here the default itself means never chosen.
+        if (c.dailyDays !== c.dailyDaysDefault || c.simpleDailyDays !== c.simpleDailyDaysDefault
+                || c.detailedViewDays !== c.detailedViewDaysDefault) {
+            var oldDays = c.popupLayout === "graph" ? c.simpleDailyDays
+                        : c.popupLayout === "details" ? c.detailedViewDays : c.dailyDays;
+            if (!(c.forecastDays > 0) || c.forecastDays === c.forecastDaysDefault)
+                c.forecastDays = Math.max(1, Math.min(10, oldDays || c.forecastDaysDefault));
+            c.dailyDays = c.dailyDaysDefault;
+            c.simpleDailyDays = c.simpleDailyDaysDefault;
+            c.detailedViewDays = c.detailedViewDaysDefault;
         }
         restoreCache();
         fetchWeather();
@@ -3080,6 +3116,53 @@ PlasmoidItem {
                     onTriggered: root.fetchWeather()
                 }
             ]
+        }
+
+        // The wheel over the layout buttons, kept switching layouts while the pointer
+        // stays put. Layouts of different widths resize the popup, which moves its
+        // content under a still pointer; on Wayland the popup only learns where the
+        // pointer is from the pointer's own moves, so the next notch went to where the
+        // pointer had been in the old size — past the layout buttons, and nothing
+        // switched until the mouse moved. From a notch over the buttons until the
+        // pointer really moves (root.layoutWheelHeld), this takes the wheel over the
+        // whole popup first, and nothing else: clicks and hovers pass through. In a
+        // popup it reaches far past the popup's edges, as where the popup thinks the
+        // pointer is can be outside it once it has narrowed under the pointer.
+        // A MouseArea rather than a WheelHandler: a pointer handler turns down any
+        // event from outside the window. And the pointer's moves are watched from the
+        // popup's own item (fullRepHover), not from here: a HoverHandler on an item
+        // over the others takes the hover from every button under it, and their hover
+        // backgrounds went.
+        MouseArea {
+            id: layoutWheelCatcher
+            anchors.fill: parent
+            anchors.margins: root.planar ? 0 : -Kirigami.Units.gridUnit * 200
+            z: 1000
+            enabled: root.layoutWheelHeld
+            acceptedButtons: Qt.NoButton
+            property real acc: 0   // the notch in progress (see wheel.js)
+            onWheel: (wheel) => {
+                wheel.accepted = true;
+                var ad = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x;
+                var dir = Wheel.step(layoutWheelCatcher, ad);
+                if (dir !== 0) root.stepLayout(dir);
+            }
+        }
+        // Lets go of layoutWheelHeld once the pointer moves. Only a move does: hover
+        // events the popup repeats at the same spot (after a resize) don't, nor does
+        // the pointer seeming to leave, as the popup narrowing past where it thinks
+        // the pointer is makes it seem to. An ancestor of every button, so it shares
+        // the hover with them rather than taking it.
+        HoverHandler {
+            id: fullRepHover
+            property point lastAt: Qt.point(-1, -1)
+            onPointChanged: {
+                var p = point.scenePosition;
+                if (Math.abs(p.x - lastAt.x) > 0.5 || Math.abs(p.y - lastAt.y) > 0.5) {
+                    lastAt = Qt.point(p.x, p.y);
+                    root.layoutWheelHeld = false;
+                }
+            }
         }
     }
 }
