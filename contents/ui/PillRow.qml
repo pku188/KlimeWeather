@@ -54,7 +54,13 @@ Item {
     // the Daily forecast's tab names).
     readonly property bool twoLines: subLabels.some(function (s) { return !!s; })
     readonly property int subPull: Math.round(Kirigami.Units.smallSpacing / 2)
-    readonly property int rowHeight: twoLines ? lineHeight + Math.ceil(subFont.height) - subPull : lineHeight
+    readonly property int twoLineHeight: lineHeight + Math.ceil(subFont.height) - subPull
+    readonly property int rowHeight: twoLines ? twoLineHeight : lineHeight
+    // How much taller a row of these pills is with a second line than without, and
+    // how much of that they lack now: room a view can keep for it, so it doesn't
+    // change size when the pills get their dates (past five days).
+    readonly property int secondLineHeight: twoLineHeight - lineHeight
+    readonly property int secondLineRoom: twoLines ? 0 : secondLineHeight
     // How far a pill's plate reaches past its label on either side.
     readonly property int sidePad: Math.round(Kirigami.Units.gridUnit * 1.1 / 2)
     readonly property int iconPx: Math.round(fontPx * 1.1)

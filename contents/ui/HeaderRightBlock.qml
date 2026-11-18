@@ -43,6 +43,11 @@ ColumnLayout {
     property int providerFontSize: 16
     property bool pillsShown: true
     property bool pillsInBlock: true
+    // Keep room under the day pills for the dates they show past five days, also when
+    // they show none (the graph layout: see SimpleView's plotH).
+    property bool pillsKeepSecondLine: false
+    // how much taller the pills' row is with their dates
+    readonly property int pillsSecondLineHeight: pills.secondLineHeight
     property int pillCount: 0
     property int selectedDay: -1
     signal dayClicked(int index)
@@ -169,14 +174,16 @@ ColumnLayout {
 
     // The day pills, as far under the layout buttons as those are under the first
     // line. No room is kept without them: the layout buttons above stay where they are
-    // either way.
+    // either way. With pillsKeepSecondLine, room for their dates is kept under pills
+    // that have none, so the block is as tall either way.
     Item {
         id: pillsLine
         readonly property bool shown: block.pillsShown && block.pillsInBlock
         Layout.fillWidth: true
         Layout.topMargin: shown ? (block.toolbar ? block.toolbar.secondRowGap : Kirigami.Units.smallSpacing) : 0
         implicitWidth: 0
-        implicitHeight: shown ? Math.max(pills.rowHeight, pills.implicitHeight) : 0
+        implicitHeight: shown ? Math.max(pills.rowHeight, pills.implicitHeight)
+                                + (block.pillsKeepSecondLine ? pills.secondLineRoom : 0) : 0
         DayPills {
             id: pills
             visible: pillsLine.shown

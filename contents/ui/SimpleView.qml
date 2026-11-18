@@ -259,6 +259,18 @@ Item {
         var want = chosenDay >= 0 ? dayFirstSampleIndex(chosenDay) : Math.round(hourPos);
         hourPos = Math.max(0, Math.min(max, want));
     }
+    // Fewer hours — fewer forecast days, or a shorter forecast — can leave the window
+    // past their end, where it showed no graph at all until a day was picked. It
+    // goes back to the last hours there are, and a picked day that is gone with them
+    // no longer counts. (Worked out from the samples, as above, which maxHourPos may
+    // not have caught up with yet.)
+    onSamplesChanged: {
+        if (chosenDay >= dayCount) chosenDay = -1;
+        var max = Math.max(0, (samples ? samples.length : 0) - pointsVisible);
+        if (hourPos <= max && !(posAnim.running && posAnim.to > max)) return;
+        posAnim.stop(); cancelDayMorph();
+        hourPos = max;
+    }
     function windowAt(w) {
         var o = [], n = samples.length;
         for (var i = 0; i < pointsVisible; ++i) {
@@ -320,8 +332,13 @@ Item {
     // a sample STARTS a new day when its date differs from the previous sample's.
     // Works for both hourly (midnight IS a sample) and every-2h (when "now" is odd, no
     // sample lands exactly on hour 0, so an hour-0 test would MISS the rollover and the
-    // new-day divider would vanish). g <= 0 is the leading edge, never a day-start.
+    // new-day divider would vanish). The first sample, the hour it is now, has none
+    // before it: it starts a day only when it is a midnight — from 0:00 to 0:59 the
+    // timeline opens on the day's first hour, which gets its marker like any other
+    // midnight (held inside the left edge, as a picked day's is). Any other hour
+    // there is the middle of a day, and a marker on it would say otherwise.
     function isDayStart(g) {
+        if (g === 0) return samples.length > 0 && String(samples[0].time).substring(11, 13) === "00";
         return g > 0 && g < samples.length && samples[g].date !== samples[g - 1].date;
     }
     // Global sample indices of the midnights inside the window (plus a marker's
@@ -903,17 +920,22 @@ Item {
     // amplitude (range = 0.68·plotH − topReserve) — the extra room is purely
     // headroom for the new-day marker above a peak, the curve is not flattened.
     // When the day pills need a row of their own under the header (pillsUnderHeader),
-    // or reach far enough below the hero to make the header taller (pillsBelowHero), or
+    // or reach far enough below the hero to make the header taller (pillsBelowHeroRaw), or
     // larger toolbar icons push the hero down (heroDrop), the plot gives that height
     // back, so the popup keeps its size and its last row — the hours — isn't pushed
     // out of view. All of it, to the pixel (the column's spacing above the pills' row
     // too): the view's height must not change when the pills move, or Plasma resizes
     // the popup mid-drag (see main.qml's _dragW).
+    // Except the room for the day pills' dates (past five days): it is kept under
+    // them at any day count (pillsKeepSecondLine, PillRow's secondLineRoom), and the
+    // view is that much taller for it rather than the plot shorter. Given back, it
+    // shrank the graph whenever the dates came in, however tall the popup.
     readonly property real plotH:      Kirigami.Units.gridUnit * 14.0
                                        - (pillsUnderHeader ? underHeaderRow.implicitHeight
+                                                             - underHeaderPills.secondLineHeight
                                                              + underHeaderRow.Layout.topMargin
                                                              + content.spacing : 0)
-                                       - pillsBelowHero - Math.max(0, toolbar.heroDrop)
+                                       - pillsBelowHeroUndated - Math.max(0, toolbar.heroDrop)
     readonly property real topReserve: Kirigami.Units.gridUnit * 4.1   // room for temp labels + the new-day marker above the peak
     readonly property real precipBandH: plotH * 0.13                   // bottom margin the temp curve keeps clear (smaller → taller, more dramatic temp curve)
     readonly property real precipMaxFrac: 0.70                         // precip fill rises to this fraction of plotH at 100% chance — high chances overlap the temp curve, low ones stay a sliver near the floor
@@ -1417,10 +1439,13 @@ Item {
     // changes the answer.
     readonly property bool pillsUnderHeader: !rightBlock.pillsFit
     // How far wrapped day pills reach below the hero, which the header row then grows
-    // by. The plot gives it back, as it does for the row under the header.
-    readonly property real pillsBelowHero:
-        Math.max(0, rightBlock.Layout.topMargin + rightBlock.implicitHeight
-                    - heroRow.Layout.topMargin - heroRow.implicitHeight)
+    // by (with the room kept for their dates: negative when they end above it); and
+    // how far they would reach without that room, which the plot gives back, as it
+    // does for the row under the header.
+    readonly property real pillsBelowHeroRaw: rightBlock.Layout.topMargin + rightBlock.implicitHeight
+                                              - heroRow.Layout.topMargin - heroRow.implicitHeight
+    readonly property real pillsBelowHeroUndated:
+        Math.max(0, pillsBelowHeroRaw - (pillsUnderHeader ? 0 : rightBlock.pillsSecondLineHeight))
     // kept warm across layout switches now, so replay the curve reveal when the
     // view is shown again rather than relying on recreation
     onVisibleChanged: if (visible) entranceReveal()
@@ -1664,6 +1689,7 @@ Item {
                 Layout.topMargin: toolbar.buttonCenterY - simple.headerY - capCenter
                 Layout.rightMargin: toolbar.rightInset
                 pillsInBlock: !simple.pillsUnderHeader
+                pillsKeepSecondLine: true   // see plotH
                 weatherRoot: simple.weatherRoot
                 toolbar: toolbar
                 originX: content.x + headerRow.x
@@ -1693,7 +1719,8 @@ Item {
             Layout.topMargin: Kirigami.Units.smallSpacing
             // out to the view's edge, as the header row (see there)
             Layout.rightMargin: -simple.pad
-            implicitHeight: underHeaderPills.implicitHeight
+            // with room for the pills' dates when they show none (see plotH)
+            implicitHeight: underHeaderPills.implicitHeight + underHeaderPills.secondLineRoom
             // where the plates end: level with the pills in the header block
             readonly property real plateEnd: width - (toolbar.rightInset - rightBlock.pillsOverhang)
             DayPills {
