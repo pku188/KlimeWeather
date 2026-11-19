@@ -3,7 +3,7 @@
 
 Weather widget for KDE Plasma 6, without the noise.
 
-Two weather sources, three layouts, and readouts you choose.
+Multiple forecast sources, three layouts, and readouts you choose.
 
 This is a fork of the [Bare Weather](https://github.com/bvlthvzvr/BareWeather), following its strict privacy principles and adding various QoL improvements.
 
@@ -11,9 +11,9 @@ This is a fork of the [Bare Weather](https://github.com/bvlthvzvr/BareWeather), 
 
 ## Widget features
 
-### Two weather sources
+### Multiple weather sources
 
-- **Open-Meteo** and **MET Norway** — switched with the source button in the popup.
+- **MET Norway** and 16 local **Open-Meteo** models  — switch between your preferred forecasts with the source button in the popup.
 
 
 ### Three layouts, one click apart
@@ -25,60 +25,48 @@ This is a fork of the [Bare Weather](https://github.com/bvlthvzvr/BareWeather), 
 
 ### Readouts you pick
 
-- Up to **10 days** of forecast with variety of **Weather Elements** available: air pressure, cloud cover, dew point, feels like, high/low temperature, humidity, hourly or daily precipitation, snowfall,
-sunrise/sunset, UV, wind (with a direction arrow), the date and the moon's phase.
+- Up to **10 days** of forecast with variety of **Weather Elements** available: air pressure, cloud cover, dew point, feels like, high/low temperature, humidity, hourly or daily precipitation, snowfall,sunrise/sunset, UV, wind (with a direction arrow), the date and the moon's phase.
 - Show any of the Weather Elements on the **panel**, in the order you drag them into. On a vertical panel, they automatically wrap onto multiple lines.
 - Customizable unit types and time format which follow your system's locale settings by default.
 
 
 ### Other characteristics
 
-- **Adaptive layout** — colors of the widget inherit the system's color scheme.
+- **Adaptive layout** — colors of the widget inherit the system's color scheme with optional transparency effect.
 
 - **Meteocons icons in four styles** — fill, flat, line or monochrome, animated or still.
 Your system icon theme or a folder of your own icons work too.
-- **Icons throughout the toolbar** — refresh, zoom and pin each have their own icon.
-- **Personalize almost anything** — nearly every piece of text has its own font-size setting,
-with each layout having additional customization options.
-- **Redrawn wind direction icon** — a clear arrow at a size you choose, turning to
-the exact reported angle instead of snapping to the fixed set of compass points.
-- **Severe-weather alerts** from the KDE FOSS Public Alert Server, from a severity you set,
-each new one also sent to your desktop's notifications.
+- **Personalize almost anything** — nearly every piece of text has its own font-size setting, with each layout having additional customization options.
+- **Severe-weather alerts** from the KDE FOSS Public Alert Server, from a severity you set, each new one also sent to your desktop's notifications.
 - **Saved locations with favourites** — search by name, or detect one automatically.
 - **Scroll through the forecast** — the mouse wheel moves through hours and days.
   How far and fast one notch travels is configurable per view. You can point anywhere along the graph to read that hour's conditions.
-
+- **Redrawn wind direction icon** — a clear arrow at a size you choose, turning to
+the exact reported angle instead of snapping to the fixed set of compass points.
 
 ### Faster and smoother
 
-- **Icons are vector, not video** — the animated icons are Meteocons' own SVG animations,
-  played by Qt Quick, instead of 3 MB of pre-rendered WebP frames. The widget package
-  shrank over four times and the popup opens noticeably faster now. Each different
-  icon is rendered once and shared across all weather images of the same type.
+- **Icons are vectors, not video** — the animated icons are Meteocons' own SVG animations, played by Qt Quick, instead of 3 MB of pre-rendered WebP frames. The widget package shrank over four times and the popup opens noticeably faster now. Each different icon is rendered once and shared across all weather images of the same type.
 
 - **Never opens empty** — the last forecast is saved to disk, so after a reboot the
   widget shows weather immediately instead of waiting for the network to come up.
   If a fetch does fail, it says so and keeps retrying.
-- **The graph builds only what it draws** — the widget elements, like layout types, graph
-views are built in the background, so switching them is instant and never flashes an empty frame.
-- **Only visible cards are drawn** — cards outside the visible strip are now hidden from the
-renderer, which halves the CPU usage.
+- **The graph builds only what it draws** — the hidden widget elements, like layout types, graph views are built in the background, so switching them is instant and never flashes an empty frame.
 - **The graph curve is rendered on the GPU**, on its own thread, so dragging through
   the hours stays smooth instead of re-rasterising the full width every frame.
-- **Refreshes are conditional** — when the forecast has not changed, the server answers
-  with a few bytes instead of the whole payload.
+- **Refreshes are conditional** — when the forecast has not changed, the server answers with a few bytes instead of the whole payload.
 
 
-## Install
+### Install
 
-### KDE Store
+**KDE Store**
 
 Right click your panel or desktop -> **Add Widgets…** -> **Get New Widgets** ->
 **Download New Plasma Widgets**, then search for **KlimeWeather** 
 
-### From a release file
+**From a release file**
 
-1. Download the latest version from the [Releases](https://github.com/pku188/KlimeWeather/releases) page.
+1. Download the latest plasmoid from the [Releases](https://github.com/pku188/KlimeWeather/releases) page.
 2. Install it — either:
    - **GUI:** Add Widgets… -> Get New Widgets -> **Install Widget from Local File…**, or
    - **Terminal:**
@@ -86,11 +74,17 @@ Right click your panel or desktop -> **Add Widgets…** -> **Get New Widgets** -
      kpackagetool6 --type Plasma/Applet --install KlimeWeather.plasmoid
      ```
 
-### From source
-
+**Upgrade from older version**
 ```bash
-python3 tools/build-plasmoid.py
 kpackagetool6 --type Plasma/Applet --upgrade KlimeWeather.plasmoid
+systemctl --user restart plasma-plasmashell
+```
+
+**Build plasmoid from source**
+```bash
+git clone https://github.com/pku188/KlimeWeather.git
+cd KlimeWeather
+python3 tools/build-plasmoid.py
 ```
 
 ## Credits

@@ -38,7 +38,7 @@ ColumnLayout {
         text: i18n("Weather data")
     }
     Label {
-        text: i18n("The active source is chosen with the toolbar button in the widget, and applies to every saved location.")
+        text: i18n("The forecasts are chosen in General settings, and the source button in the widget switches between the two. They apply to every saved location.")
         opacity: 0.8
         wrapMode: Text.WordWrap
         Layout.fillWidth: true

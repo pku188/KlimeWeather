@@ -28,7 +28,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: contents/config/config.qml:10 contents/ui/configAppearance.qml:183
+#: contents/config/config.qml:10 contents/ui/configAppearance.qml:173
 msgid "Location"
 msgstr ""
 
@@ -61,188 +61,188 @@ msgid ""
 "width."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:143 contents/ui/configAppearance.qml:163
-#: contents/ui/configAppearance.qml:423 contents/ui/configAppearance.qml:961
-#: contents/ui/configAppearance.qml:1298
+#: contents/ui/configAppearance.qml:133 contents/ui/configAppearance.qml:153
+#: contents/ui/configAppearance.qml:411 contents/ui/configAppearance.qml:932
+#: contents/ui/configAppearance.qml:1261 contents/ui/configGeneral.qml:42
 msgid "None"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:144 contents/ui/configAppearance.qml:169
-#: contents/ui/configAppearance.qml:188 contents/ui/main.qml:829
+#: contents/ui/configAppearance.qml:134 contents/ui/configAppearance.qml:159
+#: contents/ui/configAppearance.qml:178 contents/ui/main.qml:828
 msgid "Feels like"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:145 contents/ui/configAppearance.qml:170
-#: contents/ui/configAppearance.qml:194 contents/ui/main.qml:832
+#: contents/ui/configAppearance.qml:135 contents/ui/configAppearance.qml:160
+#: contents/ui/configAppearance.qml:184 contents/ui/main.qml:831
 msgid "Dew point"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:146 contents/ui/configAppearance.qml:171
-#: contents/ui/configAppearance.qml:189 contents/ui/main.qml:830
+#: contents/ui/configAppearance.qml:136 contents/ui/configAppearance.qml:161
+#: contents/ui/configAppearance.qml:179 contents/ui/main.qml:829
 msgid "Humidity"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:147 contents/ui/configAppearance.qml:172
-#: contents/ui/configAppearance.qml:191 contents/ui/main.qml:831
+#: contents/ui/configAppearance.qml:137 contents/ui/configAppearance.qml:162
+#: contents/ui/configAppearance.qml:181 contents/ui/main.qml:830
 msgid "UV Index"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:148 contents/ui/configAppearance.qml:185
+#: contents/ui/configAppearance.qml:138 contents/ui/configAppearance.qml:175
 msgid "High / low temperature"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:149 contents/ui/configAppearance.qml:186
+#: contents/ui/configAppearance.qml:139 contents/ui/configAppearance.qml:176
 msgid "Precipitation (hourly)"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:150 contents/ui/configAppearance.qml:190
+#: contents/ui/configAppearance.qml:140 contents/ui/configAppearance.qml:180
 msgid "Precipitation (daily)"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:151 contents/ui/configAppearance.qml:164
-#: contents/ui/main.qml:836
+#: contents/ui/configAppearance.qml:141 contents/ui/configAppearance.qml:154
+#: contents/ui/main.qml:835
 msgid "Wind"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:152
+#: contents/ui/configAppearance.qml:142
 msgid "Snowfall today"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:153 contents/ui/configAppearance.qml:173
-#: contents/ui/configAppearance.qml:196 contents/ui/main.qml:837
+#: contents/ui/configAppearance.qml:143 contents/ui/configAppearance.qml:163
+#: contents/ui/configAppearance.qml:186 contents/ui/main.qml:836
 msgid "Cloud cover"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:154 contents/ui/configAppearance.qml:174
-#: contents/ui/configAppearance.qml:192
+#: contents/ui/configAppearance.qml:144 contents/ui/configAppearance.qml:164
+#: contents/ui/configAppearance.qml:182
 msgid "Air pressure"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:155 contents/ui/configAppearance.qml:193
+#: contents/ui/configAppearance.qml:145 contents/ui/configAppearance.qml:183
 msgid "Sunrise / sunset"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:156 contents/ui/configAppearance.qml:175
-#: contents/ui/configAppearance.qml:197 contents/ui/main.qml:840
+#: contents/ui/configAppearance.qml:146 contents/ui/configAppearance.qml:165
+#: contents/ui/configAppearance.qml:187 contents/ui/main.qml:839
 msgid "Date"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:157 contents/ui/configAppearance.qml:198
+#: contents/ui/configAppearance.qml:147 contents/ui/configAppearance.qml:188
 msgid "Moon phase"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:165
+#: contents/ui/configAppearance.qml:155
 msgid "Wind + gust"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:166
+#: contents/ui/configAppearance.qml:156
 msgid "Precip chance"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:167
+#: contents/ui/configAppearance.qml:157
 msgid "Precip amount"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:168 contents/ui/configAppearance.qml:195
+#: contents/ui/configAppearance.qml:158 contents/ui/configAppearance.qml:185
 msgid "Snowfall"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:181
+#: contents/ui/configAppearance.qml:171
 msgid "Weather icon"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:182
+#: contents/ui/configAppearance.qml:172
 msgid "Temperature"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:184
+#: contents/ui/configAppearance.qml:174
 msgid "Condition"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:187
+#: contents/ui/configAppearance.qml:177
 msgid "Wind (speed / gust)"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:158
+#: contents/ui/configAppearance.qml:148
 msgid "Weather and temperature"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:279 contents/ui/configAppearance.qml:284
+#: contents/ui/configAppearance.qml:267 contents/ui/configAppearance.qml:272
 msgid "Choose icon folder"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:295
+#: contents/ui/configAppearance.qml:283
 msgid "Common"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:296
+#: contents/ui/configAppearance.qml:284
 msgid "Daily forecast"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:297
+#: contents/ui/configAppearance.qml:285
 msgid "Weather graph"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:298
+#: contents/ui/configAppearance.qml:286
 msgid "Detailed view"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:299
+#: contents/ui/configAppearance.qml:287
 msgid "Panel"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:322
+#: contents/ui/configAppearance.qml:310
 msgid "Weather icon pack:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:328
+#: contents/ui/configAppearance.qml:316
 msgid "Meteocons (fill)"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:329 contents/ui/configAppearance.qml:378
+#: contents/ui/configAppearance.qml:317 contents/ui/configAppearance.qml:366
 msgid "Meteocons (flat)"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:330 contents/ui/configAppearance.qml:379
+#: contents/ui/configAppearance.qml:318 contents/ui/configAppearance.qml:367
 msgid "Meteocons (line)"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:331
+#: contents/ui/configAppearance.qml:319
 msgid "Meteocons (monochrome)"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:332
+#: contents/ui/configAppearance.qml:320
 msgid "System theme"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:333 contents/ui/configAppearance.qml:380
+#: contents/ui/configAppearance.qml:321 contents/ui/configAppearance.qml:368
 msgid "Custom folder…"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:342 contents/ui/configAppearance.qml:390
+#: contents/ui/configAppearance.qml:330 contents/ui/configAppearance.qml:378
 msgid "Custom folder:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:345 contents/ui/configAppearance.qml:393
+#: contents/ui/configAppearance.qml:333 contents/ui/configAppearance.qml:381
 msgid "Choose…"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:358 contents/ui/configAppearance.qml:405
+#: contents/ui/configAppearance.qml:346 contents/ui/configAppearance.qml:393
 msgid "(none selected)"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:368
+#: contents/ui/configAppearance.qml:356
 msgid ""
 "Folder with SVGs named like the bundled set (wi-day-sunny.svg, wi-night-"
 "clear.svg, …). Tip: copy contents/icons/meteocons/fill/static/ as a starting "
 "point so every condition is covered, then edit."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:374
+#: contents/ui/configAppearance.qml:362
 msgid "Element icon pack:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:387
+#: contents/ui/configAppearance.qml:375
 msgid ""
 "The icons of the Weather Elements wherever they are colored: in the header, "
 "on the hourly cards, in the Detailed view, on the panel and at the Weather "
@@ -252,7 +252,7 @@ msgid ""
 "without it, the icons are monochrome."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:415
+#: contents/ui/configAppearance.qml:403
 msgid ""
 "Folder with SVGs named like the bundled set (thermometer.svg, humidity.svg, "
 "wind.svg, …); an icon missing from it shows Meteocons' flat one. Weather "
@@ -262,200 +262,200 @@ msgid ""
 "icons/meteocons/readings/flat/ as a starting point, then edit."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:419
+#: contents/ui/configAppearance.qml:407
 msgid "Weather icon animation:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:424
+#: contents/ui/configAppearance.qml:412
 msgid "Header icon"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:425
+#: contents/ui/configAppearance.qml:413
 msgid "Header and daily tab icons"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:426
+#: contents/ui/configAppearance.qml:414
 msgid "Full layout"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:433
+#: contents/ui/configAppearance.qml:418
 msgid ""
 "Which icons move, in every layout: the header's, then the Daily forecast's "
 "daily tabs, then the hourly cards and the Weather graph's hour icons."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:437
+#: contents/ui/configAppearance.qml:422
 msgid "Background transparency:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:445
+#: contents/ui/configAppearance.qml:430
 msgid ""
 "How see-through the widget's background is: the popup's when the widget is "
 "on a panel, and on the desktop the frame that \"Show Background\" adds. 0% "
 "leaves the theme's background as it is."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:449
+#: contents/ui/configAppearance.qml:434
 msgid "Header icon size:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:456 contents/ui/configAppearance.qml:1220
+#: contents/ui/configAppearance.qml:441 contents/ui/configAppearance.qml:1183
 msgid "Temperature font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:463
+#: contents/ui/configAppearance.qml:448
 msgid "Condition font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:470
+#: contents/ui/configAppearance.qml:455
 msgid "Location font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:477
+#: contents/ui/configAppearance.qml:462
 msgid "Location font style:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:481 contents/ui/configAppearance.qml:559
-#: contents/ui/configAppearance.qml:1098 contents/ui/configAppearance.qml:1237
-#: contents/ui/configAppearance.qml:1266
+#: contents/ui/configAppearance.qml:466 contents/ui/configAppearance.qml:544
+#: contents/ui/configAppearance.qml:1061 contents/ui/configAppearance.qml:1200
+#: contents/ui/configAppearance.qml:1229
 msgid "Regular"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:482 contents/ui/configAppearance.qml:560
-#: contents/ui/configAppearance.qml:1099 contents/ui/configAppearance.qml:1238
-#: contents/ui/configAppearance.qml:1267
+#: contents/ui/configAppearance.qml:467 contents/ui/configAppearance.qml:545
+#: contents/ui/configAppearance.qml:1062 contents/ui/configAppearance.qml:1201
+#: contents/ui/configAppearance.qml:1230
 msgid "SemiBold"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:483 contents/ui/configAppearance.qml:561
-#: contents/ui/configAppearance.qml:1100 contents/ui/configAppearance.qml:1239
-#: contents/ui/configAppearance.qml:1268
+#: contents/ui/configAppearance.qml:468 contents/ui/configAppearance.qml:546
+#: contents/ui/configAppearance.qml:1063 contents/ui/configAppearance.qml:1202
+#: contents/ui/configAppearance.qml:1231
 msgid "Bold"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:490 contents/ui/configAppearance.qml:568
+#: contents/ui/configAppearance.qml:475 contents/ui/configAppearance.qml:553
 msgid ""
 "SemiBold needs a font that has it. Where yours doesn't, the nearest weight "
 "it has is used — normally Bold."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:494
+#: contents/ui/configAppearance.qml:479
 msgid "Weather source font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:499
+#: contents/ui/configAppearance.qml:484
 msgid ""
 "Sizes the MET Norway / Open-Meteo button; its logo scales with the text."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:503
+#: contents/ui/configAppearance.qml:488
 msgid "Toolbar icon size:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:508
+#: contents/ui/configAppearance.qml:493
 msgid "Sizes the buttons in the popup's corners: keep open, zoom and refresh."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:512
+#: contents/ui/configAppearance.qml:497
 msgid "Layout buttons font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:517
+#: contents/ui/configAppearance.qml:502
 msgid "Sizes the Forecast, Graph and Details buttons under the location."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:521
+#: contents/ui/configAppearance.qml:506
 msgid "Day buttons font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:526
+#: contents/ui/configAppearance.qml:511
 msgid "Sizes the day buttons of the Detailed view and the Weather graph."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:530
+#: contents/ui/configAppearance.qml:515
 msgid "Wind direction arrow:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:535
+#: contents/ui/configAppearance.qml:520
 msgid ""
 "Size of the arrow that follows a wind reading: on the hourly cards, in the "
 "Weather Elements and in the Detailed view."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:543 contents/ui/configAppearance.qml:731
-#: contents/ui/configAppearance.qml:1016
+#: contents/ui/configAppearance.qml:528 contents/ui/configAppearance.qml:710
+#: contents/ui/configAppearance.qml:987
 msgid "Weather Elements"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:548
+#: contents/ui/configAppearance.qml:533
 msgid "Font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:555
+#: contents/ui/configAppearance.qml:540
 msgid "Font style:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:572
+#: contents/ui/configAppearance.qml:557
 msgid "Style:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:575
+#: contents/ui/configAppearance.qml:560
 msgid "Icons"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:576
+#: contents/ui/configAppearance.qml:561
 msgid "Text"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:580
+#: contents/ui/configAppearance.qml:565
 msgid ""
 "Icons shows each element's icon — the one the hourly cards use — in place of "
 "its label."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:584 contents/ui/configAppearance.qml:1200
+#: contents/ui/configAppearance.qml:569 contents/ui/configAppearance.qml:1163
 msgid "Icon color:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:587 contents/ui/configAppearance.qml:708
-#: contents/ui/configAppearance.qml:1111 contents/ui/configAppearance.qml:1201
+#: contents/ui/configAppearance.qml:572 contents/ui/configAppearance.qml:687
+#: contents/ui/configAppearance.qml:1074 contents/ui/configAppearance.qml:1164
 msgid "Use colored icons"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:589
+#: contents/ui/configAppearance.qml:574
 msgid "Colors the icons of the Weather Elements in the header."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:593
+#: contents/ui/configAppearance.qml:578
 msgid "Font color:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:594 contents/ui/configAppearance.qml:714
-#: contents/ui/configAppearance.qml:1118
+#: contents/ui/configAppearance.qml:579 contents/ui/configAppearance.qml:693
+#: contents/ui/configAppearance.qml:1081
 msgid "Use weather-specific color"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:596
+#: contents/ui/configAppearance.qml:581
 msgid ""
 "Colors the values of the Weather Elements in the header — blue for "
 "precipitation, green to red for the UV index, and so on. Off, they follow "
 "your theme."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:617
+#: contents/ui/configAppearance.qml:596
 msgid "Cards per scroll:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:623
+#: contents/ui/configAppearance.qml:602
 msgid "Scroll animation:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:628 contents/ui/configAppearance.qml:889
-#: contents/ui/configAppearance.qml:902 contents/ui/configAppearance.qml:915
+#: contents/ui/configAppearance.qml:607 contents/ui/configAppearance.qml:860
+#: contents/ui/configAppearance.qml:873 contents/ui/configAppearance.qml:886
 msgid "%1 ms"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:631
+#: contents/ui/configAppearance.qml:610
 msgid ""
 "How long the cards take to glide to their new place after one scroll notch, "
 "and the day tabs to bring in a day left out. More cards per scroll covers "
@@ -463,973 +463,974 @@ msgid ""
 "there."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:635
+#: contents/ui/configAppearance.qml:614
 msgid "Daily tab name font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:640
+#: contents/ui/configAppearance.qml:619
 msgid "The day name. The date under it follows at a slightly smaller size."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:644
+#: contents/ui/configAppearance.qml:623
 msgid "Daily tab icon size:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:651
+#: contents/ui/configAppearance.qml:630
 msgid "Daily tab temperature font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:658 contents/ui/configAppearance.qml:922
+#: contents/ui/configAppearance.qml:637 contents/ui/configAppearance.qml:893
 msgid "Hourly icon size:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:665
+#: contents/ui/configAppearance.qml:644
 msgid "Hourly temperature font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:672
+#: contents/ui/configAppearance.qml:651
 msgid "Hourly card font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:679
+#: contents/ui/configAppearance.qml:658
 msgid "Card entrance duration:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:442 contents/ui/configAppearance.qml:685
-#: contents/ui/configAppearance.qml:976 contents/ui/configAppearance.qml:1130
-#: contents/ui/configAppearance.qml:1213 contents/ui/configAppearance.qml:1225
-#: contents/ui/configAppearance.qml:1254
+#: contents/ui/configAppearance.qml:427 contents/ui/configAppearance.qml:664
+#: contents/ui/configAppearance.qml:947 contents/ui/configAppearance.qml:1093
+#: contents/ui/configAppearance.qml:1176 contents/ui/configAppearance.qml:1188
+#: contents/ui/configAppearance.qml:1217
 msgid "%1%"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:688
+#: contents/ui/configAppearance.qml:667
 msgid ""
 "How long the hourly cards take to fly in when a day opens, as a percentage "
 "of the original pace: lower is faster, 0 turns the animation off."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:692
+#: contents/ui/configAppearance.qml:671
 msgid "Daily tabs:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:693
+#: contents/ui/configAppearance.qml:672
 msgid "Show the date under each day"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:697
+#: contents/ui/configAppearance.qml:676
 msgid "Use colored H/L"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:699
+#: contents/ui/configAppearance.qml:678
 msgid ""
 "The high temperature in orange and the low in blue. Off, they follow your "
 "theme."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:703
+#: contents/ui/configAppearance.qml:682
 msgid "Hourly cards:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:704
+#: contents/ui/configAppearance.qml:683
 msgid "Show above the daily tabs"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:710
+#: contents/ui/configAppearance.qml:689
 msgid "Colors the icons before the hourly cards' readings."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:716
+#: contents/ui/configAppearance.qml:695
 msgid ""
 "Colors the hourly cards' readings — blue for precipitation, green to red for "
 "the UV index, and so on. Off, they follow your theme."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:720
+#: contents/ui/configAppearance.qml:699
 msgid "Show precipitation gradient"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:722
+#: contents/ui/configAppearance.qml:701
 msgid ""
 "Tints a card blue from its lower left corner where rain is likely, and white "
 "from its upper right where snow is: the likelier, the stronger."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:736 contents/ui/configAppearance.qml:776
-#: contents/ui/configAppearance.qml:1021
+#: contents/ui/configAppearance.qml:715 contents/ui/configAppearance.qml:755
+#: contents/ui/configAppearance.qml:992
 msgid "Element 1:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:745 contents/ui/configAppearance.qml:802
-#: contents/ui/configAppearance.qml:1029
+#: contents/ui/configAppearance.qml:724 contents/ui/configAppearance.qml:781
+#: contents/ui/configAppearance.qml:1000
 msgid "Element 2:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:754 contents/ui/configAppearance.qml:1037
+#: contents/ui/configAppearance.qml:733 contents/ui/configAppearance.qml:1008
 msgid "Element 3:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:763 contents/ui/configAppearance.qml:1045
+#: contents/ui/configAppearance.qml:742 contents/ui/configAppearance.qml:1016
 msgid "Element 4:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:771
+#: contents/ui/configAppearance.qml:750
 msgid "Hourly cards"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:784 contents/ui/configAppearance.qml:793
-#: contents/ui/configAppearance.qml:810 contents/ui/configAppearance.qml:819
+#: contents/ui/configAppearance.qml:763 contents/ui/configAppearance.qml:772
+#: contents/ui/configAppearance.qml:789 contents/ui/configAppearance.qml:798
 msgid "Fallback:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:789 contents/ui/configAppearance.qml:798
-#: contents/ui/configAppearance.qml:815 contents/ui/configAppearance.qml:824
+#: contents/ui/configAppearance.qml:768 contents/ui/configAppearance.qml:777
+#: contents/ui/configAppearance.qml:794 contents/ui/configAppearance.qml:803
 msgid ""
 "Shows the main metric, or the fallback on hours the main one has nothing to "
 "show."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:860
+#: contents/ui/configAppearance.qml:831
 msgid "Scroll step, 12-hour view (hours):"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:866
+#: contents/ui/configAppearance.qml:837
 msgid "Scroll step, 24-hour view (hours):"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:873
+#: contents/ui/configAppearance.qml:844
 msgid "Scroll step, 48-hour view (hours):"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:883
+#: contents/ui/configAppearance.qml:854
 msgid "Scroll animation, 12-hour view:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:896
+#: contents/ui/configAppearance.qml:867
 msgid "Scroll animation, 24-hour view:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:909
+#: contents/ui/configAppearance.qml:880
 msgid "Scroll animation, 48-hour view:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:929
+#: contents/ui/configAppearance.qml:900
 msgid "Hour font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:936
+#: contents/ui/configAppearance.qml:907
 msgid "Graph temperature font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:943
+#: contents/ui/configAppearance.qml:914
 msgid "Day markers font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:948
+#: contents/ui/configAppearance.qml:919
 msgid ""
 "The date at each new day on the graph, and the sunrise and sunset times with "
 "their icons."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:952
+#: contents/ui/configAppearance.qml:923
 msgid "Graph color:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:957
+#: contents/ui/configAppearance.qml:928
 msgid "Temperature curve & precipitation"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:958
+#: contents/ui/configAppearance.qml:929
 msgid "Temperature & precipitation"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:959
+#: contents/ui/configAppearance.qml:930
 msgid "Temperature only"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:960
+#: contents/ui/configAppearance.qml:931
 msgid "Precipitation only"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:971
+#: contents/ui/configAppearance.qml:942
 msgid "Precipitation gradient:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:979
+#: contents/ui/configAppearance.qml:950
 msgid ""
 "How dense the shaded band under the precipitation curve is. It fades toward "
 "the floor either way; 0 leaves the curve as a bare line."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:983
+#: contents/ui/configAppearance.qml:954
 msgid "Precipitation labels:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:987
+#: contents/ui/configAppearance.qml:958
 msgid "Chance and amount"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:988
+#: contents/ui/configAppearance.qml:959
 msgid "Amount"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:989
+#: contents/ui/configAppearance.qml:960
 msgid "Chance"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:990
+#: contents/ui/configAppearance.qml:961
 msgid "Hide"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1000
+#: contents/ui/configAppearance.qml:971
 msgid "Day markers:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1001
+#: contents/ui/configAppearance.qml:972
 msgid "Show the date under the weekday"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1005
+#: contents/ui/configAppearance.qml:976
 msgid "Use colored day markers"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1007
+#: contents/ui/configAppearance.qml:978
 msgid ""
 "Colors the graph's day markers and its sunrise and sunset icons, times and "
 "glow."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1085
+#: contents/ui/configAppearance.qml:1048
 msgid "Element font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1090
+#: contents/ui/configAppearance.qml:1053
 msgid "The elements' names and values; their icons grow with it."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1094
+#: contents/ui/configAppearance.qml:1057
 msgid "Element font style:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1110
+#: contents/ui/configAppearance.qml:1073
 msgid "Element icon color:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1113
+#: contents/ui/configAppearance.qml:1076
 msgid "Colors the elements' icons, and the sun on its arc."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1117
+#: contents/ui/configAppearance.qml:1080
 msgid "Element font color:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1120
+#: contents/ui/configAppearance.qml:1083
 msgid ""
 "Colors the elements' values — blue for precipitation, green to red for the "
 "UV index, and so on. Off, they follow your theme."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1124
+#: contents/ui/configAppearance.qml:1087
 msgid "Element entrance duration:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1133
+#: contents/ui/configAppearance.qml:1096
 msgid ""
 "How long the elements take to come in when the view opens, as a percentage "
 "of the original pace: lower is faster, 0 turns the animation off."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1141
+#: contents/ui/configAppearance.qml:1104
 msgid "Add to view"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1142
+#: contents/ui/configAppearance.qml:1105
 msgid "Every element is in the view."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1150
+#: contents/ui/configAppearance.qml:1113
 msgid "Detailed view Elements"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1163
+#: contents/ui/configAppearance.qml:1126
 msgid "The view shows its elements in this order, three to a row."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1172
+#: contents/ui/configAppearance.qml:1135
 msgid "Hide in the view"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1173
+#: contents/ui/configAppearance.qml:1136
 msgid "Show in the view"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1204
+#: contents/ui/configAppearance.qml:1167
 msgid ""
 "Colors the weather icon and the icons before the readings. The weather icon "
 "is the Weather icon pack's, or the Element icon pack's when the Weather icon "
 "pack is monochrome."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1208
+#: contents/ui/configAppearance.qml:1171
 msgid "Weather icon size:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1232
+#: contents/ui/configAppearance.qml:1195
 msgid "Temperature font style:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1249
+#: contents/ui/configAppearance.qml:1212
 msgid "Secondary font:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1257
+#: contents/ui/configAppearance.qml:1220
 msgid ""
 "Everything on the panel but the weather icon and the temperature: the "
 "location, the condition and the readings. A percentage of the panel's "
 "thickness."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1261
+#: contents/ui/configAppearance.qml:1224
 msgid "Secondary font style:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1278
+#: contents/ui/configAppearance.qml:1241
 msgid "Element spacing:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1283
+#: contents/ui/configAppearance.qml:1246
 msgid "%1 px"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1286
+#: contents/ui/configAppearance.qml:1249
 msgid ""
 "Pixels added to the space between the elements, on both sides of a "
 "separator, and between a vertical panel's lines. 0 keeps the panel's own "
 "spacing, which grows with its thickness; below 0 brings the elements closer."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1291
+#: contents/ui/configAppearance.qml:1254
 msgid "Element separator:"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1299
+#: contents/ui/configAppearance.qml:1262
 msgid "Bullet"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1300
+#: contents/ui/configAppearance.qml:1263
 msgid "Custom"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1323
+#: contents/ui/configAppearance.qml:1286
 msgid "Your own separator: a single character."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1333
+#: contents/ui/configAppearance.qml:1296
 msgid "Add to panel"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1334
+#: contents/ui/configAppearance.qml:1297
 msgid "Every element is on the panel."
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1343
+#: contents/ui/configAppearance.qml:1306
 msgid "Panel Elements"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1358
+#: contents/ui/configAppearance.qml:1321
 msgid "Hide on the panel"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1359
+#: contents/ui/configAppearance.qml:1322
 msgid "Show on the panel"
 msgstr ""
 
-#: contents/ui/configAppearance.qml:1360
+#: contents/ui/configAppearance.qml:1323
 msgid "With no element shown, the panel shows the weather icon."
 msgstr ""
 
-#: contents/ui/configGeneral.qml:47 contents/ui/configGeneral.qml:49
-#: contents/ui/configGeneral.qml:252
+#: contents/ui/configGeneral.qml:56 contents/ui/configGeneral.qml:58
+#: contents/ui/configGeneral.qml:286
 msgid "Follow system (%1)"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:90 contents/ui/configSources.qml:38
+#: contents/ui/configSources.qml:38 contents/ui/configGeneral.qml:103
 msgid "Weather data"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:114
+#: contents/ui/configSources.qml:41
+msgid ""
+"The forecasts are chosen in General settings, and the source button in the "
+"widget switches between the two. They apply to every saved location."
+msgstr ""
+
+#: contents/ui/configGeneral.qml:108
 msgid "Forecast days:"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:120
+#: contents/ui/configGeneral.qml:112
 msgid ""
 "How many days the forecast shows, today included, in every layout: the Daily "
 "forecast's day tabs and the day buttons of the Weather graph and the "
 "Detailed view. The graph always shows at least three."
 msgstr ""
 
-#: contents/ui/configGeneral.qml:95
+#: contents/ui/configGeneral.qml:116
 msgid "Refresh interval (minutes):"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:102
-msgid "Open-Meteo model:"
+#: contents/ui/configGeneral.qml:123
+msgid "Default forecast:"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:112
+#: contents/ui/configGeneral.qml:136
+msgid "Alternative forecast:"
+msgstr ""
+
+#: contents/ui/configGeneral.qml:146
 msgid ""
-"The forecast model Open-Meteo uses. Best match picks the best models for "
-"your location. A national weather service's model can be more precise in and "
-"around its country. Whatever a model doesn't forecast, such as the UV index, "
-"the days beyond its range or places outside its area, is filled in from Best "
-"match. Used while Open-Meteo is the weather source."
+"The forecast the source button in the widget switches to, and back. None "
+"keeps the button from switching."
 msgstr ""
 
-#: contents/ui/configGeneral.qml:115
+#: contents/ui/configGeneral.qml:149
 msgid "Weather alerts:"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:118
+#: contents/ui/configGeneral.qml:152
 msgid "Show weather alerts"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:127
+#: contents/ui/configGeneral.qml:161
 msgid ""
 "Weather alerts come from KDE Public Alert Server. It collects official "
 "weather warnings from agencies around the world so you get worldwide alerts "
 "without contacting, or exposing yourself to each individual agency."
 msgstr ""
 
-#: contents/ui/configGeneral.qml:132
+#: contents/ui/configGeneral.qml:166
 msgid "Show alerts at or above:"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:137
+#: contents/ui/configGeneral.qml:171
 msgid "Minor"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:138 contents/ui/main.qml:2337
+#: contents/ui/main.qml:2484 contents/ui/configGeneral.qml:172
 msgid "Moderate"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:139
+#: contents/ui/configGeneral.qml:173
 msgid "Severe"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:140 contents/ui/main.qml:2339
+#: contents/ui/main.qml:2486 contents/ui/configGeneral.qml:174
 msgid "Extreme"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:151
+#: contents/ui/configGeneral.qml:185
 msgid "Alert notifications:"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:152
+#: contents/ui/configGeneral.qml:186
 msgid "Notify about new alerts"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:155
+#: contents/ui/configGeneral.qml:189
 msgid ""
 "Sends each new alert at or above the level above to the system's "
 "notifications, once. A click on it opens the widget."
 msgstr ""
 
-#: contents/ui/configGeneral.qml:158
+#: contents/ui/configGeneral.qml:192
 msgid "Units"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:163
+#: contents/ui/configGeneral.qml:197
 msgid "Temperature unit:"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:167
+#: contents/ui/configGeneral.qml:201
 msgid "Celsius (°C)"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:168
+#: contents/ui/configGeneral.qml:202
 msgid "Fahrenheit (°F)"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:183
+#: contents/ui/configGeneral.qml:217
 msgid "Wind speed unit:"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:187
+#: contents/ui/configGeneral.qml:221
 msgid "Kilometers per hour (km/h)"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:188
+#: contents/ui/configGeneral.qml:222
 msgid "Miles per hour (mph)"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:189
+#: contents/ui/configGeneral.qml:223
 msgid "Meters per second (m/s)"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:190
+#: contents/ui/configGeneral.qml:224
 msgid "Knots (kn)"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:191
+#: contents/ui/configGeneral.qml:225
 msgid "Beaufort scale (bft)"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:206
+#: contents/ui/configGeneral.qml:240
 msgid "Air pressure unit:"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:210
+#: contents/ui/configGeneral.qml:244
 msgid "Hectopascals (hPa)"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:211
+#: contents/ui/configGeneral.qml:245
 msgid "Inches of mercury (inHg)"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:212
+#: contents/ui/configGeneral.qml:246
 msgid "Millimeters of mercury (mmHg)"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:227
+#: contents/ui/configGeneral.qml:261
 msgid "Precipitation unit:"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:231
+#: contents/ui/configGeneral.qml:265
 msgid "Millimeters (mm)"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:232
+#: contents/ui/configGeneral.qml:266
 msgid "Inches (in)"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:244
+#: contents/ui/configGeneral.qml:278
 msgid "Snowfall follows it: centimeters with millimeters, inches with inches."
 msgstr ""
 
-#: contents/ui/configGeneral.qml:248
+#: contents/ui/configGeneral.qml:282
 msgid "Clock format:"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:252
+#: contents/ui/configGeneral.qml:286
 msgctxt "short for 12-hour time"
 msgid "12h"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:253
+#: contents/ui/configGeneral.qml:287
 msgctxt "short for 24-hour time"
 msgid "24h"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:255
+#: contents/ui/configGeneral.qml:289
 msgid "12-hour time"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:256
+#: contents/ui/configGeneral.qml:290
 msgid "24-hour time"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:269
+#: contents/ui/configGeneral.qml:303
 msgid "Miscellaneous"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:274
+#: contents/ui/configGeneral.qml:308
 msgid "Day starts at:"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:279
+#: contents/ui/configGeneral.qml:313
 msgid "6 AM"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:280
+#: contents/ui/configGeneral.qml:314
 msgid "Midnight"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:288
+#: contents/ui/configGeneral.qml:322
 msgid ""
 "The hour a day opens at when you pick it, in the Daily forecast and the "
 "Detailed view. Today always opens at the current hour."
 msgstr ""
 
-#: contents/ui/configGeneral.qml:291
+#: contents/ui/configGeneral.qml:325
 msgid "Reset All Settings…"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:297
+#: contents/ui/configGeneral.qml:331
 msgid "Reset all settings?"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:298
+#: contents/ui/configGeneral.qml:332
 msgid ""
 "Every setting of this widget goes back to its default. Your location and "
 "saved locations are kept."
 msgstr ""
 
-#: contents/ui/configGeneral.qml:302
+#: contents/ui/configGeneral.qml:336
 msgid "Reset"
 msgstr ""
 
-#: contents/ui/configGeneral.qml:307
+#: contents/ui/configGeneral.qml:341
 msgid "Cancel"
 msgstr ""
 
-#: contents/ui/main.qml:323
+#: contents/ui/main.qml:328
 msgid "Updated %1m ago"
 msgstr ""
 
-#: contents/ui/main.qml:325
+#: contents/ui/main.qml:330
 msgid "Updated %1h ago"
 msgstr ""
 
-#: contents/ui/main.qml:326
+#: contents/ui/main.qml:331
 msgid "Updated %1d ago"
 msgstr ""
 
-#: contents/ui/main.qml:381
+#: contents/ui/main.qml:386
 msgid "until %1"
 msgstr ""
 
-#: contents/ui/main.qml:407
+#: contents/ui/main.qml:412
 msgid "Also active:"
 msgstr ""
 
-#: contents/ui/main.qml:523 contents/ui/main.qml:658
+#: contents/ui/main.qml:522 contents/ui/main.qml:657
 msgid "light"
 msgstr ""
 
-#: contents/ui/main.qml:579
+#: contents/ui/main.qml:578
 msgid "%1 inHg"
 msgstr ""
 
-#: contents/ui/main.qml:580
+#: contents/ui/main.qml:579
 msgid "%1 mmHg"
 msgstr ""
 
-#: contents/ui/main.qml:581
+#: contents/ui/main.qml:580
 msgid "%1 hPa"
 msgstr ""
 
-#: contents/ui/main.qml:677 contents/ui/main.qml:827 contents/ui/main.qml:1052
-#: contents/ui/main.qml:1242 contents/ui/main.qml:1243
+#: contents/ui/main.qml:676 contents/ui/main.qml:826 contents/ui/main.qml:1091
+#: contents/ui/main.qml:1281 contents/ui/main.qml:1282
 msgid "Today"
 msgstr ""
 
-#: contents/ui/main.qml:680
+#: contents/ui/main.qml:679
 msgid "Feels like: %1"
 msgstr ""
 
-#: contents/ui/main.qml:685
+#: contents/ui/main.qml:684
 msgid "Humidity: %1"
 msgstr ""
 
-#: contents/ui/main.qml:690
+#: contents/ui/main.qml:689
 msgid "UV Index: %1"
 msgstr ""
 
-#: contents/ui/main.qml:694
+#: contents/ui/main.qml:693
 msgid "Dew point: %1"
 msgstr ""
 
-#: contents/ui/main.qml:701
+#: contents/ui/main.qml:700
 msgid "H/L: %1"
 msgstr ""
 
-#: contents/ui/main.qml:709
+#: contents/ui/main.qml:708
 msgid "Precip.: %1"
 msgstr ""
 
-#: contents/ui/main.qml:710
+#: contents/ui/main.qml:709
 msgid "Precip.: %1 / %2"
 msgstr ""
 
-#: contents/ui/main.qml:716
+#: contents/ui/main.qml:715
 msgid "Precip. (%1): %2"
 msgstr ""
 
-#: contents/ui/main.qml:734
+#: contents/ui/main.qml:733
 msgid "Wind: %1"
 msgstr ""
 
-#: contents/ui/main.qml:738
+#: contents/ui/main.qml:737
 msgid "Cloud cover: %1"
 msgstr ""
 
-#: contents/ui/main.qml:742
+#: contents/ui/main.qml:741
 msgid "Pressure: %1"
 msgstr ""
 
-#: contents/ui/main.qml:746
+#: contents/ui/main.qml:745
 msgid "Snowfall (%1): %2"
 msgstr ""
 
-#: contents/ui/main.qml:749
+#: contents/ui/main.qml:748
 msgid "Date: %1"
 msgstr ""
 
-#: contents/ui/main.qml:750
+#: contents/ui/main.qml:749
 msgid "Moon: %1"
 msgstr ""
 
-#: contents/ui/main.qml:1137
+#: contents/ui/main.qml:1176
 msgctxt "@info a temperature, then a weather condition"
 msgid "%1 %2"
 msgstr ""
 
-#: contents/ui/main.qml:816
+#: contents/ui/main.qml:815
 msgid "New moon"
 msgstr ""
 
-#: contents/ui/main.qml:816
+#: contents/ui/main.qml:815
 msgid "Waxing crescent"
 msgstr ""
 
-#: contents/ui/main.qml:816
+#: contents/ui/main.qml:815
 msgid "First quarter"
 msgstr ""
 
-#: contents/ui/main.qml:817
+#: contents/ui/main.qml:816
 msgid "Waxing gibbous"
 msgstr ""
 
-#: contents/ui/main.qml:817
+#: contents/ui/main.qml:816
 msgid "Full moon"
 msgstr ""
 
-#: contents/ui/main.qml:817
+#: contents/ui/main.qml:816
 msgid "Waning gibbous"
 msgstr ""
 
-#: contents/ui/main.qml:818
+#: contents/ui/main.qml:817
 msgid "Last quarter"
 msgstr ""
 
-#: contents/ui/main.qml:818
+#: contents/ui/main.qml:817
 msgid "Waning crescent"
 msgstr ""
 
-#: contents/ui/main.qml:833
+#: contents/ui/main.qml:832
 msgid "H/L"
 msgstr ""
 
-#: contents/ui/main.qml:834
+#: contents/ui/main.qml:833
 msgid "Precip."
 msgstr ""
 
-#: contents/ui/main.qml:835
+#: contents/ui/main.qml:834
 msgid "Precip. (%1)"
 msgstr ""
 
-#: contents/ui/main.qml:838
+#: contents/ui/main.qml:837
 msgid "Pressure"
 msgstr ""
 
-#: contents/ui/main.qml:839
+#: contents/ui/main.qml:838
 msgid "Snowfall (%1)"
 msgstr ""
 
-#: contents/ui/main.qml:841
+#: contents/ui/main.qml:840
 msgid "Moon"
 msgstr ""
 
-#: contents/ui/main.qml:1959
+#: contents/ui/main.qml:2061
 msgid "%1, until %2"
 msgstr ""
 
-#: contents/ui/main.qml:1964
+#: contents/ui/main.qml:2066
 msgid "Weather alert"
 msgstr ""
 
-#: contents/ui/main.qml:1984
+#: contents/ui/main.qml:2086
 msgid "Show"
 msgstr ""
 
-#: contents/ui/main.qml:2070
+#: contents/ui/main.qml:2172
 msgid "Clear night"
 msgstr ""
 
-#: contents/ui/main.qml:2070
+#: contents/ui/main.qml:2172
 msgid "Clear sky"
 msgstr ""
 
-#: contents/ui/main.qml:2071
+#: contents/ui/main.qml:2173
 msgid "Partly cloudy"
 msgstr ""
 
-#: contents/ui/main.qml:2072
+#: contents/ui/main.qml:2174
 msgid "Overcast"
 msgstr ""
 
-#: contents/ui/main.qml:2073
+#: contents/ui/main.qml:2175
 msgid "Fog"
 msgstr ""
 
-#: contents/ui/main.qml:2074
+#: contents/ui/main.qml:2176
 msgid "Freezing rain"
 msgstr ""
 
-#: contents/ui/main.qml:2075
+#: contents/ui/main.qml:2177
 msgid "Rain"
 msgstr ""
 
-#: contents/ui/main.qml:2076
+#: contents/ui/main.qml:2178
 msgid "Snow"
 msgstr ""
 
-#: contents/ui/main.qml:2077
+#: contents/ui/main.qml:2179
 msgid "Showers"
 msgstr ""
 
-#: contents/ui/main.qml:2078
+#: contents/ui/main.qml:2180
 msgid "Snow showers"
 msgstr ""
 
-#: contents/ui/main.qml:2079
+#: contents/ui/main.qml:2181
 msgid "Thunderstorm"
 msgstr ""
 
-#: contents/ui/main.qml:2336
+#: contents/ui/main.qml:2483
 msgid "Low"
 msgstr ""
 
-#: contents/ui/main.qml:2338
+#: contents/ui/main.qml:2485
 msgid "High"
 msgstr ""
 
-#: contents/ui/main.qml:2339
+#: contents/ui/main.qml:2486
 msgid "Very High"
 msgstr ""
 
-#: contents/ui/main.qml:2971
+#: contents/ui/main.qml:3164
 msgid "No location set. Open settings to choose where to show the weather."
 msgstr ""
 
-#: contents/ui/main.qml:2974
+#: contents/ui/main.qml:3167
 msgid "Open settings"
 msgstr ""
 
-#: contents/ui/main.qml:2992
+#: contents/ui/main.qml:3185
 msgid "Can't reach %1 yet. Retrying automatically."
 msgstr ""
 
-#: contents/ui/main.qml:2995
+#: contents/ui/main.qml:3188
 msgid "Retry now"
 msgstr ""
 
-#: contents/ui/configLocation.qml:131
+#: contents/ui/configLocation.qml:103
 msgid "Searching…"
 msgstr ""
 
-#: contents/ui/configLocation.qml:146
+#: contents/ui/configLocation.qml:118
 msgid "No match for “%1”. Try just the place name."
 msgstr ""
 
-#: contents/ui/configLocation.qml:187
+#: contents/ui/configLocation.qml:159
 msgid "%1 matches — pick one:"
 msgstr ""
 
-#: contents/ui/configLocation.qml:200
+#: contents/ui/configLocation.qml:171
 msgid "Set to: %1"
 msgstr ""
 
-#: contents/ui/configLocation.qml:262
+#: contents/ui/configLocation.qml:233
 msgid "Detecting location…"
 msgstr ""
 
-#: contents/ui/configLocation.qml:281
+#: contents/ui/configLocation.qml:251
 msgid "Could not detect location. Enter it manually below."
 msgstr ""
 
-#: contents/ui/configLocation.qml:312
+#: contents/ui/configLocation.qml:282
 msgid "This location is already saved."
 msgstr ""
 
-#: contents/ui/configLocation.qml:343
+#: contents/ui/configLocation.qml:313
 msgid "You can have up to %1 favorites."
 msgstr ""
 
-#: contents/ui/configLocation.qml:371
+#: contents/ui/configLocation.qml:341
 msgid "Edit location"
 msgstr ""
 
-#: contents/ui/configLocation.qml:383
+#: contents/ui/configLocation.qml:353
 msgid "Name:"
 msgstr ""
 
-#: contents/ui/configLocation.qml:387 contents/ui/configLocation.qml:524
+#: contents/ui/configLocation.qml:357 contents/ui/configLocation.qml:494
 msgid "Latitude:"
 msgstr ""
 
-#: contents/ui/configLocation.qml:393 contents/ui/configLocation.qml:542
+#: contents/ui/configLocation.qml:363 contents/ui/configLocation.qml:512
 msgid "Longitude:"
 msgstr ""
 
-#: contents/ui/configLocation.qml:418
+#: contents/ui/configLocation.qml:388
 msgid "Automatic"
 msgstr ""
 
-#: contents/ui/configLocation.qml:422
+#: contents/ui/configLocation.qml:392
 msgid "Auto-detect:"
 msgstr ""
 
-#: contents/ui/configLocation.qml:424
+#: contents/ui/configLocation.qml:394
 msgid "Detect now"
 msgstr ""
 
-#: contents/ui/configLocation.qml:438
+#: contents/ui/configLocation.qml:408
 msgid ""
 "Auto-detect estimates your location from your public IP address via Mullvad, "
 "a privacy focused, no logging service. Your IP is not stored or profiled."
 msgstr ""
 
-#: contents/ui/configLocation.qml:454
+#: contents/ui/configLocation.qml:424
 msgid "Manual"
 msgstr ""
 
-#: contents/ui/configLocation.qml:459
+#: contents/ui/configLocation.qml:429
 msgid "Location name:"
 msgstr ""
 
-#: contents/ui/configLocation.qml:509
+#: contents/ui/configLocation.qml:479
 msgid ""
 "Type a place name (city, town, postal) to find the coordinates.  The name is "
 "looked up via OpenMeteo's geocoding service, which fills in the latitude and "
 "longitude below."
 msgstr ""
 
-#: contents/ui/configLocation.qml:562
+#: contents/ui/configLocation.qml:532
 msgid "Save current location"
 msgstr ""
 
-#: contents/ui/configLocation.qml:578
+#: contents/ui/configLocation.qml:548
 msgid "Saved locations"
 msgstr ""
 
-#: contents/ui/configLocation.qml:592
+#: contents/ui/configLocation.qml:562
 msgid "No saved locations yet."
 msgstr ""
 
-#: contents/ui/configLocation.qml:658
+#: contents/ui/configLocation.qml:628
 msgid "Active"
 msgstr ""
 
-#: contents/ui/configLocation.qml:667
+#: contents/ui/configLocation.qml:637
 msgid "Remove favorite"
 msgstr ""
 
-#: contents/ui/configLocation.qml:667
+#: contents/ui/configLocation.qml:637
 msgid "Set as favorite"
 msgstr ""
 
-#: contents/ui/configLocation.qml:673
+#: contents/ui/configLocation.qml:643
 msgid "Edit name or coordinates"
 msgstr ""
 
-#: contents/ui/ElementRows.qml:98 contents/ui/configLocation.qml:679
+#: contents/ui/ElementRows.qml:98 contents/ui/configLocation.qml:649
 msgid "Remove"
-msgstr ""
-
-#: contents/ui/configSources.qml:41
-msgid ""
-"The active source is chosen with the toolbar button in the widget, and "
-"applies to every saved location."
 msgstr ""
 
 #: contents/ui/configSources.qml:72
@@ -1458,11 +1459,11 @@ msgstr ""
 msgid "Each data source keeps its own licence — see the links above."
 msgstr ""
 
-#: contents/ui/FullView.qml:230
+#: contents/ui/FullView.qml:236
 msgid "Earlier hours"
 msgstr ""
 
-#: contents/ui/FullView.qml:231
+#: contents/ui/FullView.qml:237
 msgid "Later hours"
 msgstr ""
 
@@ -1478,7 +1479,7 @@ msgstr ""
 msgid "Keep window open"
 msgstr ""
 
-#: contents/ui/ProviderButton.qml:66
+#: contents/ui/ProviderButton.qml:72
 msgid "Switch to %1"
 msgstr ""
 
@@ -1486,75 +1487,85 @@ msgstr ""
 msgid "Weather data from MET Norway (met.no)"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:58
+#: contents/ui/providers/MetNo.qml:61
+msgctxt ""
+"@item:inlistbox MET Norway's forecast, fetched from MET Norway itself rather "
+"than through Open-Meteo"
+msgid "MET Norway (direct)"
+msgstr ""
+
+#: contents/ui/providers/OpenMeteo.qml:65
 msgid "Weather data by Open-Meteo.com"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:84
+#: contents/ui/providers/OpenMeteo.qml:94
 msgid "Best match"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:85
+#: contents/ui/providers/OpenMeteo.qml:95
 msgid "worldwide"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:86
+#: contents/ui/providers/OpenMeteo.qml:96
 msgid "Austria"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:87
+#: contents/ui/providers/OpenMeteo.qml:97
 msgid "Canada"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:88
+#: contents/ui/providers/OpenMeteo.qml:98
 msgid "China"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:89
+#: contents/ui/providers/OpenMeteo.qml:99
 msgid "Czechia"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:90
+#: contents/ui/providers/OpenMeteo.qml:100
 msgid "Denmark"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:91
+#: contents/ui/providers/OpenMeteo.qml:101
 msgid "France"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:92
+#: contents/ui/providers/OpenMeteo.qml:102
 msgid "Germany"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:93
+#: contents/ui/providers/OpenMeteo.qml:103
 msgid "Italy"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:94
+#: contents/ui/providers/OpenMeteo.qml:104
 msgid "Japan"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:95
+#: contents/ui/providers/OpenMeteo.qml:105
 msgid "Netherlands"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:96
-msgid "Nordic countries"
+#: contents/ui/providers/OpenMeteo.qml:110
+msgctxt ""
+"@item:inlistbox MET Norway's forecast as Open-Meteo serves it, as opposed to "
+"fetched from MET Norway itself"
+msgid "MET Norway (via Open-Meteo)"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:97
+#: contents/ui/providers/OpenMeteo.qml:111
 msgid "Switzerland"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:98
+#: contents/ui/providers/OpenMeteo.qml:112
 msgid "United Kingdom"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:99
+#: contents/ui/providers/OpenMeteo.qml:113
 msgid "United States"
 msgstr ""
 
-#: contents/ui/providers/OpenMeteo.qml:103
+#: contents/ui/providers/OpenMeteo.qml:118
 msgctxt ""
 "@item:inlistbox a weather service, then the area its forecast model is made "
 "for"
@@ -1575,33 +1586,33 @@ msgctxt "a duration: minutes"
 msgid "%1m"
 msgstr ""
 
-#: contents/ui/DetailedElement.qml:327
+#: contents/ui/DetailedElement.qml:329
 msgid "To sunset: %1"
 msgstr ""
 
-#: contents/ui/DetailedElement.qml:328
+#: contents/ui/DetailedElement.qml:330
 msgid "To sunrise: %1"
 msgstr ""
 
-#: contents/ui/DetailedElement.qml:496
+#: contents/ui/DetailedElement.qml:498
 msgid "To moonset: %1"
 msgstr ""
 
-#: contents/ui/DetailedElement.qml:497
+#: contents/ui/DetailedElement.qml:499
 msgid "To moonrise: %1"
 msgstr ""
 
-#: contents/ui/HeaderRightBlock.qml:156
+#: contents/ui/HeaderRightBlock.qml:163
 msgctxt "the Daily forecast layout's button"
 msgid "Forecast"
 msgstr ""
 
-#: contents/ui/HeaderRightBlock.qml:157
+#: contents/ui/HeaderRightBlock.qml:164
 msgctxt "the Weather graph layout's button"
 msgid "Graph"
 msgstr ""
 
-#: contents/ui/HeaderRightBlock.qml:158
+#: contents/ui/HeaderRightBlock.qml:165
 msgctxt "the Detailed view layout's button"
 msgid "Details"
 msgstr ""

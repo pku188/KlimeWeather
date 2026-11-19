@@ -9,22 +9,38 @@
          locationConfigured below) and shows a "set your location" prompt instead
          of a stand-in city. Coordinates stay 0 and are never fetched until the
          user sets a location, which flips locationConfigured true. -->
-    <!-- Which weather API supplies the forecast. GLOBAL, not per-location:
-         saved locations are plain coordinates, so every one of them works with
-         every provider and switching providers never asks for a location twice.
-         Must match a key in main.qml's `providers` registry; an unknown value
-         falls back to openmeteo. Open-Meteo by default: hourly all week, and its
-         best match picks a fine regional model for the location; met.no turns to
-         6-hour blocks after about two days. KConfig keeps no value equal to the
-         default, so every widget on met.no (picked or not) followed the old default,
-         and moves to Open-Meteo with it. -->
+    <!-- The forecast the widget shows (General → Default forecast), and the one the
+         header's source button switches to and back (Alternative forecast). GLOBAL,
+         not per-location: saved locations are plain coordinates, so every one of
+         them works with every forecast and switching never asks for a location
+         twice. Each is an Open-Meteo models= name from the list in
+         providers/OpenMeteo.qml, or "metno", MET Norway's own forecast (see
+         providers/sources.js); the alternative also "none". best_match is
+         Open-Meteo's own pick for the location; whatever another Open-Meteo model
+         leaves out is filled in from it. An unknown default counts as best_match,
+         and an unknown alternative, or the default again, as none (the button then
+         doesn't switch). Carried over once from weatherProvider and openMeteoModel
+         below (main.qml). -->
+    <entry name="forecastSource" type="String">
+      <default>best_match</default>
+    </entry>
+    <entry name="alternativeSource" type="String">
+      <default>metno</default>
+    </entry>
+    <!-- Whether the alternative forecast is the one in use (the source button). -->
+    <entry name="alternativeActive" type="Bool">
+      <default>false</default>
+    </entry>
+    <!-- Deprecated: which weather API supplied the forecast, "openmeteo" or "metno",
+         switched by the header's source button; alternativeActive replaced it, with
+         MET Norway as the alternative. Read once at startup to carry "metno" over,
+         then cleared; to be removed, with that carry-over, a release or two on. -->
     <entry name="weatherProvider" type="String">
       <default>openmeteo</default>
     </entry>
-    <!-- The forecast model Open-Meteo is asked for, by its models= name, from the
-         list in providers/OpenMeteo.qml (Settings → General). best_match is
-         Open-Meteo's own pick for the location; whatever another model leaves out is
-         filled in from it. Only read while Open-Meteo is the provider. -->
+    <!-- Deprecated: the Open-Meteo model forecastSource replaced. Read once at
+         startup to carry it over, then cleared; to be removed, with that carry-over,
+         a release or two on. -->
     <entry name="openMeteoModel" type="String">
       <default>best_match</default>
     </entry>

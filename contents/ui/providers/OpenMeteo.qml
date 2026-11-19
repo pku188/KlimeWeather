@@ -77,8 +77,9 @@ QtObject {
     readonly property bool conditional: false
 
     // ── The forecast model ──
-    // Which of Open-Meteo's models to forecast with (Settings → General), by its
-    // models= name. best_match is Open-Meteo's own pick for the location: the
+    // Which of Open-Meteo's models to forecast with (the forecast in use, see
+    // main.qml's sourceId), by its models= name. best_match is Open-Meteo's own
+    // pick for the location: the
     // default, asked for with no models= at all, so its requests stay as they always
     // were. A name not in the list below (a hand-edited config) counts as best_match,
     // as Open-Meteo turns away a request naming a model it doesn't know.
@@ -86,28 +87,35 @@ QtObject {
     // The models offered: Open-Meteo's pick, ECMWF's worldwide model, then the
     // national weather services', by country. Most national ones are "seamless": the
     // service's fine model in and around its country, blended with a global one
-    // beyond its area and past its range.
+    // beyond its area and past its range. Each is { id, name, text }: the models=
+    // name, the service as the header's source button shows it (Best match:
+    // Open-Meteo itself), and the model as the settings list it.
     readonly property var models: [
-        { id: "best_match",                 text: i18n("Best match") },
-        { id: "ecmwf_ifs",                  text: modelLabel("ECMWF", i18n("worldwide")) },
-        { id: "geosphere_seamless",         text: modelLabel("GeoSphere", i18n("Austria")) },
-        { id: "gem_seamless",               text: modelLabel("GEM", i18n("Canada")) },
-        { id: "cma_grapes_global",          text: modelLabel("CMA", i18n("China")) },
-        { id: "chmi_aladin_seamless",       text: modelLabel("CHMI", i18n("Czechia")) },
-        { id: "dmi_seamless",               text: modelLabel("DMI", i18n("Denmark")) },
-        { id: "meteofrance_seamless",       text: modelLabel("Météo-France", i18n("France")) },
-        { id: "dwd_icon_seamless",          text: modelLabel("DWD ICON", i18n("Germany")) },
-        { id: "italia_meteo_arpae_icon_2i", text: modelLabel("ItaliaMeteo", i18n("Italy")) },
-        { id: "jma_seamless",               text: modelLabel("JMA", i18n("Japan")) },
-        { id: "knmi_seamless",              text: modelLabel("KNMI", i18n("Netherlands")) },
-        { id: "metno_seamless",             text: modelLabel("MET Norway", i18n("Nordic countries")) },
-        { id: "meteoswiss_icon_seamless",   text: modelLabel("MeteoSwiss", i18n("Switzerland")) },
-        { id: "ukmo_seamless",              text: modelLabel("Met Office", i18n("United Kingdom")) },
-        { id: "ncep_gfs_seamless",          text: modelLabel("NOAA GFS", i18n("United States")) }
+        { id: "best_match", name: displayName, text: i18n("Best match") },
+        model("ecmwf_ifs",                  "ECMWF",        i18n("worldwide")),
+        model("geosphere_seamless",         "GeoSphere",    i18n("Austria")),
+        model("gem_seamless",               "GEM",          i18n("Canada")),
+        model("cma_grapes_global",          "CMA",          i18n("China")),
+        model("chmi_aladin_seamless",       "CHMI",         i18n("Czechia")),
+        model("dmi_seamless",               "DMI",          i18n("Denmark")),
+        model("meteofrance_seamless",       "Météo-France", i18n("France")),
+        model("dwd_icon_seamless",          "DWD ICON",     i18n("Germany")),
+        model("italia_meteo_arpae_icon_2i", "ItaliaMeteo",  i18n("Italy")),
+        model("jma_seamless",               "JMA",          i18n("Japan")),
+        model("knmi_seamless",              "KNMI",         i18n("Netherlands")),
+        // named by where it comes from rather than its area, to tell it from MET
+        // Norway's own forecast, listed after it as "MET Norway (direct)"
+        { id: "metno_seamless", name: "MET Norway",
+          text: i18nc("@item:inlistbox MET Norway's forecast as Open-Meteo serves it, as opposed to fetched from MET Norway itself",
+                      "MET Norway (via Open-Meteo)") },
+        model("meteoswiss_icon_seamless",   "MeteoSwiss",   i18n("Switzerland")),
+        model("ukmo_seamless",              "Met Office",   i18n("United Kingdom")),
+        model("ncep_gfs_seamless",          "NOAA GFS",     i18n("United States"))
     ]
-    function modelLabel(service, area) {
-        return i18nc("@item:inlistbox a weather service, then the area its forecast model is made for",
-                     "%1 (%2)", service, area);
+    function model(id, service, area) {
+        return { id: id, name: service,
+                 text: i18nc("@item:inlistbox a weather service, then the area its forecast model is made for",
+                             "%1 (%2)", service, area) };
     }
     // the model to ask for by name; "" for Open-Meteo's own pick
     readonly property string chosenModel: {

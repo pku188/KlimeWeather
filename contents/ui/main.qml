@@ -19,6 +19,7 @@ import org.kde.notification
 import "wheel.js" as Wheel
 import "providers"
 import "providers/grid.js" as Grid
+import "providers/sources.js" as Sources
 import "../icons/meteocons/readings/monochrome.js" as MonoReadings
 import "../icons/meteocons/readings/line.js" as LineReadings
 import "../icons/meteocons/readings/flat.js" as FlatReadings
@@ -1444,30 +1445,52 @@ PlasmoidItem {
     // none of the icon/condition machinery, knows a provider exists.
     OpenMeteo {
         id: openMeteoProvider
-        forecastModel: Plasmoid.configuration.openMeteoModel
+        // the model of the forecast in use (Best match while it is MET Norway's own)
+        forecastModel: root.providerId === "openmeteo" ? root.sourceId : "best_match"
     }
     MetNo     { id: metNoProvider }
 
     readonly property var providers: ({ "openmeteo": openMeteoProvider, "metno": metNoProvider })
-    readonly property string providerId: providers[Plasmoid.configuration.weatherProvider]
-                                         ? Plasmoid.configuration.weatherProvider : "openmeteo"
+
+    // ── The forecast in use ──
+    // General settings choose two forecasts, the default and an alternative, each one
+    // of Open-Meteo's models or MET Norway's own forecast (sources.js); the header's
+    // source button switches between them (alternativeActive). An unknown default
+    // (a hand-edited config) is Best match; an unknown alternative, or the default
+    // again, is none, and the button then doesn't switch.
+    readonly property var sourceList: Sources.list(openMeteoProvider.models, metNoProvider.source)
+    readonly property string defaultSourceId: Sources.find(sourceList, Plasmoid.configuration.forecastSource)
+                                              ? Plasmoid.configuration.forecastSource : "best_match"
+    readonly property string alternativeSourceId: {
+        var a = Plasmoid.configuration.alternativeSource;
+        return a !== defaultSourceId && Sources.find(sourceList, a) ? a : "";
+    }
+    readonly property bool hasAlternative: alternativeSourceId !== ""
+    readonly property string sourceId: hasAlternative && Plasmoid.configuration.alternativeActive
+                                       ? alternativeSourceId : defaultSourceId
+    readonly property var source: Sources.find(sourceList, sourceId)
+    // the forecast the button switches to, null when it doesn't
+    readonly property var otherSource: hasAlternative
+        ? Sources.find(sourceList, sourceId === defaultSourceId ? alternativeSourceId : defaultSourceId)
+        : null
+    // the provider that fetches it
+    readonly property string providerId: source && providers[source.provider] ? source.provider : "openmeteo"
     readonly property var provider: providers[providerId]
-    // Toggle order for the header button — the switch walks this list, so a third
-    // provider joins the rotation by being added here and to the registry above.
-    readonly property var providerOrder: ["openmeteo", "metno"]
+    function toggleProvider() {
+        if (hasAlternative)
+            Plasmoid.configuration.alternativeActive = !Plasmoid.configuration.alternativeActive;
+    }
+    // A new default forecast, chosen in the settings, is the one to show; and with no
+    // alternative left, none is in use, so a new one doesn't come in already switched to.
+    onDefaultSourceIdChanged: if (Plasmoid.configuration.alternativeActive) Plasmoid.configuration.alternativeActive = false
+    onHasAlternativeChanged: if (!hasAlternative && Plasmoid.configuration.alternativeActive)
+                                 Plasmoid.configuration.alternativeActive = false
+    // Another forecast in use: show the one it had last at once, then fetch. (Later,
+    // so the provider and its model have followed it.)
+    onSourceIdChanged: Qt.callLater(root._sourceChanged)
     // The header's location button. Location is the first settings page, which is
     // where the dialog opens.
     function openLocationSettings() { Plasmoid.internalAction("configure").trigger(); }
-    function toggleProvider() {
-        var i = providerOrder.indexOf(providerId);
-        Plasmoid.configuration.weatherProvider = providerOrder[(i + 1) % providerOrder.length];
-    }
-    // Name of the provider the button would switch TO — for its tooltip.
-    readonly property string nextProviderName: {
-        var i = providerOrder.indexOf(providerId);
-        var next = providers[providerOrder[(i + 1) % providerOrder.length]];
-        return next ? next.displayName : "";
-    }
 
     // ── The location's UTC offset ─────────────────────────────────────────
     // Open-Meteo reports it in every response; met.no has no notion of timezone
@@ -1625,8 +1648,39 @@ PlasmoidItem {
         // The days are in the key even where the URL lacks them (met.no's): parsed
         // for another count, the data held is not this request's, so it must not be
         // revalidated into a 304 that keeps it.
-        return { provider: p, ctx: ctx, url: url,
+        return { provider: p, ctx: ctx, url: url, source: root.sourceId,
                  cacheKey: p.providerId + "|" + url + "|" + ctx.forecastDays + "d" };
+    }
+
+    // The forecast each source had last, by source id: { key, raw, fetched }, its
+    // request's cacheKey, the unconverted model and when it was fetched (or last
+    // confirmed by a 304). Switching to a source shows its own at once rather than the
+    // other one's under its name while it loads — the offline cache holds only the
+    // last response. Kept for this session only.
+    property var _heldForecasts: ({})
+    function _holdForecast(plan, raw, fetchedMs) {
+        _heldForecasts[plan.source] = { key: plan.cacheKey, raw: raw, fetched: fetchedMs };
+    }
+    // Another forecast is in use (the source button, or the settings): show what it had
+    // last, if that was for this same request and isn't too old to be any use, then
+    // fetch it. A copy older than the refresh interval shows the forecast for the hour
+    // it is now, as a restored one does, and is marked as old as it is.
+    function _sourceChanged() {
+        var plan = _requestPlan();
+        if (!plan) return;
+        // the fetch at startup may already be on its way for it
+        if (root._wxhr && root._wxhr.readyState !== XMLHttpRequest.DONE && root._fetchingKey === plan.cacheKey)
+            return;
+        var held = _heldForecasts[plan.source];
+        var age = held ? Date.now() - held.fetched : Infinity;
+        if (held && held.key === plan.cacheKey && age < cacheMaxAgeMs
+                && (age < root.refreshMinutes * 60000 || _currentFromForecast(held.raw))) {
+            root._rawWeather = held.raw;
+            root.applyWeather(root.convertUnits(held.raw));
+            root.lastGoodFetch = held.fetched;
+            root._loadedKey = plan.cacheKey;   // what the model holds now (see _loadedKey)
+        }
+        fetchWeather();
     }
 
     function fetchWeather() {
@@ -1639,7 +1693,13 @@ PlasmoidItem {
         // boot probe (below) re-fires on its OWN schedule whether or not the
         // previous attempt's callbacks ever returned, so without this an attempt
         // hung on a half-up route would leak one socket per probe tick.
-        if (root._wxhr) { try { root._wxhr.abort(); } catch (e) {} }
+        // Quietly: its abort ends it with HTTP 0, which it would take for a failure,
+        // and clear `loading` while this one is still on its way.
+        if (root._wxhr) {
+            root._wxhr.onreadystatechange = null;
+            root._wxhr.ontimeout = null;
+            try { root._wxhr.abort(); } catch (e) {}
+        }
         var xhr = new XMLHttpRequest();
         root._wxhr = xhr;
         // Belt-and-suspenders fast-fail. At login the interface can be up while
@@ -1660,6 +1720,7 @@ PlasmoidItem {
         xhr.timeout = 8000;
         xhr.ontimeout = function () { failWeather("timeout"); };
         var cacheKey = plan.cacheKey;
+        root._fetchingKey = cacheKey;
         xhr.onreadystatechange = function () {
             if (xhr.readyState !== XMLHttpRequest.DONE || done) return;
             // 304: our copy is still the current forecast. Nothing to parse — just
@@ -1672,6 +1733,8 @@ PlasmoidItem {
                 root._probeUntilOk = false;
                 root.lastGoodFetch = Date.now();
                 root._touchCache(cacheKey, root.lastGoodFetch);
+                var held = root._heldForecasts[plan.source];
+                if (held && held.key === cacheKey) held.fetched = root.lastGoodFetch;
                 return;
             }
             if (xhr.status !== 200) {
@@ -1696,6 +1759,7 @@ PlasmoidItem {
                     if (lm) root._lastModified[cacheKey] = lm;
                 }
                 root._saveCache(cacheKey, xhr.responseText, root.lastGoodFetch, lm);
+                root._holdForecast(plan, root._rawWeather, root.lastGoodFetch);
                 // good data — weatherCode is now ≥ 0, so the boot probe stops
             } catch (e) {
                 root.fetchFailing = true;
@@ -2501,6 +2565,21 @@ PlasmoidItem {
         if (c.panelDisplay !== c.panelDisplayDefault) c.panelDisplay = c.panelDisplayDefault;
         if (c.panelDetailed !== c.panelDetailedDefault) c.panelDetailed = c.panelDetailedDefault;
         if (c.panelSecondLine !== c.panelSecondLineDefault) c.panelSecondLine = c.panelSecondLineDefault;
+        // The forecast: the Open-Meteo model becomes the default forecast, and MET
+        // Norway, which the source button used to switch to, stays the alternative —
+        // in use if it was. Neither older setting shipped with another default, so
+        // here the default means never chosen. (The default forecast first: a new one
+        // makes it the forecast in use, see onDefaultSourceIdChanged.)
+        if (c.openMeteoModel !== c.openMeteoModelDefault) {
+            if (c.forecastSource === c.forecastSourceDefault)
+                c.forecastSource = c.openMeteoModel;
+            c.openMeteoModel = c.openMeteoModelDefault;
+        }
+        if (c.weatherProvider !== c.weatherProviderDefault) {
+            if (c.weatherProvider === "metno")
+                c.alternativeActive = true;
+            c.weatherProvider = c.weatherProviderDefault;
+        }
         // Each layout used to keep its own day count. When any was set, carry the
         // count of the layout in use over to Forecast days, unless that was already
         // set (it is then left as it is). Forecast days never shipped with another
@@ -2604,6 +2683,8 @@ PlasmoidItem {
     // would answer 304 and leave the widget showing the wrong source's forecast
     // under the new name. Only send If-Modified-Since when this matches.
     property string _loadedKey: ""
+    // the request _wxhr is for (see _sourceChanged)
+    property string _fetchingKey: ""
     property int _bootProbes: 0
     // Armed by the resume-from-suspend detector. Waking up is the boot case all over
     // again — the wifi is still reassociating, so the refetch hits the same half-up
@@ -2634,12 +2715,6 @@ PlasmoidItem {
         target: Plasmoid.configuration
         function onLatitudeChanged()        { root.fetchWeather(); root.weatherAlerts = []; alertsDebounce.restart(); }
         function onLongitudeChanged()       { root.fetchWeather(); root.weatherAlerts = []; alertsDebounce.restart(); }
-        function onWeatherProviderChanged() { root.fetchWeather(); }
-        // only Open-Meteo's requests name a model; fetched once the provider above
-        // has taken the new one
-        function onOpenMeteoModelChanged() {
-            if (root.providerId === "openmeteo") Qt.callLater(root.fetchWeather);
-        }
         // the offset feeds straight into a met.no request — a new zone means the
         // forecast has to be rebuilt on the new clock
         function onLocationTimezoneChanged() { root.fetchWeather(); }

@@ -1,5 +1,5 @@
 /*
- * General settings — units and refresh.
+ * General settings — the forecasts, units and refresh.
  * (Location → configLocation.qml; forecast days, graph detail and the per-layout
  *  header-info pickers → configAppearance.qml, inside the layout tabs.)
  * Copyright 2026  pku188, bvlthvzvr — SPDX-License-Identifier: GPL-2.0-or-later
@@ -10,6 +10,7 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasmoid
 import "providers"
+import "providers/sources.js" as Sources
 
 ScrollView {
     id: page
@@ -28,11 +29,17 @@ ScrollView {
     property string cfg_precipUnit
     property int    cfg_clockFormat           // -1 never chosen: the system's
     property int    cfg_detailDayStartHour
-    property string cfg_openMeteoModel
+    property string cfg_forecastSource
+    property string cfg_alternativeSource
     property alias  cfg_forecastDays: forecastDaysSpin.value
 
-    // Open-Meteo's forecast models, as its provider lists them
+    // The forecasts to choose from, as the widget lists them (providers/sources.js),
+    // the same in both lists whatever the other holds; the alternative's with None
+    // first. The default again works as None: the widget then doesn't switch.
     readonly property OpenMeteo openMeteo: OpenMeteo {}
+    readonly property MetNo metNo: MetNo {}
+    readonly property var sources: Sources.list(openMeteo.models, metNo.source)
+    readonly property var alternativeSources: [{ id: "none", text: i18n("None") }].concat(sources)
 
     // What "Follow system" resolves to, shown in its brackets. The same rules as
     // main.qml's units, windUnitApi, pressureUnitApi, precipImperial and use24Hour —
@@ -77,7 +84,8 @@ ScrollView {
     }
     // the lists pick their entry from cfg_ values only when asked
     function syncControls() {
-        modelCombo.sync();
+        forecastCombo.sync();
+        alternativeCombo.sync();
         alertLevelCombo.sync();
         unitCombo.sync();
         windUnitCombo.sync();
@@ -111,18 +119,31 @@ ScrollView {
             stepSize: 5
         }
         ConfigComboBox {
-            id: modelCombo
-            Kirigami.FormData.label: i18n("Open-Meteo model:")
+            id: forecastCombo
+            Kirigami.FormData.label: i18n("Default forecast:")
             textRole: "text"
-            model: page.openMeteo.models
+            model: page.sources
             function sync() {
                 currentIndex = 0;   // Best match, also for a name no longer listed
                 for (var i = 0; i < model.length; ++i)
-                    if (model[i].id === page.cfg_openMeteoModel) { currentIndex = i; break; }
+                    if (model[i].id === page.cfg_forecastSource) { currentIndex = i; break; }
             }
             Component.onCompleted: sync()
-            onActivated: page.cfg_openMeteoModel = model[currentIndex].id
-            ToolTip.text: i18n("The forecast model Open-Meteo uses. Best match picks the best models for your location. A national weather service's model can be more precise in and around its country. Whatever a model doesn't forecast, such as the UV index, the days beyond its range or places outside its area, is filled in from Best match. Used while Open-Meteo is the weather source.")
+            onActivated: page.cfg_forecastSource = model[currentIndex].id
+        }
+        ConfigComboBox {
+            id: alternativeCombo
+            Kirigami.FormData.label: i18n("Alternative forecast:")
+            textRole: "text"
+            model: page.alternativeSources
+            function sync() {
+                currentIndex = 0;   // None, also for a name no longer listed
+                for (var i = 0; i < model.length; ++i)
+                    if (model[i].id === page.cfg_alternativeSource) { currentIndex = i; break; }
+            }
+            Component.onCompleted: sync()
+            onActivated: page.cfg_alternativeSource = model[currentIndex].id
+            ToolTip.text: i18n("The forecast the source button in the widget switches to, and back. None keeps the button from switching.")
         }
         RowLayout {
             Kirigami.FormData.label: i18n("Weather alerts:")
