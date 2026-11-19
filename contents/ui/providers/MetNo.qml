@@ -53,6 +53,14 @@ QtObject {
     readonly property string userAgent: "KlimeWeather/1.0.0 (+https://github.com/pku188/KlimeWeather)"
     readonly property var requestHeaders: [["User-Agent", userAgent]]
 
+    // MET Norway's own forecast among the forecasts the widget can show (sources.js),
+    // named apart from Open-Meteo's copy of it, which differs
+    readonly property var source: ({
+        id: "metno", provider: providerId, name: displayName,
+        text: i18nc("@item:inlistbox MET Norway's forecast, fetched from MET Norway itself rather than through Open-Meteo",
+                    "MET Norway (direct)")
+    })
+
     // Ask the lifecycle for If-Modified-Since / Expires handling (met.no terms).
     readonly property bool conditional: true
 
