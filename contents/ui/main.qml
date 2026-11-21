@@ -2944,19 +2944,43 @@ PlasmoidItem {
             return root.expanded && Date.now() - _openedMs > 600;
         }
 
+        // Plasma's echo of the size asked for. Until Plasma reads back a popup size of
+        // its own (it saves one on every close, but reads it only when plasmashell
+        // starts, so all through the first session after the widget is added), it
+        // sizes the popup to Layout.preferredWidth/Height: the content plus its frame's
+        // margins as they are with the border on the panel's side, which it then takes
+        // off, so the content comes back a pixel larger than asked for. Taken for a
+        // drag, followed (_followDrag) and saved (captureSize), that size was asked
+        // for in turn and came back a pixel larger again: the popup grew without end,
+        // about 40 px a second, until it reached the screen's edge. So a size within
+        // _echoSlack of the one asked for is Plasma's: no drag, and the size asked for
+        // is the one to save. A drag still moving the edge by less than that is
+        // followed as soon as it moves it further.
+        readonly property int _echoSlack: 2
+        function _near(a, b) { return b > 0 && Math.abs(a - b) <= _echoSlack; }
+        function _isEcho() {
+            return _near(width, Layout.preferredWidth) && _near(height, Layout.preferredHeight);
+        }
+
         function captureSize() {
             if (_applying || fullRep.width <= 0 || fullRep.height <= 0) return;
             if (root.planar) return;   // desktop auto-fits to content; nothing to capture
             if (!_userCanResize()) return;
-            if (shownLayout === "graph") {
-                Plasmoid.configuration.simplePopupWidth  = Math.round(fullRep.width);
-                Plasmoid.configuration.simplePopupHeight = Math.round(fullRep.height);
-            } else if (shownLayout === "details") {
-                Plasmoid.configuration.detailedViewPopupWidth  = Math.round(fullRep.width);
-                Plasmoid.configuration.detailedViewPopupHeight = Math.round(fullRep.height);
-            } else {
-                Plasmoid.configuration.detailPopupWidth  = Math.round(fullRep.width);
-                Plasmoid.configuration.detailPopupHeight = Math.round(fullRep.height);
+            // the size asked for, where Plasma gave back its echo of it (see _echoSlack)
+            var w = Math.round(fullRep.width), h = Math.round(fullRep.height);
+            if (_near(w, Layout.preferredWidth))  w = Math.round(Layout.preferredWidth);
+            if (_near(h, Layout.preferredHeight)) h = Math.round(Layout.preferredHeight);
+            if (w !== savedW || h !== savedH) {
+                if (shownLayout === "graph") {
+                    Plasmoid.configuration.simplePopupWidth  = w;
+                    Plasmoid.configuration.simplePopupHeight = h;
+                } else if (shownLayout === "details") {
+                    Plasmoid.configuration.detailedViewPopupWidth  = w;
+                    Plasmoid.configuration.detailedViewPopupHeight = h;
+                } else {
+                    Plasmoid.configuration.detailPopupWidth  = w;
+                    Plasmoid.configuration.detailPopupHeight = h;
+                }
             }
             _dragW = 0;   // the saved size has caught up with the drag
             _dragH = 0;
@@ -2969,9 +2993,10 @@ PlasmoidItem {
         property double _lastDragMs: 0
         // A non-self WIDTH change is a user drag → latch "manual" so auto-fit-to-tabs
         // stops overriding their chosen width (Simple layout only; cleared on a day-
-        // count change). Height drags don't disable width auto-fit.
+        // count change). Height drags don't disable width auto-fit. Neither is
+        // Plasma's echo of the size asked for (see _echoSlack).
         onWidthChanged:  {
-            if (!_applying && _userCanResize()) {
+            if (!_applying && _userCanResize() && !_isEcho()) {
                 _lastDragMs = Date.now();
                 // a moment later: Plasma resizes the popup as the implicit width
                 // changes, and taking the width from inside that resize re-entered it
@@ -2981,7 +3006,7 @@ PlasmoidItem {
             captureTimer.restart();
         }
         onHeightChanged: {
-            if (!_applying && _userCanResize()) {
+            if (!_applying && _userCanResize() && !_isEcho()) {
                 _lastDragMs = Date.now();
                 Qt.callLater(fullRep._followDrag);
             }
